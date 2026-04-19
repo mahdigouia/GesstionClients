@@ -4,7 +4,7 @@ import { format, differenceInDays } from 'date-fns';
 export class AnalysisService {
   static analyzeDebts(debts: ClientDebt[]): AnalysisResult {
     const totalDebts = debts.reduce((sum, debt) => sum + debt.amount, 0);
-    const totalPaid = debts.reduce((sum, debt) => sum + debt.paid, 0);
+    const totalPaid = debts.reduce((sum, debt) => sum + debt.settlement, 0);
     const totalBalance = debts.reduce((sum, debt) => sum + debt.balance, 0);
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
 
@@ -46,7 +46,7 @@ export class AnalysisService {
 
     debts.forEach(debt => {
       if (debt.balance > 0) {
-        const range = agingRanges.find(r => debt.agingDays >= r.min && debt.agingDays <= r.max);
+        const range = agingRanges.find(r => debt.age >= r.min && debt.age <= r.max);
         if (range) {
           range.count++;
           range.amount += debt.balance;
@@ -94,7 +94,7 @@ export class AnalysisService {
           id: `alert_${alertId++}`,
           type: 'critical_debt',
           clientName: debt.clientName,
-          message: `Créance critique de ${debt.balance.toFixed(2)}€ (${debt.agingDays} jours)`,
+          message: `Créance critique de ${debt.balance.toFixed(2)} TND (${debt.age} jours)`,
           severity: 'high',
           recommendation: 'Action immédiate requise - Contact téléphonique et mise en demeure'
         });
@@ -110,7 +110,7 @@ export class AnalysisService {
             id: `alert_${alertId++}`,
             type: 'frequent_delays',
             clientName: client.clientName,
-            message: `${clientDebts.length} factures en retard pour un total de ${client.totalBalance.toFixed(2)}€`,
+            message: `${clientDebts.length} factures en retard pour un total de ${client.totalBalance.toFixed(2)} TND`,
             severity: 'high',
             recommendation: 'Suspendre les livraisons et négocier un plan de paiement'
           });
@@ -119,13 +119,13 @@ export class AnalysisService {
 
     // Alertes pour créances anciennes
     debts
-      .filter(debt => debt.agingDays > 730 && debt.balance > 0) // Plus de 2 ans
+      .filter(debt => debt.age > 730 && debt.balance > 0) // Plus de 2 ans
       .forEach(debt => {
         alerts.push({
           id: `alert_${alertId++}`,
           type: 'old_debt',
           clientName: debt.clientName,
-          message: `Créance très ancienne (${Math.floor(debt.agingDays / 365)} ans) de ${debt.balance.toFixed(2)}€`,
+          message: `Créance très ancienne (${Math.floor(debt.age / 365)} ans) de ${debt.balance.toFixed(2)} TND`,
           severity: 'medium',
           recommendation: 'Évaluer la possibilité de recouvrement juridique ou provision'
         });
@@ -133,15 +133,15 @@ export class AnalysisService {
 
     // Alertes pour paiements partiels
     debts
-      .filter(debt => debt.paid > 0 && debt.paid < debt.amount && debt.balance > 0)
+      .filter(debt => debt.settlement > 0 && debt.settlement < debt.amount && debt.balance > 0)
       .forEach(debt => {
-        const paymentRate = (debt.paid / debt.amount) * 100;
+        const paymentRate = (debt.settlement / debt.amount) * 100;
         if (paymentRate < 50) {
           alerts.push({
             id: `alert_${alertId++}`,
             type: 'partial_payment',
             clientName: debt.clientName,
-            message: `Paiement partiel de ${paymentRate.toFixed(1)}% (${debt.paid.toFixed(2)}€/${debt.amount.toFixed(2)}€)`,
+            message: `Paiement partiel de ${paymentRate.toFixed(1)}% (${debt.settlement.toFixed(2)} TND/${debt.amount.toFixed(2)} TND)`,
             severity: 'medium',
             recommendation: 'Contacter le client pour comprendre les raisons du paiement partiel'
           });

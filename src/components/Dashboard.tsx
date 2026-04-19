@@ -45,10 +45,10 @@ export function Dashboard({ analysis }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analysis.totalDebts.toFixed(2)}€
+              {analysis.totalDebts.toFixed(2)} TND
             </div>
             <p className="text-xs text-muted-foreground">
-              {analysis.totalBalance.toFixed(2)}€ en attente
+              {analysis.totalBalance.toFixed(2)} TND en attente
             </p>
           </CardContent>
         </Card>
@@ -60,9 +60,9 @@ export function Dashboard({ analysis }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analysis.recoveryRate.toFixed(1)}%
+              {isNaN(analysis.recoveryRate) ? '0.0' : analysis.recoveryRate.toFixed(1)}%
             </div>
-            <Progress value={analysis.recoveryRate} className="mt-2" />
+            <Progress value={isNaN(analysis.recoveryRate) ? 0 : Math.min(analysis.recoveryRate, 100)} className="mt-2" />
           </CardContent>
         </Card>
 

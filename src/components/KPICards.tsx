@@ -24,7 +24,7 @@ export function KPICards({ totalDebts, totalBalance, criticalDebts, recoveryRate
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-gray-900">
-            {totalDebts.toLocaleString('fr-FR')}€
+            {totalDebts.toLocaleString('fr-FR')} TND
           </div>
           <p className="text-xs text-gray-500 mt-1">
             {clientCount} clients
@@ -42,7 +42,7 @@ export function KPICards({ totalDebts, totalBalance, criticalDebts, recoveryRate
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-red-600">
-            {totalBalance.toLocaleString('fr-FR')}€
+            {totalBalance.toLocaleString('fr-FR')} TND
           </div>
           <p className="text-xs text-gray-500 mt-1">
             {criticalDebts} critiques
@@ -60,13 +60,13 @@ export function KPICards({ totalDebts, totalBalance, criticalDebts, recoveryRate
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold text-gray-900">
-            {recoveryRate.toFixed(1)}%
+            {isNaN(recoveryRate) ? '0.0' : recoveryRate.toFixed(1)}%
           </div>
           <p className="text-xs text-gray-500 mt-1">
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
               <div 
                 className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${recoveryRate}%` }}
+                style={{ width: `${isNaN(recoveryRate) ? 0 : Math.min(recoveryRate, 100)}%` }}
               />
             </div>
           </p>
