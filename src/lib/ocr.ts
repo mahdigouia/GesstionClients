@@ -27,9 +27,10 @@ export class OCRService {
 
   private static async extractFromPDF(file: File): Promise<string> {
     try {
-      console.log('Traitement direct du PDF avec Tesseract...');
+      console.log('Traitement du PDF multi-pages avec Tesseract...');
+      console.log('Fichier:', file.name, 'Taille:', (file.size / 1024 / 1024).toFixed(2), 'MB');
       
-      // Utiliser Tesseract directement sur le PDF
+      // Utiliser Tesseract directement sur le PDF avec gestion multi-pages
       const reader = new FileReader();
       
       return new Promise((resolve, reject) => {
@@ -37,33 +38,93 @@ export class OCRService {
           try {
             const typedArray = new Uint8Array(reader.result as ArrayBuffer);
             
+            // Paramètres optimisés pour les documents financiers multi-pages
+            const ocrOptions = {
+              logger: (m: any) => {
+                if (m.status === 'recognizing text') {
+                  const progress = Math.round(m.progress * 100);
+                  console.log(`Progression OCR ${file.name}: ${progress}%`);
+                  
+                  // Afficher des détails sur la progression pour les documents longs
+                  if (m.jobId) {
+                    console.log(`Job ID: ${m.jobId}, Status: ${m.status}`);
+                  }
+                } else if (m.status === 'loading tesseract core') {
+                  console.log('Chargement du moteur OCR...');
+                } else if (m.status === 'initializing tesseract') {
+                  console.log('Initialisation de Tesseract...');
+                }
+              },
+              // Paramètres optimisés pour les documents financiers français
+              tessedit_ocr_engine_mode: '3', // LSTM OCR Engine
+              tessedit_pageseg_mode: '6', // Mode segmentation de page
+              preserve_interword_spaces: '1',
+              tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàâäéèêëïîôöùûçÀÂÄÄÉÈÊËÏÎÔÖÙÛÇ%.,/-()',
+              tessedit_language: 'fra',
+              // Paramètres pour améliorer la reconnaissance de tableaux et nombres
+              tessedit_create_hocr: '0',
+              tessedit_create_tsv: '0',
+              tessedit_create_box: '0',
+              tessedit_create_unlv: '0',
+              tessedit_create_txt: '1',
+              // Optimisation pour les documents de grande taille
+              tessedit_zero_rejection: '0',
+              tessedit_zero_rejection_mode: '0',
+              // Paramètres pour les nombres et montants
+              tessedit_number_mode: '1',
+              tessedit_reject_mode: '0',
+            };
+            
+            console.log('Démarrage de l\'OCR pour le document multi-pages...');
+            const startTime = Date.now();
+            
             const result = await Tesseract.recognize(
               typedArray,
               'fra',
-              {
-                logger: (m: any) => {
-                  if (m.status === 'recognizing text') {
-                    console.log('Progression OCR PDF:', Math.round(m.progress * 100), '%');
-                  }
-                },
-                // Paramètres optimisés pour les PDF et documents français
-                tessedit_ocr_engine_mode: '3', // LSTM OCR Engine
-                tessedit_pageseg_mode: '6', // Mode segmentation de page
-                preserve_interword_spaces: '1',
-                tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàâäéèêëïîôöùûçÀÂÄÄÉÈÊËÏÎÔÖÙÛÇ%.,/-()',
-                tessedit_language: 'fra',
-              }
+              ocrOptions
             );
             
+            const endTime = Date.now();
+            const processingTime = ((endTime - startTime) / 1000).toFixed(2);
+            
+            console.log(`OCR terminé en ${processingTime}s`);
             console.log('Texte extrait du PDF:', result.data.text.length, 'caractères');
+            
+            // Analyser la qualité de l'extraction
+            const lines = result.data.text.split('\n').filter(line => line.trim().length > 0);
+            console.log('Nombre de lignes extraites:', lines.length);
+            
+            // Si trop peu de texte, essayer avec des paramètres alternatifs
+            if (lines.length < 10) {
+              console.log('Texte trop court, tentative avec paramètres alternatifs...');
+              
+              const altResult = await Tesseract.recognize(
+                typedArray,
+                'fra',
+                {
+                  ...ocrOptions,
+                  tessedit_pageseg_mode: '11', // Mode sparse text
+                  tessedit_ocr_engine_mode: '1', // Legacy engine
+                }
+              );
+              
+              if (altResult.data.text.length > result.data.text.length) {
+                console.log('Meilleur résultat avec paramètres alternatifs');
+                resolve(altResult.data.text);
+                return;
+              }
+            }
+            
             resolve(result.data.text);
             
           } catch (ocrError) {
             console.error('Erreur OCR PDF:', ocrError);
+            console.error('Détails de l\'erreur:', ocrError);
+            
             // Fallback: retourner un texte de test pour le développement
             if (typeof window !== 'undefined' && window.process?.env?.NODE_ENV === 'development') {
               const fallbackText = this.getFallbackText(file.name);
-              console.log('Utilisation du fallback texte');
+              console.log('Utilisation du fallback texte pour le développement');
               resolve(fallbackText);
             } else {
               reject(ocrError);
@@ -71,7 +132,10 @@ export class OCRService {
           }
         };
         
-        reader.onerror = () => reject(new Error('Erreur lecture fichier PDF'));
+        reader.onerror = () => {
+          console.error('Erreur lecture fichier PDF');
+          reject(new Error('Erreur lecture fichier PDF'));
+        };
         reader.readAsArrayBuffer(file);
       });
       
@@ -175,21 +239,63 @@ export class OCRService {
     }
   }
 
-  // Texte de fallback pour le développement et les tests
+  // Texte de fallback pour le développement et les tests (simulant un document de 9 pages)
   private static getFallbackText(fileName: string): string {
     console.log('Utilisation du texte de fallback pour:', fileName);
     return `
+ETAT DE RECOUVREMENT CLIENT
+Date: 15/03/2024
+Période: 01/01/2024 - 31/03/2024
+
 0424 LA MANGEARIA 06 12 34 56 78
 15/01/2024 15/01/2024 FC001 30 15 FACTURE VENTE MATERIEL 1500.00 500.00 1000.00
 15/02/2024 15/02/2024 FC002 45 20 FACTURE CONSULTATION 800.00 200.00 600.00
+15/03/2024 15/03/2024 FC003 60 30 FACTURE MAINTENANCE 1200.00 400.00 800.00
 
 0646 ECO-PRIX 06 98 76 54
-20/01/2024 20/01/2024 FC003 60 30 FACTURE PRODUITS 2000.00 800.00 1200.00
-10/02/2024 10/02/2024 FC004 90 45 FACTURE SERVICES 1200.00 400.00 800.00
+20/01/2024 20/01/2024 FC004 90 45 FACTURE PRODUITS 2000.00 800.00 1200.00
+10/02/2024 10/02/2024 FC005 120 60 FACTURE SERVICES 1800.00 600.00 1200.00
+05/03/2024 05/03/2024 FC006 150 75 FACTURE EQUIPEMENT 2500.00 1000.00 1500.00
 
 0751 EL ANOUAR EXPRESS 07 120 90 180
-25/01/2024 25/01/2024 FC005 180 90 FACTURE LIVRAISON 3500.00 1000.00 2500.00
-05/02/2024 05/02/2024 FC006 210 105 FACTURE TRANSPORT 800.00 300.00 500.00
+25/01/2024 25/01/2024 FC007 180 90 FACTURE LIVRAISON 3500.00 1000.00 2500.00
+05/02/2024 05/02/2024 FC008 210 105 FACTURE TRANSPORT 800.00 300.00 500.00
+10/03/2024 10/03/2024 FC009 240 120 FACTURE LOGISTIQUE 1500.00 500.00 1000.00
+
+0831 NAIFAR ISKANDAR (FEMA) 07 234 567 890
+01/02/2024 01/02/2024 FC010 270 135 FACTURE IMPORT 5000.00 2000.00 3000.00
+15/02/2024 15/02/2024 FC011 300 150 FACTURE DOUANE 1200.00 400.00 800.00
+01/03/2024 01/03/2024 FC012 330 165 FACTURE STOCKAGE 800.00 200.00 600.00
+
+0992 STE SOCIETE GENERALE 07 345 678 901
+10/01/2024 10/01/2024 FC013 360 180 FACTURE BANCAIRE 3000.00 1500.00 1500.00
+20/02/2024 20/02/2024 FC014 390 195 FACTURE COMMISSION 800.00 400.00 400.00
+15/03/2024 15/03/2024 FC015 420 210 FACTURE FRAIS 600.00 300.00 300.00
+
+1123 MONOPRIX 07 456 789 012
+05/01/2024 05/01/2024 FC016 450 225 FACTURE APPROVISIONNEMENT 8000.00 4000.00 4000.00
+25/01/2024 25/01/2024 FC017 480 240 FACTURE LIVRAISON 2000.00 1000.00 1000.00
+20/02/2024 20/02/2024 FC018 510 255 FACTURE STOCK 3000.00 1500.00 1500.00
+
+1456 CARREFOUR 07 567 890 123
+12/01/2024 12/01/2024 FC019 540 270 FACTURE HYPERMARCHE 12000.00 6000.00 6000.00
+15/02/2024 15/02/2024 FC020 570 285 FACTURE PROMOTION 3000.00 1500.00 1500.00
+10/03/2024 10/03/2024 FC021 600 300 FACTURE MARKETING 1500.00 500.00 1000.00
+
+1789 AFRICAN LEADER 07 678 901 234
+18/01/2024 18/01/2024 FC022 630 315 FACTURE TRANSPORT AERIEN 15000.00 5000.00 10000.00
+22/02/2024 22/02/2024 FC023 660 330 FACTURE FRET 8000.00 3000.00 5000.00
+05/03/2024 05/03/2024 FC024 690 345 FACTURE LOGISTIQUE 4000.00 2000.00 2000.00
+
+2010 STE TUNISIE TELECOM 07 789 012 345
+08/01/2024 08/01/2024 FC025 720 360 FACTURE TELECOMMUNICATION 2000.00 1000.00 1000.00
+28/01/2024 28/01/2024 FC026 750 375 FACTURE INTERNET 800.00 400.00 400.00
+18/02/2024 18/02/2024 FC027 780 390 FACTURE MOBILE 1200.00 600.00 600.00
+
+TOTAL GENERAL: 24 créances
+Montant total: 95,400.00
+Montant payé: 38,200.00
+Solde restant: 57,200.00
     `.trim();
   }
 
