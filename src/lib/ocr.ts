@@ -1,6 +1,12 @@
 import Tesseract from 'tesseract.js';
 import { ClientDebt } from '@/types/debt';
 
+declare global {
+  interface Window {
+    pdf2pic: any;
+  }
+}
+
 export class OCRService {
   static async extractTextFromPDF(file: File): Promise<string> {
     try {
@@ -21,50 +27,89 @@ export class OCRService {
 
   private static async extractFromPDF(file: File): Promise<string> {
     try {
-      // Pour les PDF, essayer d'abord Tesseract
-      const result = await Tesseract.recognize(
-        file,
-        'fra',
-        {
-          logger: (m) => {
-            if (m.status === 'recognizing text') {
-              console.log('Progression OCR:', Math.round(m.progress * 100), '%');
-            }
-          },
-        }
-      );
+      console.log('Conversion du PDF en images...');
       
-      const extractedText = result.data.text;
-      console.log('Texte extrait du PDF:', extractedText.length, 'caractères');
+      // Convertir le PDF en images
+      const images = await this.convertPDFToImages(file);
+      console.log('PDF converti en', images.length, 'images');
       
-      // Si le texte est trop court, essayer avec des paramètres différents
-      if (extractedText.length < 50) {
-        console.log('Texte trop court, tentative avec paramètres alternatifs...');
-        const altResult = await Tesseract.recognize(
-          file,
-          'fra',
-          {
-            tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàâääéèêëïîôöùûçÀÂÄÄÉÈÊËÏÎÔÖÙÛÇ%.,/-()',
-            tessedit_pageseg_mode: '6',
-            logger: (m) => console.log('Alt OCR:', m.status),
-          }
-        );
+      let allText = '';
+      
+      // Traiter chaque image avec OCR
+      for (let i = 0; i < images.length; i++) {
+        console.log(`Traitement de l'image ${i + 1}/${images.length}...`);
         
-        if (altResult.data.text.length > extractedText.length) {
-          console.log('Meilleur résultat avec paramètres alternatifs');
-          return altResult.data.text;
+        try {
+          const result = await Tesseract.recognize(
+            images[i],
+            'fra',
+            {
+              logger: (m: any) => {
+                if (m.status === 'recognizing text') {
+                  console.log(`Progression OCR Image ${i + 1}:`, Math.round(m.progress * 100), '%');
+                }
+              },
+            }
+          );
+          
+          const pageText = result.data.text;
+          console.log(`Texte extrait de l'image ${i + 1}:`, pageText.length, 'caractères');
+          allText += pageText + '\n';
+          
+        } catch (error) {
+          console.error(`Erreur OCR image ${i + 1}:`, error);
+          // Continuer avec les autres images même si une échoue
         }
       }
       
-      return extractedText;
+      console.log('Texte total extrait du PDF:', allText.length, 'caractères');
+      return allText;
+      
     } catch (error) {
       console.error('Erreur extraction PDF:', error);
       // Fallback: retourner un texte de test pour le développement
-      if (process.env.NODE_ENV === 'development') {
+      if (typeof window !== 'undefined' && window.process?.env?.NODE_ENV === 'development') {
         return this.getFallbackText(file.name);
       }
       throw error;
     }
+  }
+
+  private static async convertPDFToImages(file: File): Promise<ImageData[]> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = async () => {
+        try {
+          const typedArray = new Uint8Array(reader.result as ArrayBuffer);
+          
+          // Utiliser pdf2pic pour convertir le PDF
+          if (typeof window !== 'undefined' && window.pdf2pic) {
+            window.pdf2pic(typedArray, {
+              outputType: 'image',
+              outputFormat: 'png',
+              density: 200, // Qualité améliorée
+              pages: 'all'
+            }).then((images: any[]) => {
+              console.log('PDF converti avec succès en', images.length, 'images');
+              resolve(images.map(img => img.data));
+            }).catch((error: any) => {
+              console.error('Erreur conversion PDF:', error);
+              reject(error);
+            });
+          } else {
+            // Fallback si pdf2pic n'est pas disponible
+            console.error('pdf2pic n\'est pas disponible');
+            reject(new Error('pdf2pic library not available'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Erreur lecture fichier'));
+      reader.readAsArrayBuffer(file);
+    });
   }
 
   private static async extractFromImage(file: File): Promise<string> {

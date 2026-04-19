@@ -57,7 +57,8 @@
     "react-dropzone": "^14.2.10",
     "xlsx": "^0.18.5",
     "jspdf": "^2.5.2",
-    "html2canvas": "^1.4.1"
+    "html2canvas": "^1.4.1",
+    "pdf2pic": "^2.1.4"
   },
   "devDependencies": {
     "@types/node": "^20",
