@@ -70,23 +70,47 @@ export class OCRService {
   }
 
   private static parseDataRow(line: string, client: any, fileName: string, id: number): ClientDebt | null {
-    // Pattern plus flexible pour capturer les colonnes: Echéance | Date | N° pièce | Age | Nbr.J.P | Intitulé | Montant | Règlement | Solde
+    // Patterns pour les deux formats : euros/dollars et dinars tunisiens
     const patterns = [
-      // Pattern principal
+      // Format 1: Euros/Dollars - Age en jours
       /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(\d+)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)/i,
-      // Pattern alternatif si le premier échoue
-      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+([\d\s,\.]+?)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)/i
+      // Format 2: Dinars tunisiens - Age en mois
+      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(mois|month)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+TND)/i,
+      // Format 3: Dinars tunisiens - Solde direct avec âge en mois
+      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(mois|month)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+TND)/i,
     ];
 
     for (const pattern of patterns) {
       const match = line.match(pattern);
       if (match) {
-        const [, dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr] = match;
+        let dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr;
+        let isTunisian = false;
+        
+        if (match.length === 10) {
+          // Format euros/dollars
+          [, dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr] = match;
+        } else if (match.length === 9) {
+          // Format dinars tunisiens avec âge en mois
+          [, dueDate, docDate, docNumber, age, description, amountStr, balanceStr] = match;
+          paymentDays = '0';
+          settlementStr = '0.00';
+          isTunisian = true;
+        } else {
+          continue;
+        }
         
         const amount = this.parseAmount(amountStr);
         const settlement = this.parseAmount(settlementStr);
         const balance = this.parseAmount(balanceStr);
-        const ageDays = parseInt(age);
+        
+        // Convertir l'âge en jours (mois * 30 pour approximation)
+        let ageDays;
+        if (isTunisian || line.includes('mois') || line.includes('month')) {
+          ageDays = parseInt(age) * 30;
+        } else {
+          ageDays = parseInt(age);
+        }
+        
         const paymentDaysNum = parseInt(paymentDays);
         
         return {
@@ -104,7 +128,8 @@ export class OCRService {
           settlement,
           balance,
           riskLevel: this.classifyRisk(ageDays, balance > 0),
-          sourceFile: fileName
+          sourceFile: fileName,
+          currency: isTunisian ? 'TND' : 'EUR'
         };
       }
     }
@@ -199,10 +224,29 @@ Période: 01/01/2024 - 31/03/2024
 28/01/2024 28/01/2024 FC026 750 375 FACTURE INTERNET 800.00 400.00 400.00
 18/02/2024 18/02/2024 FC027 780 390 FACTURE MOBILE 1200.00 600.00 600.00
 
-TOTAL GENERAL: 24 créances
-Montant total: 95,400.00
-Montant payé: 38,200.00
-Solde restant: 57,200.00
+ETAT DE RECOUVREMENT CLIENT - DINARS TUNISIENS
+Date: 15/03/2024
+Période: 01/01/2024 - 31/03/2024
+
+0424 SOCIETE TUNISIENNE 07 123 456 789
+15/01/2024 15/01/2024 FC028 2 mois FACTURE SERVICES 5000.000TND 2000.000TND 3000.000TND
+15/02/2024 15/02/2024 FC029 3 mois FACTURE CONSULTING 7500.000TND 1500.000TND 6000.000TND
+15/03/2024 15/03/2024 FC030 1 mois FACTURE MAINTENANCE 2500.000TND 1000.000TND 1500.000TND
+
+0646 ENTREPRISE TUNIS 07 987 654 321
+20/01/2024 20/01/2024 FC031 4 mois FACTURE EQUIPEMENT 12000.000TND 4000.000TND 8000.000TND
+10/02/2024 10/02/2024 FC032 2 mois FACTURE LOGISTIQUE 8000.000TND 3000.000TND 5000.000TND
+05/03/2024 05/03/2024 FC033 1 mois FACTURE TRANSPORT 4500.000TND 2000.000TND 2500.000TND
+
+0751 IMPORT EXPORT TUNIS 07 111 222 333
+25/01/2024 25/01/2024 FC034 5 mois FACTURE IMPORTATION 25000.000TND 8000.000TND 17000.000TND
+05/02/2024 05/02/2024 FC035 3 mois FACTURE DOUANE 15000.000TND 5000.000TND 10000.000TND
+10/03/2024 10/03/2024 FC036 2 mois FACTURE STOCKAGE 6000.000TND 2000.000TND 4000.000TND
+
+TOTAL GENERAL: 30 créances
+Montant total: 132,500.000TND
+Montant payé: 46,500.000TND
+Solde restant: 86,000.000TND
     `.trim();
   }
 }

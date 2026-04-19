@@ -14,6 +14,7 @@ export interface ClientDebt {
   balance: number;
   riskLevel: 'healthy' | 'monitoring' | 'overdue' | 'critical';
   sourceFile: string;
+  currency?: 'EUR' | 'TND' | 'USD';
 }
 
 export interface AnalysisResult {
