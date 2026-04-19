@@ -17,8 +17,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter&display=swap" rel="stylesheet" />
-        <script src="/pdf2pic.min.js" async></script>
-      </head>
+              </head>
       <body className="font-body antialiased">{children}</body>
     </html>
   );
