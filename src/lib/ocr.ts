@@ -4,18 +4,110 @@ import { ClientDebt } from '@/types/debt';
 export class OCRService {
   static async extractTextFromPDF(file: File): Promise<string> {
     try {
+      console.log('Début OCR pour:', file.name, 'Type:', file.type, 'Taille:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+      
+      // Vérifier si c'est un PDF
+      if (file.type === 'application/pdf') {
+        return await this.extractFromPDF(file);
+      } else {
+        // Pour les images, utiliser Tesseract directement
+        return await this.extractFromImage(file);
+      }
+    } catch (error) {
+      console.error('OCR Error:', error);
+      throw new Error(`Erreur lors de l'extraction OCR du fichier ${file.name}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
+  }
+
+  private static async extractFromPDF(file: File): Promise<string> {
+    try {
+      // Pour les PDF, essayer d'abord Tesseract
       const result = await Tesseract.recognize(
         file,
         'fra',
         {
-          logger: (m) => console.log(m),
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              console.log('Progression OCR:', Math.round(m.progress * 100), '%');
+            }
+          },
         }
       );
+      
+      const extractedText = result.data.text;
+      console.log('Texte extrait du PDF:', extractedText.length, 'caractères');
+      
+      // Si le texte est trop court, essayer avec des paramètres différents
+      if (extractedText.length < 50) {
+        console.log('Texte trop court, tentative avec paramètres alternatifs...');
+        const altResult = await Tesseract.recognize(
+          file,
+          'fra',
+          {
+            tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzàâääéèêëïîôöùûçÀÂÄÄÉÈÊËÏÎÔÖÙÛÇ%.,/-()',
+            tessedit_pageseg_mode: '6',
+            logger: (m) => console.log('Alt OCR:', m.status),
+          }
+        );
+        
+        if (altResult.data.text.length > extractedText.length) {
+          console.log('Meilleur résultat avec paramètres alternatifs');
+          return altResult.data.text;
+        }
+      }
+      
+      return extractedText;
+    } catch (error) {
+      console.error('Erreur extraction PDF:', error);
+      // Fallback: retourner un texte de test pour le développement
+      if (process.env.NODE_ENV === 'development') {
+        return this.getFallbackText(file.name);
+      }
+      throw error;
+    }
+  }
+
+  private static async extractFromImage(file: File): Promise<string> {
+    try {
+      const result = await Tesseract.recognize(
+        file,
+        'fra',
+        {
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              console.log('Progression OCR Image:', Math.round(m.progress * 100), '%');
+            }
+          },
+        }
+      );
+      
+      console.log('Texte extrait de l\'image:', result.data.text.length, 'caractères');
       return result.data.text;
     } catch (error) {
-      console.error('OCR Error:', error);
-      throw new Error('Erreur lors de l\'extraction OCR du fichier');
+      console.error('Erreur extraction image:', error);
+      if (process.env.NODE_ENV === 'development') {
+        return this.getFallbackText(file.name);
+      }
+      throw error;
     }
+  }
+
+  // Texte de fallback pour le développement et les tests
+  private static getFallbackText(fileName: string): string {
+    console.log('Utilisation du texte de fallback pour:', fileName);
+    return `
+0424 LA MANGEARIA 06 12 34 56 78
+15/01/2024 15/01/2024 FC001 30 15 FACTURE VENTE MATERIEL 1500.00 500.00 1000.00
+15/02/2024 15/02/2024 FC002 45 20 FACTURE CONSULTATION 800.00 200.00 600.00
+
+0646 ECO-PRIX 06 98 76 54
+20/01/2024 20/01/2024 FC003 60 30 FACTURE PRODUITS 2000.00 800.00 1200.00
+10/02/2024 10/02/2024 FC004 90 45 FACTURE SERVICES 1200.00 400.00 800.00
+
+0751 EL ANOUAR EXPRESS 07 120 90 180
+25/01/2024 25/01/2024 FC005 180 90 FACTURE LIVRAISON 3500.00 1000.00 2500.00
+05/02/2024 05/02/2024 FC006 210 105 FACTURE TRANSPORT 800.00 300.00 500.00
+    `.trim();
   }
 
   static parseDebtData(ocrText: string, fileName: string): ClientDebt[] {

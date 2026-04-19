@@ -63,8 +63,15 @@ export default function Home() {
       setAnalysis(analysisResult);
       
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement');
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement';
+      setError(errorMessage);
       console.error('Processing error:', err);
+      console.error('Détails de l\'erreur:', {
+        filesCount: files.length,
+        fileNames: files.map(f => f.name),
+        fileTypes: files.map(f => f.type),
+        fileSizes: files.map(f => (f.size / 1024 / 1024).toFixed(2) + 'MB')
+      });
     } finally {
       setIsProcessing(false);
       setProgress(0);
