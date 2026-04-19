@@ -1,18 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Sidebar } from '@/components/Sidebar';
+import { KPICards } from '@/components/KPICards';
 import { FileUpload } from '@/components/FileUpload';
 import { Dashboard } from '@/components/Dashboard';
 import { DebtTable } from '@/components/DebtTable';
 import { OCRService } from '@/lib/ocr';
 import { AnalysisService } from '@/lib/analysis';
 import { ExportService } from '@/lib/export';
-import { ClientDebt, ProcessingResult } from '@/types/debt';
-import { Upload, BarChart3, Table, Download, AlertCircle } from 'lucide-react';
+import { ClientDebt } from '@/types/debt';
+import { 
+  LayoutDashboard, 
+  Users, 
+  FileText, 
+  BarChart3, 
+  TrendingUp,
+  AlertTriangle,
+  Bell,
+  Search,
+  Filter,
+  Download,
+  Settings,
+  X
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Home() {
   const [debts, setDebts] = useState<ClientDebt[]>([]);
@@ -20,6 +34,7 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const handleFileProcess = async (files: File[]) => {
     setIsProcessing(true);
@@ -66,12 +81,6 @@ export default function Home() {
       const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement';
       setError(errorMessage);
       console.error('Processing error:', err);
-      console.error('Détails de l\'erreur:', {
-        filesCount: files.length,
-        fileNames: files.map(f => f.name),
-        fileTypes: files.map(f => f.type),
-        fileSizes: files.map(f => (f.size / 1024 / 1024).toFixed(2) + 'MB')
-      });
     } finally {
       setIsProcessing(false);
       setProgress(0);
@@ -90,191 +99,276 @@ export default function Home() {
     }
   };
 
-  const handleExportReport = () => {
-    if (debts.length > 0 && analysis) {
-      const report = ExportService.generateReport(debts, analysis);
-      const fileName = `rapport-creances-${new Date().toISOString().split('T')[0]}.txt`;
-      ExportService.downloadTextFile(report, fileName);
-    }
+  const clearError = () => {
+    setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                GesstionClients - Analyse des Créances
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <Sidebar />
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden">
+        {/* Top Navigation Bar */}
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-semibold text-gray-900">
+                Tableau de Bord
               </h1>
-              <p className="text-sm text-gray-600">
-                Solution intelligente de gestion et d'analyse des créances clients
-              </p>
+              {debts.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">
+                    {debts.length} créances analysées
+                  </span>
+                </div>
+              )}
             </div>
             
-            {debts.length > 0 && (
-              <div className="flex space-x-2">
-                <Button onClick={handleExportExcel} variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Excel
-                </Button>
-                <Button onClick={handleExportPDF} variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  PDF
-                </Button>
-                <Button onClick={handleExportReport} variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Rapport
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-6">
-        {/* File Upload Section */}
-        <div className="mb-8">
-          <FileUpload 
-            onFileSelect={handleFileProcess}
-            isProcessing={isProcessing}
-            progress={progress}
-          />
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <span className="text-red-800">{error}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Main Content */}
-        {debts.length > 0 && analysis ? (
-          <div id="dashboard-content">
-            <Tabs defaultValue="dashboard" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="dashboard" className="flex items-center space-x-2">
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </TabsTrigger>
-                <TabsTrigger value="table" className="flex items-center space-x-2">
-                  <Table className="h-4 w-4" />
-                  <span>Détail des créances</span>
-                </TabsTrigger>
-                <TabsTrigger value="summary" className="flex items-center space-x-2">
-                  <Upload className="h-4 w-4" />
-                  <span>Résumé</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="dashboard">
-                <Dashboard analysis={analysis} />
-              </TabsContent>
-
-              <TabsContent value="table">
-                <DebtTable 
-                  debts={debts} 
-                  onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+            <div className="flex items-center space-x-3">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Rechercher un client, une facture..."
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
                 />
-              </TabsContent>
+              </div>
 
-              <TabsContent value="summary">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Statistiques Générales</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between">
-                        <span>Total créances:</span>
-                        <span className="font-bold">{analysis.totalDebts.toFixed(2)}€</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Solde restant:</span>
-                        <span className="font-bold text-red-600">{analysis.totalBalance.toFixed(2)}€</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Taux recouvrement:</span>
-                        <span className="font-bold">{analysis.recoveryRate.toFixed(1)}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Nombre de clients:</span>
-                        <span className="font-bold">{analysis.clientBreakdown.length}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
+              {/* Filters */}
+              <Button variant="outline" size="sm">
+                <Filter className="h-4 w-4 mr-2" />
+                Filtres
+              </Button>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Répartition par Risque</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {analysis.agingBreakdown.map((range: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center">
-                          <span className="text-sm">{range.range}</span>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold">{range.count}</span>
-                            <Badge variant="outline">
-                              {range.percentage.toFixed(1)}%
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+              {/* Notifications */}
+              <Button variant="outline" size="sm" className="relative">
+                <Bell className="h-4 w-4" />
+                {analysis?.alerts?.filter((a: any) => a.severity === 'high').length > 0 && (
+                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </Button>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Alertes Actives</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between">
-                        <span>Alertes critiques:</span>
-                        <Badge variant="destructive">
-                          {analysis.alerts.filter((a: any) => a.severity === 'high').length}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Alertes moyennes:</span>
-                        <Badge variant="secondary">
-                          {analysis.alerts.filter((a: any) => a.severity === 'medium').length}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Alertes faibles:</span>
-                        <Badge variant="outline">
-                          {analysis.alerts.filter((a: any) => a.severity === 'low').length}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
+              {/* Settings */}
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4" />
+              </Button>
+
+              {/* Export */}
+              {debts.length > 0 && (
+                <div className="flex items-center space-x-2">
+                  <Button onClick={handleExportExcel} variant="outline" size="sm">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={handleExportPDF} variant="outline" size="sm">
+                    <Download className="h-4 w-4" />
+                  </Button>
                 </div>
-              </TabsContent>
-            </Tabs>
+              )}
+            </div>
           </div>
-        ) : (
-          !isProcessing && (
-            <Card className="text-center py-12">
-              <CardContent>
-                <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Commencez par importer un fichier
-                </h3>
-                <p className="text-gray-600">
-                  Importez un fichier PDF ou une image pour commencer l'analyse des créances
-                </p>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+          {/* Error Alert */}
+          {error && (
+            <Card className="mb-6 border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-red-800">
+                        Erreur de traitement
+                      </h4>
+                      <p className="text-sm text-red-700 mt-1">
+                        {error}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearError}
+                    className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
-          )
-        )}
-      </main>
+          )}
+
+          {/* Processing State */}
+          {isProcessing ? (
+            <Card className="mb-6">
+              <CardContent className="p-8">
+                <div className="text-center">
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Traitement des fichiers en cours...
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Extraction OCR et analyse des données
+                  </p>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {progress}% complété
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* KPI Cards */}
+              {analysis && (
+                <div className="mb-8">
+                  <KPICards
+                    totalDebts={analysis.totalDebts}
+                    totalBalance={analysis.totalBalance}
+                    criticalDebts={analysis.alerts?.filter((a: any) => a.severity === 'high').length || 0}
+                    recoveryRate={analysis.recoveryRate}
+                    clientCount={analysis.clientBreakdown?.length || 0}
+                  />
+                </div>
+              )}
+
+              {/* File Upload */}
+              {!debts.length && (
+                <Card className="mb-8">
+                  <CardContent className="p-8">
+                    <div className="text-center">
+                      <FileText className="mx-auto h-12 w-12 text-blue-600 mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        Importer vos fichiers
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-6">
+                        Glissez-déposez vos fichiers PDF ou images pour commencer l'analyse
+                      </p>
+                      <FileUpload 
+                        onFileSelect={handleFileProcess}
+                        isProcessing={isProcessing}
+                        progress={progress}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tabs Content */}
+              {debts.length > 0 && analysis && (
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="dashboard" className="flex items-center space-x-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span>Vue d'ensemble</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="aging" className="flex items-center space-x-2">
+                      <BarChart3 className="h-4 w-4" />
+                      <span>Analyse</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="clients" className="flex items-center space-x-2">
+                      <Users className="h-4 w-4" />
+                      <span>Clients</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="table" className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4" />
+                      <span>Détail</span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="dashboard" className="space-y-6">
+                    <Dashboard analysis={analysis} />
+                  </TabsContent>
+
+                  <TabsContent value="aging" className="space-y-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                          Répartition par Ancienneté
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {analysis.agingBreakdown?.map((range: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  index === 0 ? 'bg-green-500' :
+                                  index === 1 ? 'bg-yellow-500' :
+                                  index === 2 ? 'bg-orange-500' :
+                                  'bg-red-500'
+                                }`}></div>
+                                <span className="text-sm font-medium">{range.range}</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-lg font-bold">{range.count}</div>
+                                <div className="text-sm text-gray-500">{range.amount.toFixed(0)}€</div>
+                                <div className="text-xs text-gray-400">{range.percentage.toFixed(1)}%</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="clients" className="space-y-6">
+                    <Card>
+                      <CardContent className="p-6">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">
+                          Top Clients par Montant Dû
+                        </h3>
+                        <div className="space-y-3">
+                          {analysis.clientBreakdown?.slice(0, 10).map((client: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                                  <span className="text-sm font-medium text-gray-600">
+                                    {client.clientName.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div className="font-medium">{client.clientName}</div>
+                                  <div className="text-sm text-gray-500">{client.totalAmount.toFixed(2)}€ dû</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`px-2 py-1 rounded text-xs font-medium ${
+                                  client.totalBalance > 1000 ? 'bg-red-100 text-red-800' :
+                                  client.totalBalance > 500 ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-green-100 text-green-800'
+                                }`}>
+                                  {client.totalBalance > 0 ? 'À risque' : 'Sain'}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="table" className="space-y-6">
+                    <DebtTable 
+                      debts={debts} 
+                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+                    />
+                  </TabsContent>
+                </Tabs>
+              )}
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
