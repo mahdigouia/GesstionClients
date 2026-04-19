@@ -2,13 +2,18 @@ export interface ClientDebt {
   id: string;
   clientCode: string;
   clientName: string;
-  invoiceNumber: string;
-  invoiceDate: string;
+  clientPhone?: string;
+  dueDate: string;
+  documentDate: string;
+  documentNumber: string;
+  age: number;
+  paymentDays: number;
+  description: string;
   amount: number;
-  paid: number;
+  settlement: number;
   balance: number;
-  agingDays: number;
   riskLevel: 'healthy' | 'monitoring' | 'overdue' | 'critical';
+  sourceFile: string;
 }
 
 export interface AnalysisResult {

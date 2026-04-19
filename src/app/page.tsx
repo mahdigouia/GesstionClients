@@ -21,31 +21,45 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileProcess = async (file: File) => {
+  const handleFileProcess = async (files: File[]) => {
     setIsProcessing(true);
     setProgress(0);
     setError(null);
 
     try {
-      // Étape 1: Extraction OCR
-      setProgress(20);
-      const ocrText = await OCRService.extractTextFromPDF(file);
+      let allDebts: ClientDebt[] = [];
+      const totalFiles = files.length;
       
-      // Étape 2: Parsing des données
-      setProgress(50);
-      const parsedDebts = OCRService.parseDebtData(ocrText);
+      // Traiter chaque fichier
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileProgress = 20 + (60 * i / totalFiles);
+        setProgress(Math.round(fileProgress));
+        
+        // Étape 1: Extraction OCR
+        const ocrText = await OCRService.extractTextFromPDF(file);
+        
+        // Étape 2: Parsing des données
+        const parsedDebts = OCRService.parseDebtData(ocrText, file.name);
+        
+        if (parsedDebts.length === 0) {
+          console.warn(`Aucune donnée trouvée dans le fichier: ${file.name}`);
+        } else {
+          allDebts = [...allDebts, ...parsedDebts];
+        }
+      }
       
-      if (parsedDebts.length === 0) {
-        throw new Error('Aucune donnée de créance trouvée dans le fichier');
+      if (allDebts.length === 0) {
+        throw new Error('Aucune donnée de créance trouvée dans les fichiers');
       }
 
-      // Étape 3: Analyse
-      setProgress(80);
-      const analysisResult = AnalysisService.analyzeDebts(parsedDebts);
+      // Étape 3: Analyse agrégée
+      setProgress(90);
+      const analysisResult = AnalysisService.analyzeDebts(allDebts);
       
       // Étape 4: Finalisation
       setProgress(100);
-      setDebts(parsedDebts);
+      setDebts(allDebts);
       setAnalysis(analysisResult);
       
     } catch (err) {

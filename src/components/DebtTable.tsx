@@ -134,13 +134,18 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
               <TableRow>
                 <TableHead>Client</TableHead>
                 <TableHead>Code</TableHead>
-                <TableHead>Facture</TableHead>
+                <TableHead>Téléphone</TableHead>
+                <TableHead>N° Pièce</TableHead>
+                <TableHead>Description</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead>Échéance</TableHead>
                 <TableHead className="text-right">Montant</TableHead>
-                <TableHead className="text-right">Payé</TableHead>
+                <TableHead className="text-right">Règlement</TableHead>
                 <TableHead className="text-right">Solde</TableHead>
                 <TableHead className="text-center">Âge</TableHead>
+                <TableHead className="text-center">J.P</TableHead>
                 <TableHead className="text-center">Risque</TableHead>
+                <TableHead className="text-center">Source</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -152,30 +157,42 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
                   <TableCell className="text-gray-600">
                     {debt.clientCode}
                   </TableCell>
+                  <TableCell className="text-gray-600">
+                    {debt.clientPhone || '-'}
+                  </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {debt.invoiceNumber}
+                    {debt.documentNumber}
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate" title={debt.description}>
+                    {debt.description}
                   </TableCell>
                   <TableCell>
-                    {new Date(debt.invoiceDate).toLocaleDateString('fr-FR')}
+                    {new Date(debt.documentDate).toLocaleDateString('fr-FR')}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(debt.dueDate).toLocaleDateString('fr-FR')}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {debt.amount.toFixed(2)}€
                   </TableCell>
                   <TableCell className="text-right text-green-600">
-                    {debt.paid.toFixed(2)}€
+                    {debt.settlement.toFixed(2)}€
                   </TableCell>
                   <TableCell className="text-right font-bold text-red-600">
                     {debt.balance.toFixed(2)}€
                   </TableCell>
                   <TableCell className="text-center">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      debt.agingDays > 365 ? 'bg-red-100 text-red-800' :
-                      debt.agingDays > 90 ? 'bg-orange-100 text-orange-800' :
-                      debt.agingDays > 30 ? 'bg-yellow-100 text-yellow-800' :
+                      debt.age > 365 ? 'bg-red-100 text-red-800' :
+                      debt.age > 90 ? 'bg-orange-100 text-orange-800' :
+                      debt.age > 30 ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800'
                     }`}>
-                      {debt.agingDays}j
+                      {debt.age}j
                     </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {debt.paymentDays}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge 
@@ -184,6 +201,14 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
                     >
                       {AnalysisService.getRiskLabel(debt.riskLevel)}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="text-xs text-gray-500">
+                      {debt.sourceFile.length > 15 ? 
+                        debt.sourceFile.substring(0, 12) + '...' : 
+                        debt.sourceFile
+                      }
+                    </span>
                   </TableCell>
                 </TableRow>
               ))}

@@ -18,51 +18,95 @@ export class OCRService {
     }
   }
 
-  static parseDebtData(ocrText: string): ClientDebt[] {
+  static parseDebtData(ocrText: string, fileName: string): ClientDebt[] {
     const lines = ocrText.split('\n').filter(line => line.trim());
     const debts: ClientDebt[] = [];
     
-    // Pattern pour détecter les lignes de données clients
-    // Format attendu: Code Client | Nom Client | N° Facture | Date | Montant | Payé | Solde | Âge
-    const dataPattern = /([A-Z0-9]{3,10})\s+([A-Za-z\s]+)\s+(\d{6,10})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+(\d+)/gi;
+    // Détecter les sections clients avec le pattern: CODE NOM
+    const clientHeaderPattern = /^(\d{4})\s+([A-Z\s\-\']+)(?:\s+(\d{2,}\s*\d{2,}\s*\d{2,}\s*\d{2,}))?/gm;
     
-    let match;
+    let currentClient: { code: string; name: string; phone?: string } | null = null;
     let id = 1;
     
-    while ((match = dataPattern.exec(ocrText)) !== null) {
-      try {
-        const [, clientCode, clientName, invoiceNumber, invoiceDate, amountStr, paidStr, balanceStr, agingStr] = match;
-        
-        // Nettoyage et conversion des nombres
-        const amount = this.parseAmount(amountStr);
-        const paid = this.parseAmount(paidStr);
-        const balance = this.parseAmount(balanceStr);
-        const agingDays = parseInt(agingStr);
-        
-        // Validation de la cohérence
-        const calculatedBalance = amount - paid;
-        const finalBalance = Math.abs(balance - calculatedBalance) < 0.01 ? calculatedBalance : balance;
-        
-        const debt: ClientDebt = {
-          id: `debt_${id++}`,
-          clientCode: clientCode.trim(),
-          clientName: clientName.trim(),
-          invoiceNumber: invoiceNumber.trim(),
-          invoiceDate: this.parseDate(invoiceDate),
-          amount,
-          paid,
-          balance: finalBalance,
-          agingDays,
-          riskLevel: this.classifyRisk(agingDays, finalBalance > 0)
+    // Parcourir les lignes pour identifier les clients et leurs données
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Vérifier si c'est un en-tête de client
+      const clientMatch = line.match(/^(\d{4})\s+([A-Z\s\-\']+)(?:\s+(\d{2,}\s*\d{2,}\s*\d{2,}\s*\d{2,}))?/);
+      if (clientMatch) {
+        currentClient = {
+          code: clientMatch[1],
+          name: clientMatch[2].trim(),
+          phone: clientMatch[3] ? clientMatch[3].replace(/\s/g, '') : undefined
         };
-        
-        debts.push(debt);
-      } catch (error) {
-        console.warn('Erreur lors du parsing d\'une ligne:', match[0], error);
+        continue;
+      }
+      
+      // Vérifier si c'est une ligne de données (contient des dates et montants)
+      if (currentClient && this.isDataRow(line)) {
+        try {
+          const debtData = this.parseDataRow(line, currentClient, fileName, id++);
+          if (debtData) {
+            debts.push(debtData);
+          }
+        } catch (error) {
+          console.warn('Erreur lors du parsing d\'une ligne:', line, error);
+        }
       }
     }
     
     return debts;
+  }
+
+  private static isDataRow(line: string): boolean {
+    // Une ligne de données contient généralement une date et des montants
+    return /\d{2}[\/\-]\d{2}[\/\-]\d{2,4}/.test(line) && 
+           /\d+,\d{2}/.test(line) &&
+           line.length > 20;
+  }
+
+  private static parseDataRow(line: string, client: any, fileName: string, id: number): ClientDebt | null {
+    // Pattern plus flexible pour capturer les colonnes: Echéance | Date | N° pièce | Age | Nbr.J.P | Intitulé | Montant | Règlement | Solde
+    const patterns = [
+      // Pattern principal
+      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(\d+)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)/i,
+      // Pattern alternatif si le premier échoue
+      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+([\d\s,\.]+?)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)/i
+    ];
+
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (match) {
+        const [, dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr] = match;
+        
+        const amount = this.parseAmount(amountStr);
+        const settlement = this.parseAmount(settlementStr);
+        const balance = this.parseAmount(balanceStr);
+        const ageDays = parseInt(age);
+        const paymentDaysNum = parseInt(paymentDays);
+        
+        return {
+          id: `debt_${id}`,
+          clientCode: client.code,
+          clientName: client.name,
+          clientPhone: client.phone,
+          dueDate: this.parseDate(dueDate),
+          documentDate: this.parseDate(docDate),
+          documentNumber: docNumber.trim(),
+          age: ageDays,
+          paymentDays: paymentDaysNum,
+          description: description.trim(),
+          amount,
+          settlement,
+          balance,
+          riskLevel: this.classifyRisk(ageDays, balance > 0),
+          sourceFile: fileName
+        };
+      }
+    }
+    
+    return null;
   }
 
   private static parseAmount(amountStr: string): number {

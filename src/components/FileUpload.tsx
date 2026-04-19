@@ -8,19 +8,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 
 interface FileUploadProps {
-  onFileSelect: (file: File) => void;
+  onFileSelect: (files: File[]) => void;
   isProcessing?: boolean;
   progress?: number;
 }
 
 export function FileUpload({ onFileSelect, isProcessing = false, progress = 0 }: FileUploadProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
-      setSelectedFile(file);
-      onFileSelect(file);
+      setSelectedFiles(acceptedFiles);
+      onFileSelect(acceptedFiles);
     }
   }, [onFileSelect]);
 
@@ -30,12 +29,12 @@ export function FileUpload({ onFileSelect, isProcessing = false, progress = 0 }:
       'application/pdf': ['.pdf'],
       'image/*': ['.png', '.jpg', '.jpeg', '.tiff']
     },
-    maxFiles: 1,
+    maxFiles: 10,
     disabled: isProcessing
   });
 
-  const clearFile = () => {
-    setSelectedFile(null);
+  const clearFiles = () => {
+    setSelectedFiles([]);
   };
 
   return (
@@ -58,29 +57,33 @@ export function FileUpload({ onFileSelect, isProcessing = false, progress = 0 }:
               <Progress value={progress} className="w-full" />
               <p className="text-sm text-gray-600">{progress}% complété</p>
             </div>
-          ) : selectedFile ? (
+          ) : selectedFiles.length > 0 ? (
             <div className="space-y-4">
               <File className="mx-auto h-12 w-12 text-green-500" />
               <div>
-                <p className="font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+                <p className="font-medium">{selectedFiles.length} fichier(s) sélectionné(s)</p>
+                <div className="text-sm text-gray-500 space-y-1 max-h-32 overflow-y-auto">
+                  {selectedFiles.map((file, index) => (
+                    <div key={index}>
+                      {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="flex justify-center space-x-2">
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onFileSelect(selectedFile);
+                    onFileSelect(selectedFiles);
                   }}
                   size="sm"
                 >
-                  Traiter ce fichier
+                  Traiter les fichiers
                 </Button>
                 <Button
                   onClick={(e) => {
                     e.stopPropagation();
-                    clearFile();
+                    clearFiles();
                   }}
                   variant="outline"
                   size="sm"
@@ -94,14 +97,14 @@ export function FileUpload({ onFileSelect, isProcessing = false, progress = 0 }:
               <Upload className="mx-auto h-12 w-12 text-gray-400" />
               <div>
                 <p className="text-lg font-medium">
-                  {isDragActive ? 'Déposez le fichier ici' : 'Glissez-déposez un fichier ici'}
+                  {isDragActive ? 'Déposez les fichiers ici' : 'Glissez-déposez les fichiers ici'}
                 </p>
                 <p className="text-sm text-gray-500">
-                  ou cliquez pour sélectionner un fichier
+                  ou cliquez pour sélectionner les fichiers
                 </p>
               </div>
               <div className="text-xs text-gray-400">
-                Formats supportés: PDF, PNG, JPG, JPEG, TIFF
+                Formats supportés: PDF, PNG, JPG, JPEG, TIFF (jusqu'à 10 fichiers)
               </div>
             </div>
           )}

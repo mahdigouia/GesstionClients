@@ -11,13 +11,18 @@ export class ExportService {
     const debtsData = debts.map(debt => ({
       'Code Client': debt.clientCode,
       'Nom Client': debt.clientName,
-      'Numéro Facture': debt.invoiceNumber,
-      'Date Facture': new Date(debt.invoiceDate).toLocaleDateString('fr-FR'),
-      'Montant Facture': debt.amount,
-      'Montant Payé': debt.paid,
-      'Solde Restant': debt.balance,
-      'Âge Créance (jours)': debt.agingDays,
-      'Niveau Risque': this.getRiskLabel(debt.riskLevel)
+      'Téléphone': debt.clientPhone || '',
+      'N° Pièce': debt.documentNumber,
+      'Description': debt.description,
+      'Date Document': new Date(debt.documentDate).toLocaleDateString('fr-FR'),
+      'Date Échéance': new Date(debt.dueDate).toLocaleDateString('fr-FR'),
+      'Montant': debt.amount,
+      'Règlement': debt.settlement,
+      'Solde': debt.balance,
+      'Âge (jours)': debt.age,
+      'Jours de Paiement': debt.paymentDays,
+      'Niveau Risque': this.getRiskLabel(debt.riskLevel),
+      'Fichier Source': debt.sourceFile
     }));
 
     const debtsSheet = XLSX.utils.json_to_sheet(debtsData);
@@ -154,9 +159,11 @@ DÉTAIL DES CRÉANCES
     debts.forEach(debt => {
       report += `
 ${debt.clientName} (${debt.clientCode})
-Facture: ${debt.invoiceNumber} - Date: ${new Date(debt.invoiceDate).toLocaleDateString('fr-FR')}
-Montant: ${debt.amount.toFixed(2)}€ | Payé: ${debt.paid.toFixed(2)}€ | Solde: ${debt.balance.toFixed(2)}€
-Âge: ${debt.agingDays} jours | Risque: ${this.getRiskLabel(debt.riskLevel)}
+Pièce: ${debt.documentNumber} - Date: ${new Date(debt.documentDate).toLocaleDateString('fr-FR')} - Échéance: ${new Date(debt.dueDate).toLocaleDateString('fr-FR')}
+Description: ${debt.description}
+Montant: ${debt.amount.toFixed(2)}€ | Règlement: ${debt.settlement.toFixed(2)}€ | Solde: ${debt.balance.toFixed(2)}€
+Âge: ${debt.age} jours | J.P: ${debt.paymentDays} | Risque: ${this.getRiskLabel(debt.riskLevel)}
+Source: ${debt.sourceFile}
 ---`;
     });
 
