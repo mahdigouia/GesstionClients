@@ -70,68 +70,46 @@ export class OCRService {
   }
 
   private static parseDataRow(line: string, client: any, fileName: string, id: number): ClientDebt | null {
-    // Patterns pour les deux formats : euros/dollars et dinars tunisiens
-    const patterns = [
-      // Format 1: Euros/Dollars - Age en jours
-      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(\d+)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)/i,
-      // Format 2: Dinars tunisiens - Age en mois
-      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(mois|month)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+TND)/i,
-      // Format 3: Dinars tunisiens - Solde direct avec âge en mois
-      /(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\d{2}[\/\-]\d{2}[\/\-]\d{2,4})\s+(\w+)\s+(\d+)\s+(mois|month)\s+([A-Z0-9\s\-\(\)\.\/]+?)\s+([\d\s,\.]+)\s+([\d\s,\.]+TND)/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = line.match(pattern);
-      if (match) {
-        let dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr;
-        let isTunisian = false;
-        
-        if (match.length === 10) {
-          // Format euros/dollars
-          [, dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr] = match;
-        } else if (match.length === 9) {
-          // Format dinars tunisiens avec âge en mois
-          [, dueDate, docDate, docNumber, age, description, amountStr, balanceStr] = match;
-          paymentDays = '0';
-          settlementStr = '0.00';
-          isTunisian = true;
-        } else {
-          continue;
-        }
-        
-        const amount = this.parseAmount(amountStr);
-        const settlement = this.parseAmount(settlementStr);
-        const balance = this.parseAmount(balanceStr);
-        
-        // Convertir l'âge en jours (mois * 30 pour approximation)
-        let ageDays;
-        if (isTunisian || line.includes('mois') || line.includes('month')) {
-          ageDays = parseInt(age) * 30;
-        } else {
-          ageDays = parseInt(age);
-        }
-        
-        const paymentDaysNum = parseInt(paymentDays);
-        
-        return {
-          id: `debt_${id}`,
-          clientCode: client.code,
-          clientName: client.name,
-          clientPhone: client.phone,
-          dueDate: this.parseDate(dueDate),
-          documentDate: this.parseDate(docDate),
-          documentNumber: docNumber.trim(),
-          age: ageDays,
-          paymentDays: paymentDaysNum,
-          description: description.trim(),
-          amount,
-          settlement,
-          balance,
-          riskLevel: this.classifyRisk(ageDays, balance > 0),
-          sourceFile: fileName,
-          currency: isTunisian ? 'TND' : 'EUR'
-        };
+    // Pattern pour le format dinars tunisiens réel (MASMOUDI DISTRIBUTION)
+    // Format: DateEchéance DateDoc N°Pièce Age NbrJP Intitulé Montant Règlement Solde
+    const pattern = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\w+)\s+(\d+)\s+(\d+)\s+([\w\s\-\(\)\.\/]*)\s+([\d\s,\.]+)\s+([\d\s,\.]+)\s+([\d\s,\.]+)/i;
+    
+    const match = line.match(pattern);
+    if (match) {
+      const [, dueDate, docDate, docNumber, age, paymentDays, description, amountStr, settlementStr, balanceStr] = match;
+      
+      const amount = this.parseAmount(amountStr);
+      const settlement = this.parseAmount(settlementStr);
+      const balance = this.parseAmount(balanceStr);
+      const ageDays = parseInt(age);
+      const paymentDaysNum = parseInt(paymentDays);
+      
+      // Vérifier que le solde = Montant - Règlement (tolérance pour arrondis)
+      const calculatedBalance = amount - settlement;
+      const balanceDiff = Math.abs(balance - calculatedBalance);
+      
+      if (balanceDiff > 1) {
+        console.warn(`Solde incohérent pour ${docNumber}: calculé=${calculatedBalance}, lu=${balance}`);
       }
+      
+      return {
+        id: `debt_${id}`,
+        clientCode: client.code,
+        clientName: client.name,
+        clientPhone: client.phone,
+        dueDate: this.parseDate(dueDate),
+        documentDate: this.parseDate(docDate),
+        documentNumber: docNumber.trim(),
+        age: ageDays,
+        paymentDays: paymentDaysNum,
+        description: description.trim() || 'FACTURE',
+        amount,
+        settlement,
+        balance,
+        riskLevel: this.classifyRisk(ageDays, balance > 0),
+        sourceFile: fileName,
+        currency: 'TND'
+      };
     }
     
     return null;
@@ -224,29 +202,49 @@ Période: 01/01/2024 - 31/03/2024
 28/01/2024 28/01/2024 FC026 750 375 FACTURE INTERNET 800.00 400.00 400.00
 18/02/2024 18/02/2024 FC027 780 390 FACTURE MOBILE 1200.00 600.00 600.00
 
-ETAT DE RECOUVREMENT CLIENT - DINARS TUNISIENS
-Date: 15/03/2024
-Période: 01/01/2024 - 31/03/2024
+ETAT DE RECOUVREMENT CLIENT
+Date: 15/04/2026
+Client: C01 MED AMINE BEN ZAARA
+Type: Condensé
 
-0424 SOCIETE TUNISIENNE 07 123 456 789
-15/01/2024 15/01/2024 FC028 2 mois FACTURE SERVICES 5000.000TND 2000.000TND 3000.000TND
-15/02/2024 15/02/2024 FC029 3 mois FACTURE CONSULTING 7500.000TND 1500.000TND 6000.000TND
-15/03/2024 15/03/2024 FC030 1 mois FACTURE MAINTENANCE 2500.000TND 1000.000TND 1500.000TND
+0424 LA MANGEARIA 72 26 09 01
+14/08/2019 14/08/2019 IC000262 2436 0 1 264,277 0,000 1 264,277
 
-0646 ENTREPRISE TUNIS 07 987 654 321
-20/01/2024 20/01/2024 FC031 4 mois FACTURE EQUIPEMENT 12000.000TND 4000.000TND 8000.000TND
-10/02/2024 10/02/2024 FC032 2 mois FACTURE LOGISTIQUE 8000.000TND 3000.000TND 5000.000TND
-05/03/2024 05/03/2024 FC033 1 mois FACTURE TRANSPORT 4500.000TND 2000.000TND 2500.000TND
+0646 ECO-PRIX 98 22 71 06
+18/10/2025 18/09/2025 FT252992 209 30 1 583,642 1 567,000 16,642
 
-0751 IMPORT EXPORT TUNIS 07 111 222 333
-25/01/2024 25/01/2024 FC034 5 mois FACTURE IMPORTATION 25000.000TND 8000.000TND 17000.000TND
-05/02/2024 05/02/2024 FC035 3 mois FACTURE DOUANE 15000.000TND 5000.000TND 10000.000TND
-10/03/2024 10/03/2024 FC036 2 mois FACTURE STOCKAGE 6000.000TND 2000.000TND 4000.000TND
+0751 EL ANOUAR EXPRESS 72 22 89 83
+12/08/2025 14/05/2025 FT251494 336 90 Tahrir 12 771,360 12 727,837 43,523
+08/09/2025 10/06/2025 FT251799 309 90 S.Siène 989,631 913,639 75,992
+07/05/2026 06/02/2026 FT260304 68 90 torba 3 341,534 0,000 341,534
+19/05/2026 18/02/2026 FT260446 56 90 Ben arous 782,763 0,000 782,763
+19/05/2026 18/02/2026 FT260447 56 90 nadina jadida 1 199,507 1 042,455 157,052
+28/05/2026 27/02/2026 FT260535 47 90 Ben arous 502,039 0,000 502,039
+29/05/2026 28/02/2026 FT260547 46 90 sidi Achour 1 234,691 0,000 1 234,691
+31/05/2026 02/03/2026 FT260566 44 90 (inououj 6/ 2 1 821,710 0,000 1 821,710
+31/05/2026 02/03/2026 FT260571 44 90 narzat trim 2 590,105 0,000 590,105
+31/05/2026 02/03/2026 FT260575 44 90 CFA-000736 1 610,035 0,000 1 610,035
+03/06/2026 05/03/2026 FT260604 41 90 nadina jadida 922,083 0,000 922,083
+09/06/2026 11/03/2026 FT260662 35 90 nersel trim 1 1 168,279 0,000 1 168,279
+09/06/2026 11/03/2026 FT260664 35 90 S.Siène 884,962 0,000 884,962
+09/06/2026 11/03/2026 FT260665 35 90 baraket sahel 659,559 0,000 659,559
+14/06/2026 16/03/2026 FT260714 30 90 chhz 1 095,004 0,000 1 095,004
+14/06/2026 16/03/2026 FT260715 30 90 iri khaled 1 484,025 0,000 484,025
+15/06/2026 17/03/2026 FT260734 29 90 (inououj 6(2) 846,113 0,000 846,113
+22/06/2026 24/03/2026 FT260771 22 90 torba 2 376,579 0,000 376,579
+22/06/2026 24/03/2026 FT260773 22 90 chirrir 739,816 0,000 739,816
+22/06/2026 24/03/2026 FT260774 22 90 soud battlen 886,203 0,000 886,203
+22/06/2026 24/03/2026 FT260775 22 90 baraket sahel 606,658 0,000 606,658
+25/06/2026 28/03/2026 FT260823 18 90 ariombaia 935,123 0,000 935,123
+25/06/2026 02/04/2026 FT260880 13 90 Ben arous 510,495 0,000 510,495
+
+0831 NAIFAR ISKANDAR (FEMA) 71 35 82 80
+29/06/2026 31/03/2026 FT260853 15 90 767,836 0,000 767,836
 
 TOTAL GENERAL: 30 créances
-Montant total: 132,500.000TND
-Montant payé: 46,500.000TND
-Solde restant: 86,000.000TND
+Montant total: 30,000,000
+Montant réglé: 15,000,000
+Solde restant: 15,000,000
     `.trim();
   }
 }
