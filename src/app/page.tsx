@@ -22,6 +22,7 @@ import {
   Filter,
   Download,
   Settings,
+  Save,
   X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -99,6 +100,12 @@ export default function Home() {
     }
   };
 
+  const handleSaveAnalysis = () => {
+    if (debts.length > 0 && analysis) {
+      ExportService.saveAnalysis(debts, analysis);
+    }
+  };
+
   const clearError = () => {
     setError(null);
   };
@@ -156,13 +163,16 @@ export default function Home() {
                 <Settings className="h-4 w-4" />
               </Button>
 
-              {/* Export */}
+              {/* Export & Save */}
               {debts.length > 0 && (
                 <div className="flex items-center space-x-2">
-                  <Button onClick={handleExportExcel} variant="outline" size="sm">
+                  <Button onClick={handleSaveAnalysis} variant="outline" size="sm" title="Sauvegarder l'analyse">
+                    <Save className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={handleExportExcel} variant="outline" size="sm" title="Exporter Excel">
                     <Download className="h-4 w-4" />
                   </Button>
-                  <Button onClick={handleExportPDF} variant="outline" size="sm">
+                  <Button onClick={handleExportPDF} variant="outline" size="sm" title="Exporter PDF">
                     <Download className="h-4 w-4" />
                   </Button>
                 </div>

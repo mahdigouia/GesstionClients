@@ -31,9 +31,9 @@ export class ExportService {
     // Feuille d'analyse si disponible
     if (analysis) {
       const analysisData = [
-        { 'Indicateur': 'Total Créances', 'Valeur': analysis.totalDebts.toFixed(2) + '€' },
-        { 'Indicateur': 'Total Payé', 'Valeur': analysis.totalPaid.toFixed(2) + '€' },
-        { 'Indicateur': 'Solde Restant', 'Valeur': analysis.totalBalance.toFixed(2) + '€' },
+        { 'Indicateur': 'Total Créances', 'Valeur': analysis.totalDebts.toFixed(2) + ' TND' },
+        { 'Indicateur': 'Total Payé', 'Valeur': analysis.totalPaid.toFixed(2) + ' TND' },
+        { 'Indicateur': 'Solde Restant', 'Valeur': analysis.totalBalance.toFixed(2) + ' TND' },
         { 'Indicateur': 'Taux Recouvrement', 'Valeur': analysis.recoveryRate.toFixed(1) + '%' },
         { 'Indicateur': 'Nombre de Clients', 'Valeur': analysis.clientBreakdown.length },
         { 'Indicateur': 'Alertes Critiques', 'Valeur': analysis.alerts.filter(a => a.severity === 'high').length }
@@ -109,9 +109,9 @@ Généré le: ${reportDate}
 =====================================
 RÉSUMÉ EXÉCUTIF
 =====================================
-Total des créances: ${analysis.totalDebts.toFixed(2)}€
-Total payé: ${analysis.totalPaid.toFixed(2)}€
-Solde restant: ${analysis.totalBalance.toFixed(2)}€
+Total des créances: ${analysis.totalDebts.toFixed(2)} TND
+Total payé: ${analysis.totalPaid.toFixed(2)} TND
+Solde restant: ${analysis.totalBalance.toFixed(2)} TND
 Taux de recouvrement: ${analysis.recoveryRate.toFixed(1)}%
 Nombre de clients: ${analysis.clientBreakdown.length}
 
@@ -121,7 +121,7 @@ RÉPARTITION PAR ANCIENNETÉ
 `;
     
     analysis.agingBreakdown.forEach(range => {
-      report += `${range.range}: ${range.count} créances pour ${range.amount.toFixed(2)}€ (${range.percentage.toFixed(1)}%)\n`;
+      report += `${range.range}: ${range.count} créances pour ${range.amount.toFixed(2)} TND (${range.percentage.toFixed(1)}%)\n`;
     });
 
     report += `
@@ -131,7 +131,7 @@ TOP CLIENTS À RISQUE
 `;
     
     analysis.topRiskClients.slice(0, 10).forEach((client, index) => {
-      report += `${index + 1}. ${client.clientName} - ${client.balance.toFixed(2)}€ (${client.agingDays} jours)\n`;
+      report += `${index + 1}. ${client.clientName} - ${client.balance.toFixed(2)} TND (${client.age} jours)\n`;
     });
 
     report += `
@@ -161,7 +161,7 @@ DÉTAIL DES CRÉANCES
 ${debt.clientName} (${debt.clientCode})
 Pièce: ${debt.documentNumber} - Date: ${new Date(debt.documentDate).toLocaleDateString('fr-FR')} - Échéance: ${new Date(debt.dueDate).toLocaleDateString('fr-FR')}
 Description: ${debt.description}
-Montant: ${debt.amount.toFixed(2)}€ | Règlement: ${debt.settlement.toFixed(2)}€ | Solde: ${debt.balance.toFixed(2)}€
+Montant: ${debt.amount.toFixed(2)} TND | Règlement: ${debt.settlement.toFixed(2)} TND | Solde: ${debt.balance.toFixed(2)} TND
 Âge: ${debt.age} jours | J.P: ${debt.paymentDays} | Risque: ${this.getRiskLabel(debt.riskLevel)}
 Source: ${debt.sourceFile}
 ---`;
@@ -200,5 +200,29 @@ Source: ${debt.sourceFile}
       case 'partial_payment': return 'Paiement partiel';
       default: return 'Autre';
     }
+  }
+
+  // Sauvegarder l'analyse complète dans un fichier JSON
+  static saveAnalysis(debts: ClientDebt[], analysis: AnalysisResult, fileName?: string): void {
+    const analysisData = {
+      exportDate: new Date().toISOString(),
+      exportDateFormatted: new Date().toLocaleDateString('fr-FR'),
+      summary: {
+        totalDebts: analysis.totalDebts,
+        totalPaid: analysis.totalPaid,
+        totalBalance: analysis.totalBalance,
+        recoveryRate: analysis.recoveryRate,
+        clientCount: analysis.clientBreakdown.length,
+        debtsCount: debts.length
+      },
+      debts: debts,
+      analysis: analysis
+    };
+
+    const jsonContent = JSON.stringify(analysisData, null, 2);
+    const defaultFileName = fileName || `analyse-creances-${new Date().toISOString().split('T')[0]}.json`;
+    
+    this.downloadTextFile(jsonContent, defaultFileName);
+    console.log(`Analyse sauvegardée: ${defaultFileName}`);
   }
 }
