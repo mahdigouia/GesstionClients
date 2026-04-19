@@ -22,6 +22,8 @@ export class OCRService {
     }
   }
 
+  private static currentCommercial: { code: string; name: string } | null = null;
+
   static parseDebtData(ocrText: string, fileName: string): ClientDebt[] {
     const lines = ocrText.split('\n').filter(line => line.trim());
     const debts: ClientDebt[] = [];
@@ -34,14 +36,26 @@ export class OCRService {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       
-      // Vérifier si c'est un en-tête de client
-      const clientMatch = line.match(/^(\d{4})\s+([A-Z\s\-\']+)(?:\s+(\d{2,}\s*\d{2,}\s*\d{2,}\s*\d{2,}))?/);
+      // Vérifier si c'est un commercial (pattern: C01 NOM)
+      const commercialMatch = line.match(/(C\d{2,})\s+([A-Z\s\-]+)/i);
+      if (commercialMatch) {
+        this.currentCommercial = {
+          code: commercialMatch[1].toUpperCase(),
+          name: commercialMatch[2].trim()
+        };
+        console.log('Commercial détecté:', this.currentCommercial);
+        continue;
+      }
+      
+      // Vérifier si c'est un en-tête de client (pattern: 0424 LA MANGEARIA ou similaire)
+      const clientMatch = line.match(/^(\d{4})\s+([A-Z\s\-\'\(\)\.]+?)(?:\s+(?:T[eé]l\.?\s*[:;]?\s*)?(\d[\d\s]{7,}))?$/i);
       if (clientMatch) {
         currentClient = {
           code: clientMatch[1],
           name: clientMatch[2].trim(),
-          phone: clientMatch[3] ? clientMatch[3].replace(/\s/g, '') : undefined
+          phone: clientMatch[3] ? clientMatch[3].replace(/\s/g, '').substring(0, 10) : undefined
         };
+        console.log('Client détecté:', currentClient);
         continue;
       }
       
@@ -92,6 +106,9 @@ export class OCRService {
         console.warn(`Solde incohérent pour ${docNumber}: calculé=${calculatedBalance}, lu=${balance}`);
       }
       
+      // Classifier le document selon le N° pièce
+      const documentClassification = this.classifyDocument(docNumber.trim(), ageDays, amount, settlement, balance);
+      
       return {
         id: `debt_${id}`,
         clientCode: client.code,
@@ -100,15 +117,20 @@ export class OCRService {
         dueDate: this.parseDate(dueDate),
         documentDate: this.parseDate(docDate),
         documentNumber: docNumber.trim(),
+        documentType: documentClassification.documentType,
         age: ageDays,
         paymentDays: paymentDaysNum,
         description: description.trim() || 'FACTURE',
         amount,
         settlement,
         balance,
+        paymentStatus: documentClassification.paymentStatus,
         riskLevel: this.classifyRisk(ageDays, balance > 0),
         sourceFile: fileName,
-        currency: 'TND'
+        currency: 'TND',
+        commercialCode: this.currentCommercial?.code,
+        commercialName: this.currentCommercial?.name,
+        isContentieux: documentClassification.isContentieux
       };
     }
     
@@ -147,6 +169,101 @@ export class OCRService {
     if (agingDays > 90) return 'overdue';
     if (agingDays > 30) return 'monitoring';
     return 'healthy';
+  }
+
+  /**
+   * Classifie le document selon les règles métier:
+   * - IC+chiffres: Facture impayée → Contentieux si age > 365
+   * - AV+chiffres: Facture avoir
+   * - FT+chiffres: 3 scénarios selon age et solde
+   */
+  private static classifyDocument(
+    docNumber: string, 
+    age: number, 
+    amount: number, 
+    settlement: number, 
+    balance: number
+  ): { 
+    documentType: 'invoice' | 'credit_note' | 'unpaid_old' | 'other'; 
+    paymentStatus: 'unpaid' | 'retained' | 'partial' | 'paid';
+    isContentieux: boolean;
+  } {
+    const upperDoc = docNumber.toUpperCase();
+    
+    // IC + chiffres: Facture impayée
+    if (upperDoc.startsWith('IC')) {
+      const isContentieux = age > 365 && balance > 0;
+      return {
+        documentType: isContentieux ? 'unpaid_old' : 'invoice',
+        paymentStatus: balance > 0 ? 'unpaid' : 'paid',
+        isContentieux
+      };
+    }
+    
+    // AV + chiffres: Facture avoir (crédit)
+    if (upperDoc.startsWith('AV')) {
+      return {
+        documentType: 'credit_note',
+        paymentStatus: 'paid',
+        isContentieux: false
+      };
+    }
+    
+    // FT + chiffres: Trois scénarios
+    if (upperDoc.startsWith('FT')) {
+      // Si age >= 365 ou solde = 0 → traitement standard
+      if (age >= 365 || balance <= 0) {
+        return {
+          documentType: 'invoice',
+          paymentStatus: balance <= 0 ? 'paid' : 'unpaid',
+          isContentieux: false
+        };
+      }
+      
+      // Calculer le pourcentage du solde par rapport au montant
+      const balancePercentage = amount > 0 ? (balance / amount) * 100 : 0;
+      
+      // Scénario 1: Impayé (règlement = 0)
+      if (settlement === 0) {
+        return {
+          documentType: 'invoice',
+          paymentStatus: 'unpaid',
+          isContentieux: false
+        };
+      }
+      
+      // Scénario 2: Retenu non Réglé (0.1% à 2%)
+      if (balancePercentage >= 0.1 && balancePercentage <= 2) {
+        return {
+          documentType: 'invoice',
+          paymentStatus: 'retained',
+          isContentieux: false
+        };
+      }
+      
+      // Scénario 3: Paiement partiel (2% à 99%)
+      if (balancePercentage > 2 && balancePercentage < 99) {
+        return {
+          documentType: 'invoice',
+          paymentStatus: 'partial',
+          isContentieux: false
+        };
+      }
+      
+      // Par défaut
+      return {
+        documentType: 'invoice',
+        paymentStatus: balance > 0 ? 'partial' : 'paid',
+        isContentieux: false
+      };
+    }
+    
+    // Autres types de documents
+    return {
+      documentType: 'other',
+      paymentStatus: balance > 0 ? 'unpaid' : 'paid',
+      isContentieux: false
+    };
   }
 
   // Texte de fallback pour le développement et les tests (simulant un document de 9 pages)

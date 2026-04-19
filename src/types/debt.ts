@@ -6,15 +6,22 @@ export interface ClientDebt {
   dueDate: string;
   documentDate: string;
   documentNumber: string;
+  documentType: 'invoice' | 'credit_note' | 'unpaid_old' | 'other';
   age: number;
   paymentDays: number;
   description: string;
   amount: number;
   settlement: number;
   balance: number;
+  paymentStatus: 'unpaid' | 'retained' | 'partial' | 'paid';
   riskLevel: 'healthy' | 'monitoring' | 'overdue' | 'critical';
   sourceFile: string;
   currency?: 'EUR' | 'TND' | 'USD';
+  // Commercial information
+  commercialCode?: string;
+  commercialName?: string;
+  // Contentieux flag
+  isContentieux?: boolean;
 }
 
 export interface AnalysisResult {

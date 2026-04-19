@@ -13,7 +13,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Menu,
-  X
+  X,
+  Scale
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ const navigation = [
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Factures', href: '/invoices', icon: FileText },
   { name: 'Analyse', href: '/analysis', icon: BarChart3 },
+  { name: 'Contentieux', href: '/contentieux', icon: Scale },
   { name: 'Import OCR', href: '/import', icon: Upload },
   { name: 'Paramètres', href: '/settings', icon: Settings },
 ];
