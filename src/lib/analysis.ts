@@ -8,7 +8,7 @@ export class AnalysisService {
     const totalBalance = debts.reduce((sum, debt) => sum + debt.balance, 0);
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
 
-    // Analyse par client
+    // Analyse par client avancée
     const clientMap = new Map<string, any>();
     debts.forEach(debt => {
       if (!clientMap.has(debt.clientName)) {
@@ -16,12 +16,18 @@ export class AnalysisService {
           clientName: debt.clientName,
           totalAmount: 0,
           totalBalance: 0,
-          riskLevel: 'healthy'
+          totalPaid: 0,
+          riskLevel: 'healthy',
+          paymentDelays: [] as number[],
+          debtCount: 0
         });
       }
       const client = clientMap.get(debt.clientName);
       client.totalAmount += debt.amount;
       client.totalBalance += debt.balance;
+      client.totalPaid += debt.settlement;
+      client.paymentDelays.push(debt.paymentDays);
+      client.debtCount++;
       
       // Déterminer le niveau de risque le plus élevé pour ce client
       if (debt.riskLevel === 'critical' || client.riskLevel === 'critical') {
@@ -33,7 +39,14 @@ export class AnalysisService {
       }
     });
 
+    // Calculer les délais moyens pour chaque client
     const clientBreakdown = Array.from(clientMap.values())
+      .map(client => ({
+        ...client,
+        averagePaymentDelay: client.paymentDelays.length > 0 
+          ? client.paymentDelays.reduce((a: number, b: number) => a + b, 0) / client.paymentDelays.length 
+          : 0
+      }))
       .sort((a, b) => b.totalBalance - a.totalBalance);
 
     // Analyse par ancienneté
@@ -61,6 +74,32 @@ export class AnalysisService {
       percentage: totalBalance > 0 ? (range.amount / totalBalance) * 100 : 0
     }));
 
+    // Analyse par tranches de montant
+    const amountRanges = [
+      { range: '< 1,000 TND', min: 0, max: 1000, count: 0, amount: 0 },
+      { range: '1,000 - 5,000 TND', min: 1001, max: 5000, count: 0, amount: 0 },
+      { range: '5,001 - 10,000 TND', min: 5001, max: 10000, count: 0, amount: 0 },
+      { range: '10,001 - 50,000 TND', min: 10001, max: 50000, count: 0, amount: 0 },
+      { range: '> 50,000 TND', min: 50001, max: Infinity, count: 0, amount: 0 }
+    ];
+
+    debts.forEach(debt => {
+      if (debt.balance > 0) {
+        const range = amountRanges.find(r => debt.balance >= r.min && debt.balance <= r.max);
+        if (range) {
+          range.count++;
+          range.amount += debt.balance;
+        }
+      }
+    });
+
+    const amountRangesResult = amountRanges.map(range => ({
+      range: range.range,
+      count: range.count,
+      amount: range.amount,
+      percentage: totalBalance > 0 ? (range.amount / totalBalance) * 100 : 0
+    }));
+
     // Top clients à risque
     const topRiskClients = debts
       .filter(debt => debt.balance > 0 && (debt.riskLevel === 'critical' || debt.riskLevel === 'overdue'))
@@ -70,6 +109,45 @@ export class AnalysisService {
     // Génération des alertes
     const alerts = this.generateAlerts(debts, clientBreakdown);
 
+    // Statistiques avancées
+    const allAges = debts.map(d => d.age);
+    const allAmounts = debts.map(d => d.balance);
+    const paymentDelays = debts.filter(d => d.settlement > 0).map(d => d.paymentDays);
+
+    const averageDebtAmount = debts.length > 0 ? allAmounts.reduce((a, b) => a + b, 0) / debts.length : 0;
+    const averagePaymentDelay = paymentDelays.length > 0 
+      ? paymentDelays.reduce((a, b) => a + b, 0) / paymentDelays.length 
+      : 0;
+    
+    // Calculer la médiane
+    const sortedAmounts = [...allAmounts].sort((a, b) => a - b);
+    const medianDebtAmount = sortedAmounts.length > 0 
+      ? sortedAmounts[Math.floor(sortedAmounts.length / 2)] 
+      : 0;
+
+    const maxDebtAmount = allAmounts.length > 0 ? Math.max(...allAmounts) : 0;
+    const minDebtAmount = allAmounts.length > 0 ? Math.min(...allAmounts) : 0;
+
+    // Statut de paiement
+    const fullyPaidCount = debts.filter(d => d.balance === 0 && d.settlement > 0).length;
+    const partiallyPaidCount = debts.filter(d => d.balance > 0 && d.settlement > 0).length;
+    const unpaidCount = debts.filter(d => d.settlement === 0).length;
+
+    const fullyPaidPercentage = debts.length > 0 ? (fullyPaidCount / debts.length) * 100 : 0;
+    const partiallyPaidPercentage = debts.length > 0 ? (partiallyPaidCount / debts.length) * 100 : 0;
+    const unpaidPercentage = debts.length > 0 ? (unpaidCount / debts.length) * 100 : 0;
+
+    // Prévision de trésorerie (moyenne mensuelle basée sur les 3 derniers mois)
+    const projectedMonthlyCashflow = totalPaid / 3;
+
+    // Distribution des risques
+    const riskDistribution = {
+      healthy: debts.filter(d => d.riskLevel === 'healthy').length,
+      monitoring: debts.filter(d => d.riskLevel === 'monitoring').length,
+      overdue: debts.filter(d => d.riskLevel === 'overdue').length,
+      critical: debts.filter(d => d.riskLevel === 'critical').length
+    };
+
     return {
       totalDebts,
       totalPaid,
@@ -77,8 +155,20 @@ export class AnalysisService {
       recoveryRate,
       clientBreakdown,
       agingBreakdown,
+      amountRanges: amountRangesResult,
       topRiskClients,
-      alerts
+      alerts,
+      // Métriques avancées
+      averageDebtAmount,
+      averagePaymentDelay,
+      medianDebtAmount,
+      maxDebtAmount,
+      minDebtAmount,
+      fullyPaidPercentage,
+      partiallyPaidPercentage,
+      unpaidPercentage,
+      projectedMonthlyCashflow,
+      riskDistribution
     };
   }
 

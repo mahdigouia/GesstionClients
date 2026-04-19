@@ -27,6 +27,8 @@ export interface AnalysisResult {
     totalAmount: number;
     totalBalance: number;
     riskLevel: string;
+    averagePaymentDelay: number;
+    debtCount: number;
   }[];
   agingBreakdown: {
     range: string;
@@ -34,8 +36,30 @@ export interface AnalysisResult {
     amount: number;
     percentage: number;
   }[];
+  amountRanges: {
+    range: string;
+    count: number;
+    amount: number;
+    percentage: number;
+  }[];
   topRiskClients: ClientDebt[];
   alerts: Alert[];
+  // Métriques avancées
+  averageDebtAmount: number;
+  averagePaymentDelay: number;
+  medianDebtAmount: number;
+  maxDebtAmount: number;
+  minDebtAmount: number;
+  fullyPaidPercentage: number;
+  partiallyPaidPercentage: number;
+  unpaidPercentage: number;
+  projectedMonthlyCashflow: number;
+  riskDistribution: {
+    healthy: number;
+    monitoring: number;
+    overdue: number;
+    critical: number;
+  };
 }
 
 export interface Alert {
