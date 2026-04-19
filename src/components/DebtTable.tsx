@@ -115,13 +115,13 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-2xl font-bold">
-              {totalAmount.toFixed(2)}€
+              {totalAmount.toFixed(2)} TND
             </div>
             <div className="text-sm text-gray-600">Total Facturé</div>
           </div>
           <div className="text-center p-4 bg-red-50 rounded-lg">
             <div className="text-2xl font-bold text-red-600">
-              {totalBalance.toFixed(2)}€
+              {totalBalance.toFixed(2)} TND
             </div>
             <div className="text-sm text-gray-600">Solde Restant</div>
           </div>

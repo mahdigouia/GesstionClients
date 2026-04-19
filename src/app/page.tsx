@@ -10,6 +10,7 @@ import { OCRService } from '@/lib/ocr';
 import { AnalysisService } from '@/lib/analysis';
 import { ExportService } from '@/lib/export';
 import { ClientDebt } from '@/types/debt';
+import { useDebtContext } from '@/lib/DebtContext';
 import { 
   LayoutDashboard, 
   Users, 
@@ -30,8 +31,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Home() {
-  const [debts, setDebts] = useState<ClientDebt[]>([]);
-  const [analysis, setAnalysis] = useState<any>(null);
+  const { debts, analysis, setDebts, setAnalysis } = useDebtContext();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +76,7 @@ export default function Home() {
       // Étape 4: Finalisation
       setProgress(100);
       setDebts(allDebts);
-      setAnalysis(analysisResult);
+      setAnalysis(analysisResult as any);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement';
@@ -116,7 +116,7 @@ export default function Home() {
       <Sidebar />
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto flex flex-col">
         {/* Top Navigation Bar */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
@@ -321,7 +321,7 @@ export default function Home() {
                               </div>
                               <div className="text-right">
                                 <div className="text-lg font-bold">{range.count}</div>
-                                <div className="text-sm text-gray-500">{range.amount.toFixed(0)}€</div>
+                                <div className="text-sm text-gray-500">{range.amount.toFixed(0)} TND</div>
                                 <div className="text-xs text-gray-400">{range.percentage.toFixed(1)}%</div>
                               </div>
                             </div>
@@ -348,7 +348,7 @@ export default function Home() {
                                 </div>
                                 <div>
                                   <div className="font-medium">{client.clientName}</div>
-                                  <div className="text-sm text-gray-500">{client.totalAmount.toFixed(2)}€ dû</div>
+                                  <div className="text-sm text-gray-500">{client.totalAmount.toFixed(2)} TND dû</div>
                                 </div>
                               </div>
                               <div className="text-right">

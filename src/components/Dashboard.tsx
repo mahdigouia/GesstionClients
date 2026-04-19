@@ -112,7 +112,7 @@ export function Dashboard({ analysis }: DashboardProps) {
                 <YAxis />
                 <Tooltip 
                   formatter={(value: any, name: any) => [
-                    typeof value === 'number' ? value.toFixed(2) + '€' : value,
+                    typeof value === 'number' ? value.toFixed(2) + ' TND' : value,
                     name === 'amount' ? 'Montant' : 'Nombre'
                   ]}
                 />
@@ -144,7 +144,7 @@ export function Dashboard({ analysis }: DashboardProps) {
                     <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: any) => [typeof value === 'number' ? value.toFixed(2) + '€' : value, 'Montant']} />
+                <Tooltip formatter={(value: any) => [typeof value === 'number' ? value.toFixed(2) + ' TND' : value, 'Montant']} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -163,12 +163,12 @@ export function Dashboard({ analysis }: DashboardProps) {
                 <div className="flex-1">
                   <div className="font-medium">{client.clientName}</div>
                   <div className="text-sm text-gray-500">
-                    Facture {client.invoiceNumber} • {client.agingDays} jours
+                    Facture {client.documentNumber} • {client.age} jours
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="font-bold text-lg">
-                    {client.balance.toFixed(2)}€
+                    {client.balance.toFixed(2)} TND
                   </div>
                   <Badge 
                     variant="outline" 
