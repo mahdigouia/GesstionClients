@@ -70,11 +70,14 @@ export class OCRService {
     let id = 1;
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      // Nettoyer la ligne des caractères de contrôle et espaces multiples
+      const line = lines[i].replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
+      if (!line) continue;
 
       // ─── Détection du commercial (ex: "C01 MED AMINE BEN ZAARA") ───
-      const commercialMatch = line.match(/^(C\d{2,})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-]+)/);
-      if (commercialMatch) {
+      // On retire l'ancrage strict ^ pour plus de souplesse
+      const commercialMatch = line.match(/(C\d{2,})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-]{3,})/);
+      if (commercialMatch && !currentClient) { // On ne change de commercial qu'en dehors d'un bloc client
         this.currentCommercial = {
           code: commercialMatch[1].toUpperCase(),
           name: commercialMatch[2].trim(),
@@ -83,17 +86,18 @@ export class OCRService {
         continue;
       }
 
-      // ─── Détection d'un en-tête client (ex: "0424 LA MANGEARIA 72 26 09 01") ───
-      const clientMatch = line.match(
-        /^(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]+?)(?:\s+([\d\s]{8,}))?$/i
-      );
-      if (clientMatch) {
+      // ─── Détection d'un en-tête client (ex: "0424 LA MANGEARIA...") ───
+      // Format: Code (souvent 4 chiffres) + Nom (Majuscules)
+      const clientMatch = line.match(/(\d{3,6})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{3,})/);
+      
+      // On vérifie que ce n'est pas une ligne de données (qui contient aussi des chiffres et majuscules)
+      // Une ligne client ne contient généralement pas de date DD/MM/YYYY
+      if (clientMatch && !/\d{2}\/\d{2}\/\d{4}/.test(line)) {
         currentClient = {
           code: clientMatch[1],
           name: clientMatch[2].trim(),
-          phone: clientMatch[3]
-            ? clientMatch[3].replace(/\s/g, '').substring(0, 10)
-            : undefined,
+          // On cherche un numéro de téléphone optionnel en fin de ligne
+          phone: line.match(/[\d\s]{8,}$/)?.[0]?.replace(/\s/g, '').substring(0, 10)
         };
         console.log('[OCR] Client détecté:', currentClient);
         continue;
@@ -107,7 +111,7 @@ export class OCRService {
             debts.push(debtData);
           }
         } catch (err) {
-          console.warn('[OCR] Ligne ignorée (erreur parsing):', line, err);
+          console.warn('[OCR] Ligne ignorée (erreur parsing):', line);
         }
       }
     }
@@ -122,9 +126,11 @@ export class OCRService {
    */
   private static isDataRow(line: string): boolean {
     const hasDate = /\d{2}[\/\-]\d{2}[\/\-]\d{4}/.test(line);
-    // Format montant TND: virgule + exactement 3 chiffres décimaux
-    const hasTunisianAmount = /\d+,\d{3}/.test(line);
-    return hasDate && hasTunisianAmount && line.length > 20;
+    // Format montant TND: virgule + exactement 3 chiffres décimaux.
+    // Parfois pdf-parse ajoute des espaces : on les ignore pour le test.
+    const hasTunisianAmount = /\d+,\s*?\d{3}/.test(line);
+    // Les lignes de données ont au moins une date et un montant, et sont de longueur raisonnable.
+    return hasDate && hasTunisianAmount;
   }
 
   /**
@@ -218,67 +224,36 @@ export class OCRService {
     rest: string
   ): { montant: number; reglement: number; solde: number; description: string } | null {
 
+    // Nettoyage agressif des espaces multiples pour stabiliser le parsing
+    const normalizedRest = rest.replace(/\s+/g, ' ');
+
     // Pattern avec séparateur de milliers optionnel: "1 264,277" ou "12 771,360" ou "0,000"
-    const patternFull = /\b(\d{1,3}(?:\s\d{3})*,\d{3})\b/g;
-    // Pattern simple sans séparateur de milliers: "264,277" ou "0,000"
-    const patternSimple = /\b(\d{1,3},\d{3})\b/g;
-
-    // Essai 1: avec séparateur de milliers (donne les vrais grands montants)
-    const fullMatches = [...rest.matchAll(patternFull)];
-    if (fullMatches.length >= 3) {
-      const last3 = fullMatches.slice(-3);
+    // On supporte aussi l'absence d'espace comme séparateur
+    const patternFull = /(\b\d{1,3}(?:\s\d{3})*,\d{3}\b)/g;
+    
+    const matches = [...normalizedRest.matchAll(patternFull)];
+    if (matches.length >= 3) {
+      // On prend les 3 derniers montants : Montant, Règlement, Solde
+      const last3 = matches.slice(-3);
       const m = this.parseAmount(last3[0][1]);
       const r = this.parseAmount(last3[1][1]);
       const s = this.parseAmount(last3[2][1]);
 
-      // Vérification cohérence: Solde = Montant - Règlement (tolérance 1 TND)
-      if (Math.abs(m - r - s) < 1.0 && m >= 0 && r >= 0 && s >= 0 && r <= m + 0.01) {
-        const descEnd = last3[0].index!;
+      // Vérification de cohérence (avec tolérance 1.0 TND pour arrondis OCR)
+      if (Math.abs(m - r - s) < 1.0) {
+        const firstAmountIndex = matches[matches.length - 3].index!;
         return {
           montant: m,
           reglement: r,
           solde: s,
-          description: rest.substring(0, descEnd).trim(),
+          description: normalizedRest.substring(0, firstAmountIndex).trim(),
         };
       }
     }
 
-    // Essai 2: sans séparateur de milliers (cas comme "torba 3 341,534")
-    const simpleMatches = [...rest.matchAll(patternSimple)];
-    if (simpleMatches.length >= 3) {
-      const last3 = simpleMatches.slice(-3);
-      const m = this.parseAmount(last3[0][1]);
-      const r = this.parseAmount(last3[1][1]);
-      const s = this.parseAmount(last3[2][1]);
-
-      if (Math.abs(m - r - s) < 1.0 && m >= 0 && r >= 0 && s >= 0 && r <= m + 0.01) {
-        const descEnd = last3[0].index!;
-        return {
-          montant: m,
-          reglement: r,
-          solde: s,
-          description: rest.substring(0, descEnd).trim(),
-        };
-      }
-    }
-
-    // Essai 3: toutes combinaisons avec tolérance élargie (5 TND)
-    // Utile pour les PDF avec arrondi OCR
-    if (fullMatches.length >= 3) {
-      const last3 = fullMatches.slice(-3);
-      const m = this.parseAmount(last3[0][1]);
-      const r = this.parseAmount(last3[1][1]);
-      const s = this.parseAmount(last3[2][1]);
-      if (m >= 0 && r >= 0 && s >= 0) {
-        const descEnd = last3[0].index!;
-        console.warn(`[OCR] Cohérence approx: ${m} - ${r} = ${s} (diff: ${Math.abs(m - r - s).toFixed(3)})`);
-        return {
-          montant: m,
-          reglement: r,
-          solde: s,
-          description: rest.substring(0, descEnd).trim(),
-        };
-      }
+    // Fallback si moins de 3 montants ou incohérence : on tente d'extraire tout ce qui ressemble à un montant
+    if (matches.length > 0) {
+       console.warn('[OCR] Cohérence montants non vérifiée, tentative extraction partielle pour:', normalizedRest);
     }
 
     return null;
