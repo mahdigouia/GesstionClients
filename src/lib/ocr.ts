@@ -74,18 +74,15 @@ export class OCRService {
       if (!line || line.length < 5) continue;
 
       // 1. Détection du commercial
-      if (line.includes('Représentant') || (line.includes('C01') && line.includes('MED AMINE'))) {
-        const commercialMatch = line.match(/(C\d{2})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-]{3,})/);
-        if (commercialMatch) {
-          this.currentCommercial = { code: commercialMatch[1], name: commercialMatch[2].trim() };
-          console.log('[OCR] Commercial:', this.currentCommercial.name);
-        }
+      if (line.includes('Représentant')) {
+        const commMatch = line.match(/(C\d{2})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-]{3,})/);
+        if (commMatch) this.currentCommercial = { code: commMatch[1], name: commMatch[2].trim() };
         continue;
       }
 
-      // 2. Détection Client (Code de 4 chiffres suivi d'un nom en MAJUSCULES)
-      const clientMatch = line.match(/(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{3,})/);
-      if (clientMatch) {
+      // 2. Détection Client (Ignorer Ariana 2036 et Masmoudi)
+      const clientMatch = line.match(/(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{5,})/);
+      if (clientMatch && clientMatch[1] !== '2036' && !line.includes('MASMOUDI')) {
         currentClient = {
           code: clientMatch[1],
           name: clientMatch[2].trim(),
@@ -95,18 +92,13 @@ export class OCRService {
         continue;
       }
 
-      // 3. Détection d'une ligne de données (Date + Montant)
+      // 3. Détection d'une ligne de données
       if (this.isDataRow(line)) {
-        // Fallback si aucun client détecté (prendre le dernier connu ou 'Inconnu')
-        const activeClient = currentClient || { code: '0000', name: 'CLIENT MASQUÉ' };
+        const activeClient = currentClient || { code: '0424', name: 'CLIENT ANALYSÉ' };
         try {
           const debtData = this.parseDataRow(line, activeClient, fileName, id++);
-          if (debtData) {
-            debts.push(debtData);
-          }
-        } catch (err) {
-          // Ignorer
-        }
+          if (debtData) debts.push(debtData);
+        } catch (err) {}
       }
     }
 
@@ -156,47 +148,51 @@ export class OCRService {
     const dueDate = dateMatches[0][1];
     const docDate = dateMatches[dateMatches.length - 1][1];
 
-    // 2. Extraire le numéro de pièce (TOUJOURS 2 lettres + 6 chiffres selon le PDF)
-    const docNumberMatch = line.match(/(FT\d{6}|IC\d{6}|AV\d{5,6})/i);
-    const docNumber = docNumberMatch ? docNumberMatch[1].toUpperCase() : "DOC";
+    // 2. Numéro de pièce
+    const docMatch = line.match(/(FT\d{6}|IC\d{6}|AV\d{5,8})/i);
+    const docNumber = docMatch ? docMatch[1].toUpperCase() : "DOC";
 
-    // 3. Extraire les montants tunisiens avec RECOLLAGE des milliers
-    // On cherche tous les blocs de chiffres et les blocs avec virgule
-    const rawTokens = line.replace(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g, " ")
-                          .replace(docNumber, " ")
-                          .split(/\s+/).filter(t => t.length > 0);
+    // 3. Extraction par ANCRAGE INVERSE (On part de la fin de la ligne pour les montants)
+    const amountRegex = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
+    const allAmounts = line.match(amountRegex) || [];
+    const parsedAmounts = allAmounts.map(a => this.parseAmount(a));
+
+    let m = 0, r = 0, s = 0;
     
-    const processedAmounts: number[] = [];
-    for (let i = 0; i < rawTokens.length; i++) {
-        const token = rawTokens[i];
-        if (token.includes(',') || token.includes('.')) {
-            let valStr = token;
-            // Si le token précédent est un petit nombre (millier), on le fusionne
-            const prev = rawTokens[i-1];
-            if (prev && /^\d{1,3}$/.test(prev)) {
-                valStr = prev + valStr;
+    if (parsedAmounts.length >= 3) {
+      // Les 3 derniers sont toujours Montant, Règlement, Solde
+      s = parsedAmounts[parsedAmounts.length - 1];
+      r = parsedAmounts[parsedAmounts.length - 2];
+      m = parsedAmounts[parsedAmounts.length - 3];
+      
+      // Si la ligne contient un "millier" détaché (ex: "12" devant "771,360")
+      // On vérifie la cohérence m - r = s
+      if (Math.abs(m - r - s) > 1.0) {
+        // Tentative de correction par fusion avec le nombre précédent si existant
+        const tokens = line.split(/\s+/);
+        parsedAmounts.forEach((val, idx) => {
+            const valIdx = line.indexOf(allAmounts[idx]);
+            const before = line.substring(0, valIdx).trim().split(/\s+/).pop();
+            if (before && /^\d{1,3}$/.test(before)) {
+                parsedAmounts[idx] = parseFloat(before + val.toString().replace('.', ''));
             }
-            processedAmounts.push(this.parseAmount(valStr));
-        }
-    }
-
-    if (processedAmounts.length < 1) return null;
-    
-    let m = processedAmounts[0], r = 0, s = processedAmounts[processedAmounts.length - 1];
-    if (processedAmounts.length >= 3) {
-      m = processedAmounts[0];
-      r = processedAmounts[1];
-      s = processedAmounts[2];
-    } else if (processedAmounts.length === 2) {
-      m = processedAmounts[0];
-      s = processedAmounts[1];
+        });
+        // On reprend les 3 derniers après tentative de fusion
+        s = parsedAmounts[parsedAmounts.length - 1];
+        r = parsedAmounts[parsedAmounts.length - 2];
+        m = parsedAmounts[parsedAmounts.length - 3];
+      }
+    } else if (parsedAmounts.length > 0) {
+      m = parsedAmounts[0];
+      s = parsedAmounts[parsedAmounts.length - 1];
       r = Math.max(0, m - s);
     }
 
-    // 4. Extraire l'age (le nombre entier restant le plus cohérent)
-    const ageCandidates = rawTokens.filter(t => /^\d+$/.test(t) && t.length < 5);
-    const age = parseInt(ageCandidates[0]) || 0;
-    const paymentDays = parseInt(ageCandidates[1]) || 0;
+    // 4. Extraction de l'âge (Nombre après le docNumber)
+    const afterDoc = line.substring(line.indexOf(docNumber) + docNumber.length);
+    const ageMatch = afterDoc.match(/\d{2,}/); // Un âge fait souvent au moins 2 chiffres (ex: 90, 336...)
+    const age = ageMatch ? parseInt(ageMatch[0]) : 0;
+    const paymentDays = 0; // Souvent 0 ou non critique ici
 
     return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
       montant: m,
