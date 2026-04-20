@@ -335,10 +335,10 @@ export default function Home() {
                     <Card>
                       <CardContent className="p-6">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">
-                          Top Clients par Montant Dû
+                          Liste des Clients et Portefeuille de Créances
                         </h3>
                         <div className="space-y-3">
-                          {analysis.clientBreakdown?.slice(0, 10).map((client: any, index: number) => (
+                          {analysis.clientBreakdown?.map((client: any, index: number) => (
                             <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                               <div className="flex items-center space-x-3">
                                 <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
