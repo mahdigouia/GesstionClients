@@ -154,32 +154,54 @@ export class OCRService {
     id: number
   ): ClientDebt | null {
 
-    // Étape 1: Extraire les champs de l'en-tête
-    const headerRegex = /^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\w+)\s+(\d+)\s+(\d+)\s+(.+)$/;
-    const headerMatch = line.match(headerRegex);
-    if (!headerMatch) return null;
+    // Étape 1: Extraire les dates et le numéro de pièce de manière flexible
+    // On cherche deux dates DD/MM/YYYY suivies d'un bloc de texte (le numéro de pièce)
+    const dateRegex = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g;
+    const dateMatches = [...line.matchAll(dateRegex)];
+    
+    if (dateMatches.length < 2) return null;
 
-    const [, dueDate, docDate, docNumber, ageStr, paymentDaysStr, rest] = headerMatch;
+    const dueDate = dateMatches[0][1];
+    const docDate = dateMatches[1][1];
 
-    // Étape 2: Extraire les 3 montants TND depuis la fin de la ligne (avec vérification cohérence)
+    // On cherche le numéro de pièce juste après la 2ème date
+    const afterDates = line.substring(line.indexOf(docDate) + docDate.length).trim();
+    const parts = afterDates.split(/\s+/);
+    if (parts.length < 3) return null; // Il nous faut au moins Pièce, Age, NbrJP...
+
+    const docNumber = parts[0];
+    const ageStr = parts[1];
+    const paymentDaysStr = parts[2];
+    const rest = parts.slice(3).join(' ');
+
+    // Étape 2: Extraire les 3 montants TND depuis le reste de la ligne
     const parsed = this.extractThreeAmounts(rest);
     if (!parsed) {
-      console.warn('[OCR] Impossible d\'extraire 3 montants de:', rest);
-      return null;
+      // Tentative désespérée : chercher dans toute la ligne si l'extraction par segments a échoué
+      const fallbackParsed = this.extractThreeAmounts(line);
+      if (!fallbackParsed) return null;
+      return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, ageStr, paymentDaysStr, fallbackParsed);
     }
 
-    const { montant: amount, reglement: settlement, solde: balance, description } = parsed;
-    const ageDays = parseInt(ageStr, 10);
-    const paymentDaysNum = parseInt(paymentDaysStr, 10);
+    return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, ageStr, paymentDaysStr, parsed);
+  }
 
-    // Étape 3: Classer le document
-    const classification = this.classifyDocument(
-      docNumber.trim(),
-      ageDays,
-      amount,
-      settlement,
-      balance
-    );
+  private static constructDebtObject(
+    id: number,
+    client: { code: string; name: string; phone?: string },
+    fileName: string,
+    dueDate: string,
+    docDate: string,
+    docNumber: string,
+    ageStr: string,
+    paymentDaysStr: string,
+    amounts: { montant: number; reglement: number; solde: number; description: string }
+  ): ClientDebt {
+    const { montant: amount, reglement: settlement, solde: balance, description } = amounts;
+    const ageDays = parseInt(ageStr, 10) || 0;
+    const paymentDaysNum = parseInt(paymentDaysStr, 10) || 0;
+
+    const classification = this.classifyDocument(docNumber, ageDays, amount, settlement, balance);
 
     return {
       id: `debt_${id}`,
@@ -188,7 +210,7 @@ export class OCRService {
       clientPhone: client.phone,
       dueDate: this.parseDate(dueDate),
       documentDate: this.parseDate(docDate),
-      documentNumber: docNumber.trim(),
+      documentNumber: docNumber,
       documentType: classification.documentType,
       age: ageDays,
       paymentDays: paymentDaysNum,
@@ -224,29 +246,28 @@ export class OCRService {
     rest: string
   ): { montant: number; reglement: number; solde: number; description: string } | null {
 
-    // Nettoyage agressif des espaces multiples pour stabiliser le parsing
-    const normalizedRest = rest.replace(/\s+/g, ' ');
+    // Nettoyage agressif des espaces multiples et caractères spéciaux
+    const normalizedRest = rest.replace(/\s+/g, ' ').replace(/[^\d\s\.,\-]/g, ' ');
 
-    // Pattern avec séparateur de milliers optionnel: "1 264,277" ou "12 771,360" ou "0,000"
-    // On supporte aussi l'absence d'espace comme séparateur
-    const patternFull = /(\b\d{1,3}(?:\s\d{3})*,\d{3}\b)/g;
+    // Pattern pour montant tunisien : 1 264,277 ou 0,000 ou 43,523
+    // On est très flexible sur les séparateurs car l'OCR peut bafouiller
+    const patternFull = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
     
-    const matches = [...normalizedRest.matchAll(patternFull)];
-    if (matches.length >= 3) {
-      // On prend les 3 derniers montants : Montant, Règlement, Solde
+    const matches = normalizedRest.match(patternFull);
+    if (matches && matches.length >= 3) {
+      // On prend les 3 derniers montants à partir de la DROITE (Montant, Règlement, Solde)
       const last3 = matches.slice(-3);
-      const m = this.parseAmount(last3[0][1]);
-      const r = this.parseAmount(last3[1][1]);
-      const s = this.parseAmount(last3[2][1]);
+      const m = this.parseAmount(last3[0]);
+      const r = this.parseAmount(last3[1]);
+      const s = this.parseAmount(last3[2]);
 
-      // Vérification de cohérence (avec tolérance 1.0 TND pour arrondis OCR)
-      if (Math.abs(m - r - s) < 1.0) {
-        const firstAmountIndex = matches[matches.length - 3].index!;
+      // Si le solde est nul ou si la cohérence est respectée (tolérance 2 TND)
+      if (Math.abs(m - r - s) < 2.0 || s === 0) {
         return {
           montant: m,
           reglement: r,
           solde: s,
-          description: normalizedRest.substring(0, firstAmountIndex).trim(),
+          description: normalizedRest.split(last3[0])[0].trim(),
         };
       }
     }
