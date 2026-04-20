@@ -73,37 +73,39 @@ export class OCRService {
       const line = lines[i].replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
       if (!line || line.length < 5) continue;
 
-      // 1. Détection du commercial (ex: "C01 MED AMINE BEN ZAARA")
+      // 1. Détection du commercial
       if (line.includes('Représentant') || (line.includes('C01') && line.includes('MED AMINE'))) {
         const commercialMatch = line.match(/(C\d{2})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-]{3,})/);
         if (commercialMatch) {
           this.currentCommercial = { code: commercialMatch[1], name: commercialMatch[2].trim() };
+          console.log('[OCR] Commercial:', this.currentCommercial.name);
         }
         continue;
       }
 
-      // 2. Détection Client (4 chiffres + Nom en majuscules)
-      // On évite de prendre l'en-tête ou les totaux en vérifiant la structure
-      const clientMatch = line.match(/(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{5,})/);
-      if (clientMatch && !line.includes('ARIANA') && !line.includes('MASMOUDI')) {
+      // 2. Détection Client (Code de 4 chiffres suivi d'un nom en MAJUSCULES)
+      const clientMatch = line.match(/(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{3,})/);
+      if (clientMatch) {
         currentClient = {
           code: clientMatch[1],
           name: clientMatch[2].trim(),
           phone: line.match(/(?:Tel|Tél)\s*:\s*([\d\s]{8,})/i)?.[1]?.replace(/\s/g, '')
         };
-        console.log('[OCR] Client identifié:', currentClient.name);
+        console.log('[OCR] Client:', currentClient.name);
         continue;
       }
 
-      // 3. Détection d'une ligne de données
-      if (currentClient && this.isDataRow(line)) {
+      // 3. Détection d'une ligne de données (Date + Montant)
+      if (this.isDataRow(line)) {
+        // Fallback si aucun client détecté (prendre le dernier connu ou 'Inconnu')
+        const activeClient = currentClient || { code: '0000', name: 'CLIENT MASQUÉ' };
         try {
-          const debtData = this.parseDataRow(line, currentClient, fileName, id++);
+          const debtData = this.parseDataRow(line, activeClient, fileName, id++);
           if (debtData) {
             debts.push(debtData);
           }
         } catch (err) {
-          // Ignorer l'erreur sur cette ligne
+          // Ignorer
         }
       }
     }
