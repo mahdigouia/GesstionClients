@@ -1,11 +1,130 @@
 import { ClientDebt } from '@/types/debt';
+import { transformExtractedDebts, parseExtractionResponse } from '@/lib/table-extractor/transformer';
 
 export class OCRService {
+
+  /**
+   * Extrait les créances d'un PDF en utilisant le microservice Python (pdfplumber/Camelot).
+   * C'est la méthode RECOMMANDÉE car elle donne des résultats bien plus précis.
+   * Fallback automatique sur l'extraction legacy si le service Python est indisponible.
+   */
+  static async extractDebtsFromPDF(file: File): Promise<{
+    debts: ClientDebt[];
+    method: string;
+    success: boolean;
+    fallback?: boolean;
+  }> {
+    try {
+      console.log(`[PDF Extract] Début extraction avec Python: ${file.name}`);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Essayer le nouveau endpoint pdf-extract
+      const response = await fetch('/api/pdf-extract', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`PDF Extract API failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Si extraction Python réussie
+      if (data.success && data.debts && data.debts.length > 0) {
+        console.log(`[PDF Extract] Succès avec Python: ${data.debts.length} créances trouvées`);
+        return {
+          debts: data.debts,
+          method: data.method || 'pdfplumber-python',
+          success: true
+        };
+      }
+
+      // Si méthode legacy (fallback)
+      if (data.fallback && data.text) {
+        console.log('[PDF Extract] Fallback sur extraction legacy');
+        const parsedDebts = this.parseDebtData(data.text, file.name);
+        return {
+          debts: parsedDebts,
+          method: 'pdf-parse-legacy',
+          success: parsedDebts.length > 0,
+          fallback: true
+        };
+      }
+
+      // Aucune donnée trouvée
+      return {
+        debts: [],
+        method: data.method || 'unknown',
+        success: false
+      };
+
+    } catch (error) {
+      console.warn('[PDF Extract] Service Python indisponible, fallback sur OCR legacy:', error);
+      
+      // Fallback sur l'extraction legacy
+      try {
+        const text = await this.extractTextFromPDF(file);
+        const debts = this.parseDebtData(text, file.name);
+        
+        return {
+          debts,
+          method: 'ocr-fallback',
+          success: debts.length > 0,
+          fallback: true
+        };
+      } catch (fallbackError) {
+        console.error('[PDF Extract] Fallback échoué:', fallbackError);
+        return {
+          debts: [],
+          method: 'failed',
+          success: false
+        };
+      }
+    }
+  }
+
+  /**
+   * Vérifie si le service Python est disponible
+   */
+  static async checkPythonServiceHealth(): Promise<{
+    available: boolean;
+    status: string;
+  }> {
+    try {
+      const response = await fetch('/api/pdf-extract', {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          available: data.python_service === 'connected',
+          status: data.python_service || 'unknown'
+        };
+      }
+
+      return {
+        available: false,
+        status: 'unavailable'
+      };
+
+    } catch {
+      return {
+        available: false,
+        status: 'disconnected'
+      };
+    }
+  }
 
   /**
    * Extrait le texte d'un PDF via l'API serveur (pdf-parse).
    * Supporte les PDF multi-pages de type "Etat de Recouvrement Client".
    * Fallback sur le texte statique si l'API est indisponible.
+   * @deprecated Utilisez extractDebtsFromPDF pour une extraction plus précise
    */
   static async extractTextFromPDF(file: File): Promise<string> {
     try {
@@ -287,7 +406,7 @@ export class OCRService {
     }
 
     // Fallback si moins de 3 montants ou incohérence : on tente d'extraire tout ce qui ressemble à un montant
-    if (matches.length > 0) {
+    if (matches && matches.length > 0) {
        console.warn('[OCR] Cohérence montants non vérifiée, tentative extraction partielle pour:', normalizedRest);
     }
 

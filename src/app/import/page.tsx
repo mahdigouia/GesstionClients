@@ -32,13 +32,14 @@ export default function ImportPage() {
         const fileProgress = 20 + (60 * i / totalFiles);
         setProgress(Math.round(fileProgress));
         
-        const ocrText = await OCRService.extractTextFromPDF(file);
-        const parsedDebts = OCRService.parseDebtData(ocrText, file.name);
+        // Utiliser le nouveau service d'extraction Python (avec fallback automatique)
+        const result = await OCRService.extractDebtsFromPDF(file);
         
-        if (parsedDebts.length === 0) {
+        if (!result.success || result.debts.length === 0) {
           console.warn(`Aucune donnée trouvée dans: ${file.name}`);
         } else {
-          allNewDebts = [...allNewDebts, ...parsedDebts];
+          console.log(`[Import] ${file.name}: ${result.debts.length} créances via ${result.method}${result.fallback ? ' (fallback)' : ''}`);
+          allNewDebts = [...allNewDebts, ...result.debts];
         }
       }
       

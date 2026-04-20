@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  pdf-service:
+    build: ./python-pdf-service
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  nextjs:
+    build: .
+    ports:
+      - "9002:9002"
+    environment:
+      - PDF_SERVICE_URL=http://pdf-service:8000
+    depends_on:
+      pdf-service:
+        condition: service_healthy
+    restart: unless-stopped
