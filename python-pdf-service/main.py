@@ -98,8 +98,15 @@ def is_client_row(row: List[str]) -> bool:
     if not row:
         return False
     first_cell = row[0].strip() if row[0] else ""
-    # Code client: 4 chiffres suivi d'un nom
-    return bool(re.match(r'^\d{4}$', first_cell)) and len(row) > 1
+    # Code client: 4 chiffres suivi d'un nom (pas une date, pas un montant)
+    if not re.match(r'^\d{4}$', first_cell):
+        return False
+    # Vérifier que ce n'est pas une ligne de données (qui commence aussi par 4 chiffres parfois)
+    row_text = ' '.join(row)
+    has_date = bool(re.search(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', row_text))
+    has_amount = bool(re.search(r'\d+,\d{3}', row_text))  # Format TND avec virgule
+    # Si ça a une date ET un montant, c'est une ligne de données, pas un client
+    return not (has_date and has_amount)
 
 
 def extract_client_info(row: List[str]) -> Optional[Dict[str, str]]:
@@ -108,7 +115,30 @@ def extract_client_info(row: List[str]) -> Optional[Dict[str, str]]:
         return None
     
     code = row[0].strip()
-    name = row[1].strip() if len(row) > 1 else ""
+    
+    # Concaténer toutes les cellules pour former le nom (gère les noms avec espaces)
+    # Exclure les cellules qui ressemblent à des dates, montants ou téléphones
+    name_parts = []
+    for i, cell in enumerate(row[1:], 1):  # Skip first cell (code)
+        cell = cell.strip()
+        if not cell:
+            continue
+        # Ignorer les dates
+        if re.match(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', cell):
+            continue
+        # Ignorer les montants TND
+        if re.search(r'\d+,\d{3}', cell):
+            continue
+        # Ignorer les numéros de téléphone seuls
+        if re.match(r'^(?:\d{2}\s*){4}$', cell.replace('.', '').replace('-', '')):
+            continue
+        name_parts.append(cell)
+    
+    name = ' '.join(name_parts).strip()
+    
+    # Si on n'a pas trouvé de nom, essayer la deuxième cellule brute
+    if not name and len(row) > 1:
+        name = row[1].strip()
     
     # Chercher un numéro de téléphone dans toute la ligne
     phone = None

@@ -200,24 +200,43 @@ export class OCRService {
       }
 
       // 2. Détection Client (Ignorer Ariana 2036 et Masmoudi)
-      const clientMatch = line.match(/(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{5,})/);
-      if (clientMatch && clientMatch[1] !== '2036' && !line.includes('MASMOUDI')) {
+      // Nouvelle regex plus permissive: code 4 chiffres + nom jusqu'à "Tél" ou fin de ligne
+      // Gère: "0424 LA MANGEARIA", "0646 ECO-PRIX", "0751 EL ANOUAR EXPRESS", "0831 NAIFAR ISKANDAR (FEMA)"
+      const clientMatch = line.match(/^(\d{4})\s+([A-Z][A-Z0-9\s\-'_().]*?)(?=\s+T[eé]l|\s{3,}|\d{2,}|$)/i);
+      if (clientMatch && clientMatch[1] !== '2036' && !line.includes('MASMOUDI') && !line.includes('SARL')) {
         currentClient = {
           code: clientMatch[1],
-          name: clientMatch[2].trim(),
-          phone: line.match(/(?:Tel|Tél)\s*:\s*([\d\s]{8,})/i)?.[1]?.replace(/\s/g, '')
+          name: clientMatch[2].trim().replace(/\s+/g, ' '),
+          phone: line.match(/(?:Tel|T[eé]l)\s*[:;]\s*([\d\s]{8,})/i)?.[1]?.replace(/\s/g, '')
         };
         console.log('[OCR] Client:', currentClient.name);
         continue;
       }
 
+      // 2b. Détection alternative: ligne commence par code client suivi de texte (format plus simple)
+      if (!clientMatch && /^\d{4}\s+[A-Z]/.test(line) && !line.includes('2036') && !line.includes('MASMOUDI')) {
+        const simpleMatch = line.match(/^(\d{4})\s+(.+?)(?:\s+\d{2}[\/\-]|$)/);
+        if (simpleMatch && simpleMatch[2].length > 2 && simpleMatch[2].length < 50) {
+          currentClient = {
+            code: simpleMatch[1],
+            name: simpleMatch[2].trim().replace(/\s+/g, ' '),
+            phone: undefined
+          };
+          console.log('[OCR] Client (simple):', currentClient.name);
+          continue;
+        }
+      }
+
       // 3. Détection d'une ligne de données
       if (this.isDataRow(line)) {
-        const activeClient = currentClient || { code: '0424', name: 'CLIENT ANALYSÉ' };
+        // Si aucun client détecté, utiliser un placeholder mais continuer à chercher
+        const activeClient = currentClient || { code: '0000', name: 'CLIENT NON IDENTIFIÉ' };
         try {
           const debtData = this.parseDataRow(line, activeClient, fileName, id++);
           if (debtData) debts.push(debtData);
-        } catch (err) {}
+        } catch (err) {
+          // Ignorer les erreurs de parsing silencieusement
+        }
       }
     }
 
