@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
 
     // Importer pdf-parse dynamiquement (évite les erreurs de bundling côté client)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse');
+    const pdfParseModule = await import('pdf-parse');
+    const pdfParse = pdfParseModule.default || pdfParseModule;
     
     const pdfData = await pdfParse(buffer, {
       // Options pour préserver la structure du texte
