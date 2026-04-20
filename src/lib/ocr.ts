@@ -148,51 +148,49 @@ export class OCRService {
     const dueDate = dateMatches[0][1];
     const docDate = dateMatches[dateMatches.length - 1][1];
 
-    // 2. Numéro de pièce
+    // --- TOKENIZER DE PRÉCISION ---
+    
+    // 1. On isole le numéro de pièce et on l'enlève de la ligne pour éviter les collisions
     const docMatch = line.match(/(FT\d{6}|IC\d{6}|AV\d{5,8})/i);
     const docNumber = docMatch ? docMatch[1].toUpperCase() : "DOC";
+    let workingLine = line.replace(docNumber, " [PIECE] ");
 
-    // 3. Extraction par ANCRAGE INVERSE (On part de la fin de la ligne pour les montants)
-    const amountRegex = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
-    const allAmounts = line.match(amountRegex) || [];
-    const parsedAmounts = allAmounts.map(a => this.parseAmount(a));
+    // 2. On isole les dates et on les enlève
+    workingLine = workingLine.replace(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/g, " [DATE] ");
 
-    let m = 0, r = 0, s = 0;
-    
-    if (parsedAmounts.length >= 3) {
-      // Les 3 derniers sont toujours Montant, Règlement, Solde
-      s = parsedAmounts[parsedAmounts.length - 1];
-      r = parsedAmounts[parsedAmounts.length - 2];
-      m = parsedAmounts[parsedAmounts.length - 3];
-      
-      // Si la ligne contient un "millier" détaché (ex: "12" devant "771,360")
-      // On vérifie la cohérence m - r = s
-      if (Math.abs(m - r - s) > 1.0) {
-        // Tentative de correction par fusion avec le nombre précédent si existant
-        const tokens = line.split(/\s+/);
-        parsedAmounts.forEach((val, idx) => {
-            const valIdx = line.indexOf(allAmounts[idx]);
-            const before = line.substring(0, valIdx).trim().split(/\s+/).pop();
-            if (before && /^\d{1,3}$/.test(before)) {
-                parsedAmounts[idx] = parseFloat(before + val.toString().replace('.', ''));
+    // 3. On découpe en mots (tokens)
+    const tokens = workingLine.split(/\s+/).filter(t => t.length > 0 && t !== "[DATE]" && t !== "[PIECE]");
+
+    // 4. Extraction des montants (ceux qui ont une virgule)
+    const amountTokens: string[] = [];
+    for (let i = 0; i < tokens.length; i++) {
+        if (tokens[i].includes(',')) {
+            let fullAmount = tokens[i];
+            // Si le mot précédent est un petit chiffre (millier), on fusionne
+            if (i > 0 && /^\d{1,3}$/.test(tokens[i-1])) {
+                fullAmount = tokens[i-1] + fullAmount;
             }
-        });
-        // On reprend les 3 derniers après tentative de fusion
-        s = parsedAmounts[parsedAmounts.length - 1];
-        r = parsedAmounts[parsedAmounts.length - 2];
-        m = parsedAmounts[parsedAmounts.length - 3];
-      }
-    } else if (parsedAmounts.length > 0) {
-      m = parsedAmounts[0];
-      s = parsedAmounts[parsedAmounts.length - 1];
-      r = Math.max(0, m - s);
+            amountTokens.push(fullAmount);
+        }
     }
 
-    // 4. Extraction de l'âge (Nombre après le docNumber)
-    const afterDoc = line.substring(line.indexOf(docNumber) + docNumber.length);
-    const ageMatch = afterDoc.match(/\d{2,}/); // Un âge fait souvent au moins 2 chiffres (ex: 90, 336...)
-    const age = ageMatch ? parseInt(ageMatch[0]) : 0;
-    const paymentDays = 0; // Souvent 0 ou non critique ici
+    // 5. Affectation des 3 montants (les 3 derniers avec virgule)
+    let m = 0, r = 0, s = 0;
+    if (amountTokens.length >= 3) {
+        const last3 = amountTokens.slice(-3);
+        m = this.parseAmount(last3[0]);
+        r = this.parseAmount(last3[1]);
+        s = this.parseAmount(last3[2]);
+    } else if (amountTokens.length > 0) {
+        m = this.parseAmount(amountTokens[0]);
+        s = this.parseAmount(amountTokens[amountTokens.length - 1]);
+        r = Math.max(0, m - s);
+    }
+
+    // 6. Extraction de l'âge (le premier nombre sans virgule qui reste)
+    const ageToken = tokens.find(t => /^\d+$/.test(t) && t.length < 5 && !amountTokens.join('').includes(t));
+    const age = ageToken ? parseInt(ageToken) : 0;
+    const paymentDays = 0;
 
     return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
       montant: m,
