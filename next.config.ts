@@ -1,7 +1,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -30,6 +29,27 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Exclure pdf-parse du bundle client (côté serveur uniquement via API routes)
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // pdf-parse et ses dépendances ne doivent pas être bundlées côté client
+      config.resolve = config.resolve ?? {};
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        stream: false,
+        crypto: false,
+        buffer: false,
+        zlib: false,
+        net: false,
+        tls: false,
+        child_process: false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
+
