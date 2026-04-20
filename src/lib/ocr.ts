@@ -154,36 +154,56 @@ export class OCRService {
     id: number
   ): ClientDebt | null {
 
-    // Étape 1: Extraire les dates et le numéro de pièce de manière flexible
-    // On cherche deux dates DD/MM/YYYY suivies d'un bloc de texte (le numéro de pièce)
-    const dateRegex = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g;
-    const dateMatches = [...line.matchAll(dateRegex)];
-    
+    // --- STRATÉGIE "BAG OF ENTITIES" ---
+    // On extrait tout ce qu'on peut trouver dans la ligne, peu importe l'ordre.
+
+    // 1. Extraire toutes les dates (DD/MM/YYYY)
+    const dateMatches = [...line.matchAll(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g)];
     if (dateMatches.length < 2) return null;
-
     const dueDate = dateMatches[0][1];
-    const docDate = dateMatches[1][1];
+    const docDate = dateMatches[dateMatches.length - 1][1];
 
-    // On cherche le numéro de pièce juste après la 2ème date
-    const afterDates = line.substring(line.indexOf(docDate) + docDate.length).trim();
-    const parts = afterDates.split(/\s+/);
-    if (parts.length < 3) return null; // Il nous faut au moins Pièce, Age, NbrJP...
+    // 2. Extraire le numéro de pièce (FT, IC, AV suivi de chiffres)
+    const docNumberMatch = line.match(/([A-Z]{2}\d{4,})/i);
+    const docNumber = docNumberMatch ? docNumberMatch[1] : "DOC";
 
-    const docNumber = parts[0];
-    const ageStr = parts[1];
-    const paymentDaysStr = parts[2];
-    const rest = parts.slice(3).join(' ');
+    // 3. Extraire tous les montants tunisiens (XX,XXX)
+    // On cherche des groupes de chiffres avec une virgule et exactement 3 chiffres après.
+    const amountMatches = line.match(/(\d+[\.,]\d{3})/g);
+    if (!amountMatches || amountMatches.length < 1) return null;
 
-    // Étape 2: Extraire les 3 montants TND depuis le reste de la ligne
-    const parsed = this.extractThreeAmounts(rest);
-    if (!parsed) {
-      // Tentative désespérée : chercher dans toute la ligne si l'extraction par segments a échoué
-      const fallbackParsed = this.extractThreeAmounts(line);
-      if (!fallbackParsed) return null;
-      return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, ageStr, paymentDaysStr, fallbackParsed);
+    // On transforme en nombres
+    const amounts = amountMatches.map(m => this.parseAmount(m));
+    
+    // Logique d'affectation intelligente des montants :
+    // Dans ce format, s'il n'y a qu'un montant, c'est le Solde.
+    // S'il y en a 3, c'est Montant, Règlement, Solde.
+    let m = amounts[0], r = 0, s = amounts[0];
+    if (amounts.length >= 3) {
+      m = amounts[0];
+      r = amounts[1];
+      s = amounts[2];
+    } else if (amounts.length === 2) {
+      m = amounts[0];
+      s = amounts[1];
+      r = m - s;
     }
 
-    return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, ageStr, paymentDaysStr, parsed);
+    // 4. Extraire l'age et nbrJP (nombres isolés restants)
+    const numbers = line.replace(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g, "") // Enlever dates
+                        .replace(/[A-Z]{2}\d+/gi, "")                 // Enlever doc number
+                        .replace(/\d+[\.,]\d{3}/g, "")                // Enlever montants
+                        .match(/\d+/g);                               // Garder le reste
+    
+    const age = numbers ? parseInt(numbers[0]) : 0;
+    const paymentDays = (numbers && numbers.length > 1) ? parseInt(numbers[1]) : 0;
+
+    return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
+      montant: m,
+      reglement: r,
+      solde: s,
+      description: "FACTURE"
+    });
   }
 
   private static constructDebtObject(
