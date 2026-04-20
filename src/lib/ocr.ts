@@ -71,28 +71,27 @@ export class OCRService {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].replace(/[\u0000-\u001F\u007F-\u009F]/g, "").trim();
-      if (!line) continue;
+      if (!line || line.length < 5) continue;
 
-      // 1. Détection du commercial (ex: "Représentant : C01...")
-      if (line.includes('Représentant')) {
+      // 1. Détection du commercial (ex: "C01 MED AMINE BEN ZAARA")
+      if (line.includes('Représentant') || (line.includes('C01') && line.includes('MED AMINE'))) {
         const commercialMatch = line.match(/(C\d{2})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-]{3,})/);
         if (commercialMatch) {
           this.currentCommercial = { code: commercialMatch[1], name: commercialMatch[2].trim() };
-          console.log('[OCR] Commercial:', this.currentCommercial);
         }
         continue;
       }
 
-      // 2. Détection Client (Doit commencer par 4 chiffres exacts + Nom en majuscules)
-      // On ignore si ça ressemble à une adresse ou si c'est trop court
-      const clientMatch = line.match(/^(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{3,})/);
-      if (clientMatch && !line.includes('PUMA')) { // 'PUMA' est dans l'adresse de l'en-tête
+      // 2. Détection Client (4 chiffres + Nom en majuscules)
+      // On évite de prendre l'en-tête ou les totaux en vérifiant la structure
+      const clientMatch = line.match(/(\d{4})\s+([A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ][A-ZÀÂÉÈÊËÎÏÔÙÛÜÇ\s\-\'\(\)\.\/]{5,})/);
+      if (clientMatch && !line.includes('ARIANA') && !line.includes('MASMOUDI')) {
         currentClient = {
           code: clientMatch[1],
           name: clientMatch[2].trim(),
-          phone: line.match(/Tel\s*:\s*([\d\s]{8,})/i)?.[1]?.replace(/\s/g, '')
+          phone: line.match(/(?:Tel|Tél)\s*:\s*([\d\s]{8,})/i)?.[1]?.replace(/\s/g, '')
         };
-        console.log('[OCR] Nouveau Client:', currentClient.name);
+        console.log('[OCR] Client identifié:', currentClient.name);
         continue;
       }
 
@@ -104,7 +103,7 @@ export class OCRService {
             debts.push(debtData);
           }
         } catch (err) {
-          // Ligne ignorée
+          // Ignorer l'erreur sur cette ligne
         }
       }
     }
