@@ -154,31 +154,27 @@ export class OCRService {
     id: number
   ): ClientDebt | null {
 
-    // --- STRATÉGIE "BAG OF ENTITIES" ---
-    // On extrait tout ce qu'on peut trouver dans la ligne, peu importe l'ordre.
-
+    // --- STRATÉGIE "ENTITIES 2.0" ---
+    
     // 1. Extraire toutes les dates (DD/MM/YYYY)
     const dateMatches = [...line.matchAll(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g)];
     if (dateMatches.length < 2) return null;
     const dueDate = dateMatches[0][1];
     const docDate = dateMatches[dateMatches.length - 1][1];
 
-    // 2. Extraire le numéro de pièce (FT, IC, AV suivi de chiffres)
-    const docNumberMatch = line.match(/([A-Z]{2}\d{4,})/i);
+    // 2. Extraire le numéro de pièce (Limité à 6-8 chiffres pour ne pas manger le montant suivant)
+    const docNumberMatch = line.match(/([A-Z]{2}\d{4,8})/i);
     const docNumber = docNumberMatch ? docNumberMatch[1] : "DOC";
 
-    // 3. Extraire tous les montants tunisiens (XX,XXX)
-    // On cherche des groupes de chiffres avec une virgule et exactement 3 chiffres après.
-    const amountMatches = line.match(/(\d+[\.,]\d{3})/g);
+    // 3. Extraire les montants tunisiens avec support des milliers (ex: 1 264,277)
+    // On cherche : chiffre(s) + [espace optionnel + 3 chiffres]xN + virgule/point + 3 chiffres
+    const amountRegex = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
+    const amountMatches = line.match(amountRegex);
     if (!amountMatches || amountMatches.length < 1) return null;
 
-    // On transforme en nombres
     const amounts = amountMatches.map(m => this.parseAmount(m));
     
-    // Logique d'affectation intelligente des montants :
-    // Dans ce format, s'il n'y a qu'un montant, c'est le Solde.
-    // S'il y en a 3, c'est Montant, Règlement, Solde.
-    let m = amounts[0], r = 0, s = amounts[0];
+    let m = amounts[0], r = 0, s = amounts[amounts.length - 1];
     if (amounts.length >= 3) {
       m = amounts[0];
       r = amounts[1];
@@ -186,17 +182,25 @@ export class OCRService {
     } else if (amounts.length === 2) {
       m = amounts[0];
       s = amounts[1];
-      r = m - s;
+      r = Math.max(0, m - s);
     }
 
-    // 4. Extraire l'age et nbrJP (nombres isolés restants)
-    const numbers = line.replace(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g, "") // Enlever dates
-                        .replace(/[A-Z]{2}\d+/gi, "")                 // Enlever doc number
-                        .replace(/\d+[\.,]\d{3}/g, "")                // Enlever montants
-                        .match(/\d+/g);                               // Garder le reste
+    // 4. Extraire l'age (on cherche le nombre le plus élevé restant, souvent > 30)
+    // On nettoie la ligne de ce qu'on a déjà trouvé
+    let remainder = line.replace(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g, "")
+                        .replace(docNumber, "")
+                        .replace(amountRegex, "");
     
-    const age = numbers ? parseInt(numbers[0]) : 0;
-    const paymentDays = (numbers && numbers.length > 1) ? parseInt(numbers[1]) : 0;
+    const candidates = remainder.match(/\d+/g);
+    let age = 0;
+    let paymentDays = 0;
+    
+    if (candidates) {
+      // Dans le format Recouvrement, l'Age est souvent le premier grand nombre après les dates
+      const numbers = candidates.map(n => parseInt(n));
+      age = numbers.find(n => n > 10) || numbers[0] || 0;
+      paymentDays = (numbers.length > 1) ? numbers[1] : 0;
+    }
 
     return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
       montant: m,
