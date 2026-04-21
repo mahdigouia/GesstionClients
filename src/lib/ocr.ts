@@ -227,6 +227,28 @@ export class OCRService {
         }
       }
 
+      // 2c. Détection très souple: juste 4 chiffres suivis de texte (dernier recours)
+      if (/^\d{4}\s+/.test(line) && !line.includes('2036') && !line.includes('MASMOUDI')) {
+        // Vérifier que ce n'est pas une ligne de données (qui contient une date)
+        if (!line.match(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/)) {
+          const parts = line.split(/\s+/);
+          if (parts.length >= 2) {
+            const code = parts[0];
+            const name = parts.slice(1).join(' ').trim();
+            // Filtrer les noms trop courts ou contenant des patterns de données
+            if (name.length > 3 && !name.match(/^\d/)) {
+              currentClient = {
+                code: code,
+                name: name.replace(/\s+/g, ' '),
+                phone: undefined
+              };
+              console.log('[OCR] Client (fallback):', currentClient.name);
+              continue;
+            }
+          }
+        }
+      }
+
       // 3. Détection d'une ligne de données
       if (this.isDataRow(line)) {
         // Si aucun client détecté, utiliser un placeholder mais continuer à chercher

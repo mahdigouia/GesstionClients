@@ -1,0 +1,15 @@
+# Configuration Render.com pour le microservice Python
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: pdf-extractor
+    env: docker
+    rootDir: python-pdf-service
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /health
+    autoDeploy: true
