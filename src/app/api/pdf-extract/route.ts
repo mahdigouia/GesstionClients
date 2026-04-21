@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // URL du service Python (configurable via variable d'environnement)
-const PYTHON_SERVICE_URL = process.env.PDF_SERVICE_URL || 'http://localhost:8000';
+const PYTHON_SERVICE_URL = 'http://localhost:8000';
 
 // Types pour la réponse
 interface ExtractedTable {

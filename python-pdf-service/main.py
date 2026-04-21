@@ -6,13 +6,20 @@ Utilise pdfplumber (primaire) et Camelot (fallback)
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pdfplumber
-import camelot
 import tempfile
 import os
 import re
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from pydantic import BaseModel
+
+# Camelot est optionnel (difficile à installer sur Windows sans Ghostscript)
+try:
+    import camelot
+    CAMELOT_AVAILABLE = True
+except ImportError:
+    CAMELOT_AVAILABLE = False
+    camelot = None
 
 app = FastAPI(title="PDF Table Extractor", version="1.0.0")
 
@@ -345,7 +352,7 @@ async def extract_pdf(file: UploadFile = File(...)):
             print(f"pdfplumber échec: {e}")
         
         # === STRATEGIE 2: Camelot (si pdfplumber n'a rien trouvé) ===
-        if not tables:
+        if not tables and CAMELOT_AVAILABLE:
             try:
                 camelot_tables = camelot.read_pdf(tmp_path, pages='all', flavor='lattice')
                 
@@ -367,7 +374,7 @@ async def extract_pdf(file: UploadFile = File(...)):
                 print(f"Camelot échec: {e}")
         
         # === STRATEGIE 3: Camelot stream (dernier recours) ===
-        if not tables:
+        if not tables and CAMELOT_AVAILABLE:
             try:
                 camelot_tables = camelot.read_pdf(tmp_path, pages='all', flavor='stream')
                 
