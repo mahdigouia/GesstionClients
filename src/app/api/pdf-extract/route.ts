@@ -117,11 +117,13 @@ export async function POST(request: NextRequest) {
  */
 async function tryExtractDebts(file: File): Promise<PythonDebtsResponse & { success: boolean }> {
   try {
+    console.log(`[PDF Extract] Appel service Python: ${PYTHON_SERVICE_URL}/extract-debts`);
+    
     const pythonForm = new FormData();
     pythonForm.append('file', file);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout pour cold start Render
+    const timeout = setTimeout(() => controller.abort(), 60000);
 
     const response = await fetch(`${PYTHON_SERVICE_URL}/extract-debts`, {
       method: 'POST',
@@ -131,19 +133,23 @@ async function tryExtractDebts(file: File): Promise<PythonDebtsResponse & { succ
 
     clearTimeout(timeout);
 
+    console.log(`[PDF Extract] Réponse service Python: HTTP ${response.status}`);
+
     if (!response.ok) {
-      console.warn(`[PDF Extract] Service Python erreur HTTP ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[PDF Extract] Service Python erreur HTTP ${response.status}:`, errorText);
       return { success: false, debts: [], count: 0 };
     }
 
     const data: PythonDebtsResponse = await response.json();
+    console.log(`[PDF Extract] Succès: ${data.debts?.length || 0} créances extraites`);
     return { ...data, success: true };
 
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('[PDF Extract] Timeout service Python');
+      console.error('[PDF Extract] Timeout service Python (60s)');
     } else {
-      console.warn('[PDF Extract] Service Python indisponible:', error);
+      console.error('[PDF Extract] Erreur appel service Python:', error);
     }
     return { success: false, debts: [], count: 0 };
   }
