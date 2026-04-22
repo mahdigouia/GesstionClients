@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// URL du service Python (configurable via variable d'environnement)
-const PYTHON_SERVICE_URL = 'http://localhost:8000';
+// URL du service Python sur Render
+const PYTHON_SERVICE_URL = process.env.PDF_SERVICE_URL || 'https://pdf-extractor-zcni.onrender.com';
 
 // Types pour la réponse
 interface ExtractedTable {
