@@ -121,7 +121,7 @@ async function tryExtractDebts(file: File): Promise<PythonDebtsResponse & { succ
     pythonForm.append('file', file);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout pour cold start Render
 
     const response = await fetch(`${PYTHON_SERVICE_URL}/extract-debts`, {
       method: 'POST',
