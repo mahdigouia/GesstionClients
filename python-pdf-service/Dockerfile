@@ -2,14 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Dépendances système pour Camelot et pdfplumber
+# Dépendances système pour pdfplumber (minimal pour Render)
 RUN apt-get update && apt-get install -y \
-    ghostscript \
-    poppler-utils \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
-    tesseract-ocr \
-    tesseract-ocr-fra \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
