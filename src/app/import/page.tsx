@@ -16,29 +16,56 @@ export default function ImportPage() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
 
   const handleFileProcess = async (files: File[]) => {
     setIsProcessing(true);
     setProgress(0);
     setError(null);
     setSuccessMessage(null);
+    setWaitingMessage(null);
 
     try {
+      // Étape 1: Vérifier que le service Python est disponible (avec attente)
+      setProgress(10);
+      setWaitingMessage('Vérification du service...');
+      
+      const healthCheck = await OCRService.waitForPythonService(
+        (seconds, message) => {
+          setWaitingMessage(message);
+          // Progression de 10% à 50% pendant l'attente (max 90s)
+          const progressValue = Math.min(10 + (seconds * 40 / 90), 50);
+          setProgress(Math.round(progressValue));
+        },
+        90 // max 90 secondes
+      );
+      
+      if (!healthCheck.available) {
+        throw new Error(`Le service n'est pas disponible après ${healthCheck.waitedSeconds} secondes. Veuillez réessayer plus tard.`);
+      }
+      
+      setWaitingMessage(null);
+      setProgress(50);
+
+      // Étape 2: Importer les fichiers
       let allNewDebts: any[] = [];
       const totalFiles = files.length;
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileProgress = 20 + (60 * i / totalFiles);
+        const fileProgress = 50 + (40 * (i + 1) / totalFiles);
         setProgress(Math.round(fileProgress));
         
-        // Utiliser le nouveau service d'extraction Python (avec fallback automatique)
+        // Utiliser le service d'extraction Python (PAS de fallback OCR)
         const result = await OCRService.extractDebtsFromPDF(file);
         
         if (!result.success || result.debts.length === 0) {
           console.warn(`Aucune donnée trouvée dans: ${file.name}`);
+          if (result.error) {
+            console.error(`[Import] Erreur pour ${file.name}:`, result.error);
+          }
         } else {
-          console.log(`[Import] ${file.name}: ${result.debts.length} créances via ${result.method}${result.fallback ? ' (fallback)' : ''}`);
+          console.log(`[Import] ${file.name}: ${result.debts.length} créances via ${result.method}`);
           allNewDebts = [...allNewDebts, ...result.debts];
         }
       }
@@ -108,7 +135,9 @@ export default function ImportPage() {
                   <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
                     <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Traitement en cours...</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    {waitingMessage || 'Traitement en cours...'}
+                  </h3>
                   <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                     <div 
                       className="bg-blue-600 h-2 rounded-full transition-all duration-300"
@@ -116,6 +145,11 @@ export default function ImportPage() {
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-2">{progress}% complété</p>
+                  {waitingMessage && waitingMessage.includes('Démarrage') && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      Le service se réveille, cela peut prendre jusqu'à 90 secondes...
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

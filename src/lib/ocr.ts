@@ -4,15 +4,14 @@ import { transformExtractedDebts, parseExtractionResponse } from '@/lib/table-ex
 export class OCRService {
 
   /**
-   * Extrait les créances d'un PDF en utilisant le microservice Python (pdfplumber/Camelot).
-   * C'est la méthode RECOMMANDÉE car elle donne des résultats bien plus précis.
-   * Fallback automatique sur l'extraction legacy si le service Python est indisponible.
+   * Extrait les créances d'un PDF en utilisant UNIQUEMENT le microservice Python.
+   * PAS de fallback OCR - le service Python doit être disponible.
    */
   static async extractDebtsFromPDF(file: File): Promise<{
     debts: ClientDebt[];
     method: string;
     success: boolean;
-    fallback?: boolean;
+    error?: string;
   }> {
     try {
       console.log(`[PDF Extract] Début extraction avec Python: ${file.name}`);
@@ -22,7 +21,6 @@ export class OCRService {
 
       console.log('[PDF Extract] Appel API /api/pdf-extract...');
       
-      // Essayer le nouveau endpoint pdf-extract
       const response = await fetch('/api/pdf-extract', {
         method: 'POST',
         body: formData,
@@ -33,7 +31,12 @@ export class OCRService {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[PDF Extract] API erreur HTTP ${response.status}:`, errorText);
-        throw new Error(`PDF Extract API failed: ${response.status}`);
+        return {
+          debts: [],
+          method: 'error',
+          success: false,
+          error: `Service indisponible: ${response.status}`
+        };
       }
 
       const data = await response.json();
@@ -49,54 +52,27 @@ export class OCRService {
         };
       }
 
-      // Si méthode legacy (fallback)
-      if (data.fallback && data.text) {
-        console.log('[PDF Extract] Fallback sur extraction legacy');
-        const parsedDebts = this.parseDebtData(data.text, file.name);
-        return {
-          debts: parsedDebts,
-          method: 'pdf-parse-legacy',
-          success: parsedDebts.length > 0,
-          fallback: true
-        };
-      }
-
-      // Aucune donnée trouvée
-      console.log('[PDF Extract] Aucune donnée trouvée');
+      // Aucune donnée trouvée ou erreur
       return {
         debts: [],
         method: data.method || 'unknown',
-        success: false
+        success: false,
+        error: data.error || 'Aucune donnée extraite'
       };
 
     } catch (error) {
       console.error('[PDF Extract] Erreur lors appel API:', error);
-      console.warn('[PDF Extract] Fallback sur OCR legacy');
-      
-      // Fallback sur l'extraction legacy
-      try {
-        const text = await this.extractTextFromPDF(file);
-        const debts = this.parseDebtData(text, file.name);
-        
-        return {
-          debts,
-          method: 'ocr-fallback',
-          success: debts.length > 0,
-          fallback: true
-        };
-      } catch (fallbackError) {
-        console.error('[PDF Extract] Fallback échoué:', fallbackError);
-        return {
-          debts: [],
-          method: 'failed',
-          success: false
-        };
-      }
+      return {
+        debts: [],
+        method: 'error',
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue'
+      };
     }
   }
 
   /**
-   * Vérifie si le service Python est disponible
+   * Vérifie si le service Python est disponible (une seule tentative)
    */
   static async checkPythonServiceHealth(): Promise<{
     available: boolean;
@@ -105,7 +81,7 @@ export class OCRService {
     try {
       const response = await fetch('/api/pdf-extract', {
         method: 'GET',
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(60000) // 60s pour cold start
       });
 
       if (response.ok) {
@@ -126,6 +102,52 @@ export class OCRService {
         available: false,
         status: 'disconnected'
       };
+    }
+  }
+
+  /**
+   * Attend que le service Python soit disponible avec retry
+   * Affiche la progression via callbacks
+   */
+  static async waitForPythonService(
+    onProgress?: (seconds: number, message: string) => void,
+    maxWaitSeconds: number = 90
+  ): Promise<{ available: boolean; waitedSeconds: number }> {
+    const startTime = Date.now();
+    const checkInterval = 5000; // Vérifier toutes les 5 secondes
+    
+    while (true) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      
+      if (elapsed >= maxWaitSeconds) {
+        return { available: false, waitedSeconds: elapsed };
+      }
+      
+      // Appel avec timeout court (10s) pour vérifier rapidement
+      try {
+        const response = await fetch('/api/pdf-extract', {
+          method: 'GET',
+          signal: AbortSignal.timeout(10000)
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.python_service === 'connected') {
+            return { available: true, waitedSeconds: elapsed };
+          }
+        }
+      } catch {
+        // Service pas encore réveillé
+      }
+      
+      // Afficher progression
+      if (onProgress) {
+        const remaining = Math.ceil((maxWaitSeconds - elapsed) / 5) * 5;
+        onProgress(elapsed, `Démarrage du service en cours... (${elapsed}s écoulées)`);
+      }
+      
+      // Attendre avant prochaine tentative
+      await new Promise(resolve => setTimeout(resolve, checkInterval));
     }
   }
 

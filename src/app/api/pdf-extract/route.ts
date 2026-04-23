@@ -50,8 +50,8 @@ interface PythonDebtsResponse {
 /**
  * POST /api/pdf-extract
  * 
- * Extrait les créances d'un PDF en utilisant le microservice Python (pdfplumber/Camelot).
- * Si le service Python est indisponible, fallback sur l'extraction legacy.
+ * Extrait les créances d'un PDF en utilisant UNIQUEMENT le microservice Python.
+ * PAS de fallback OCR - retourne une erreur si le service est indisponible.
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -76,13 +76,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`[PDF Extract] Traitement: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
 
-    // Essayer d'abord l'endpoint optimisé /extract-debts
+    // Appeler l'endpoint Python /extract-debts
     let result = await tryExtractDebts(file);
     
     if (!result.success) {
-      // Fallback sur l'extraction legacy
-      console.warn('[PDF Extract] Service Python indisponible, fallback sur extraction legacy');
-      return fallbackToLegacy(request, file);
+      // Service Python indisponible (probablement en cold start)
+      console.warn('[PDF Extract] Service Python indisponible');
+      return NextResponse.json(
+        { 
+          error: 'Service en cours de démarrage. Veuillez réessayer dans 60-90 secondes.',
+          code: 'SERVICE_WARMING_UP',
+          success: false
+        },
+        { status: 503 }
+      );
     }
 
     const duration = Date.now() - startTime;
@@ -152,51 +159,6 @@ async function tryExtractDebts(file: File): Promise<PythonDebtsResponse & { succ
       console.error('[PDF Extract] Erreur appel service Python:', error);
     }
     return { success: false, debts: [], count: 0 };
-  }
-}
-
-/**
- * Fallback sur l'extraction legacy via l'API OCR existante
- */
-async function fallbackToLegacy(request: NextRequest, file: File): Promise<Response> {
-  try {
-    // Recréer le FormData pour l'appel interne
-    const legacyForm = new FormData();
-    legacyForm.append('file', file);
-
-    // Appeler la route legacy /api/ocr
-    const ocrResponse = await fetch(new URL('/api/ocr', request.url), {
-      method: 'POST',
-      body: legacyForm,
-    });
-
-    if (!ocrResponse.ok) {
-      throw new Error(`OCR API failed: ${ocrResponse.status}`);
-    }
-
-    const ocrData = await ocrResponse.json();
-
-    // Le parsing sera fait côté client via OCRService.parseDebtData
-    return NextResponse.json({
-      success: true,
-      text: ocrData.text,
-      pages: ocrData.pages,
-      method: 'pdf-parse-legacy',
-      fallback: true,
-      fileName: file.name
-    });
-
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Erreur inconnue';
-    console.error('[PDF Extract] Fallback legacy échoué:', message);
-    
-    return NextResponse.json(
-      { 
-        error: `Aucune méthode d'extraction disponible: ${message}`,
-        success: false
-      },
-      { status: 503 }
-    );
   }
 }
 
