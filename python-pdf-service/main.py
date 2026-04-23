@@ -263,6 +263,83 @@ def parse_data_row(
         return None
 
 
+def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContext) -> Optional[DebtData]:
+    """Parse une ligne de créance depuis le texte brut du PDF
+    Format attendu: Echéance  Date  N°pièce  Age  Nbr.J.P  Intitulé  Montant  Règlement  Solde
+    Ex: 14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277
+    """
+    try:
+        # Extraire toutes les dates
+        dates = re.findall(r'(\d{2})[\/](\d{2})[\/](\d{4})', line)
+        if len(dates) < 1:
+            return None
+        
+        # Convertir dates en format standard
+        date_objects = []
+        for d in dates:
+            date_objects.append(f"{d[2]}-{d[1]}-{d[0]}")  # YYYY-MM-DD
+        
+        due_date = date_objects[0]  # Première date = échéance
+        doc_date = date_objects[1] if len(date_objects) > 1 else due_date  # Deuxième = date doc
+        
+        # Chercher le numéro de pièce (FT######, IC######, etc.)
+        doc_match = re.search(r'([A-Z]{2}\d{6})', line)
+        doc_number = doc_match.group(1) if doc_match else ""
+        
+        # Extraire tous les montants (nombres avec espaces ou virgules)
+        # Pattern: chiffres avec espaces comme séparateurs de milliers et virgule pour décimales
+        amounts = []
+        # Chercher les patterns comme "1 264,277" ou "0,000"
+        amount_pattern = r'\d{1,3}(?:\s\d{3})*,\d+'
+        for match in re.finditer(amount_pattern, line):
+            amount_str = match.group().replace(' ', '').replace(',', '.')
+            try:
+                amounts.append(float(amount_str))
+            except:
+                pass
+        
+        if len(amounts) < 3:
+            # Essayer un pattern alternatif sans espaces
+            amount_pattern2 = r'\d{1,3}(?:,\d{3})*\.\d+|\d+\.\d+|\d+'
+            for match in re.finditer(amount_pattern2, line):
+                try:
+                    val = float(match.group().replace(',', ''))
+                    if val > 0:
+                        amounts.append(val)
+                except:
+                    pass
+        
+        if len(amounts) < 3:
+            return None
+        
+        # Les 3 derniers montants sont généralement: Montant, Règlement, Solde
+        amount = amounts[-3] if len(amounts) >= 3 else 0
+        payment = amounts[-2] if len(amounts) >= 3 else 0
+        balance = amounts[-1] if len(amounts) >= 1 else 0
+        
+        # Générer ID unique
+        debt_id = len(context.debts) + 1
+        
+        return DebtData(
+            id=debt_id,
+            client_code=client["code"],
+            client_name=client["name"],
+            client_phone=client.get("phone"),
+            doc_number=doc_number,
+            due_date=due_date,
+            doc_date=doc_date,
+            amount=amount,
+            payment=payment,
+            balance=balance,
+            commercial_code=context.current_commercial.get("code") if context.current_commercial else None,
+            commercial_name=context.current_commercial.get("name") if context.current_commercial else None
+        )
+        
+    except Exception as e:
+        print(f"[PDF Extract] Erreur parse_text_line: {e} sur ligne: {line[:50]}")
+        return None
+
+
 def detect_commercial(row: List[Any]) -> Optional[Dict[str, str]]:
     """Détecte le commercial dans une ligne"""
     row_text = ' '.join(str(cell or '') for cell in row)
@@ -474,86 +551,63 @@ async def extract_debts(file: UploadFile = File(...)):
                     pages_with_tables += 1
                     total_tables += len(tables)
                 
-                for table_idx, table in enumerate(tables, 1):
-                    sample_logged = False
-                    for row in table:
-                        if not row:
-                            continue
-                        
-                        row_text = ' '.join(str(cell or '') for cell in row)
-                        
-                        # Log quelques exemples de lignes pour diagnostiquer
-                        if not sample_logged and row_text.strip():
-                            print(f"[PDF Extract] Table {table_idx} sample: {row_text[:80]}")
-                            sample_logged = True
-                        
-                        # Détecter commercial
-                        match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', row_text)
-                        if match:
-                            print(f"[PDF Extract] Commercial trouvé: {match.group(1)} - {match.group(2).strip()}")
-                            context.current_commercial = {
-                                "code": match.group(1),
-                                "name": match.group(2).strip()
-                            }
-                            continue
-                        
-                        # Détecter client
-                        if is_client_row(row):
-                            client_info = extract_client_info(row)
-                            if client_info:
-                                print(f"[PDF Extract] Client trouvé: {client_info['code']} - {client_info['name'][:30]}")
-                                context.current_client = client_info
-                            continue
-                        
-                        # Parser données (si on a un client)
-                        if context.current_client and is_data_row(row):
-                            debt = parse_data_row(row, context.current_client, context)
-                            if debt:
-                                print(f"[PDF Extract] Créance trouvée: {debt.amount} TND pour {debt.client_name[:20]}")
-                                context.debts.append(debt)
+                # NOUVELLE APPROCHE: Utiliser le texte brut pour les PDF avec tableaux imbriqués
+                # car pdfplumber ne gère pas bien les structures complexes
+                text = page.extract_text() or ""
+                lines = text.split('\n')
+                print(f"[PDF Extract] Page {page_idx}: {len(lines)} lignes de texte")
                 
-                # Fallback: si aucune table trouvée, essayer d'extraire le texte brut
-                if not tables:
-                    text = page.extract_text() or ""
-                    lines = text.split('\n')
-                    print(f"[PDF Extract] Page {page_idx}: Fallback texte, {len(lines)} lignes")
-                    sample_logged = False
-                    for line in lines:
-                        line = line.strip()
-                        if not line:
-                            continue
+                sample_logged = False
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    # Log les premières lignes pour debug
+                    if not sample_logged:
+                        print(f"[PDF Extract] Sample ligne: {line[:100]}")
+                        sample_logged = True
+                    
+                    # Détecter commercial (ex: C01 MED AMINE BEN ZAARA)
+                    match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]+)', line)
+                    if match:
+                        print(f"[PDF Extract] Commercial trouvé: {match.group(1)} - {match.group(2).strip()[:30]}")
+                        context.current_commercial = {
+                            "code": match.group(1),
+                            "name": match.group(2).strip()
+                        }
+                        continue
+                    
+                    # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
+                    # Pattern: début de ligne avec 4 chiffres suivis d'au moins 2 mots
+                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s]+?)(?:\s+T[eé]l|$)', line)
+                    if client_match:
+                        code = client_match.group(1)
+                        name = client_match.group(2).strip()
+                        # Extraire téléphone si présent
+                        phone_match = re.search(r'T[eé]l\s*:\s*([\d\s]+)', line)
+                        phone = phone_match.group(1).replace(' ', '') if phone_match else None
                         
-                        if not sample_logged:
-                            print(f"[PDF Extract] Sample ligne: {line[:80]}")
-                            sample_logged = True
-                        
-                        # Détecter commercial
-                        match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', line)
-                        if match:
-                            print(f"[PDF Extract] Commercial trouvé (texte): {match.group(1)}")
-                            context.current_commercial = {
-                                "code": match.group(1),
-                                "name": match.group(2).strip()
-                            }
-                            continue
-                        
-                        # Détecter client (simuler une ligne de tableau)
-                        words = line.split()
-                        if words and re.match(r'^\d{4}$', words[0]):
-                            client_info = extract_client_info(words)
-                            if client_info:
-                                print(f"[PDF Extract] Client trouvé (texte): {client_info['code']}")
-                                context.current_client = client_info
-                            continue
-                        
-                        # Parser données
-                        if re.search(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', line):
-                            # Simuler une ligne de tableau avec le texte
-                            words = line.split()
-                            if context.current_client and is_data_row(words):
-                                debt = parse_data_row(words, context.current_client, context)
+                        context.current_client = {
+                            "code": code,
+                            "name": name,
+                            "phone": phone
+                        }
+                        print(f"[PDF Extract] Client trouvé: {code} - {name[:30]}")
+                        continue
+                    
+                    # Parser données de créance
+                    # Pattern: Date Echéance (DD/MM/YYYY) + Date Doc (DD/MM/YYYY) + N°pièce + Montants
+                    # Ex: 14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277
+                    if context.current_client:
+                        # Chercher une ligne avec 2 dates et des montants
+                        date_pattern = r'\d{2}[\/\-]\d{2}[\/\-]\d{4}'
+                        if re.search(date_pattern, line):
+                            # Vérifier si c'est une ligne de données (contient des montants avec , ou .)
+                            if re.search(r'\d{1,3}(?:[\s,]\d{3})+', line) or re.search(r'\d+,\d+', line):
+                                debt = parse_text_line(line, context.current_client, context)
                                 if debt:
-                                    print(f"[PDF Extract] Créance trouvée (texte): {debt.amount} TND")
+                                    print(f"[PDF Extract] Créance trouvée: {debt.amount} TND pour {debt.client_name[:20]}")
                                     context.debts.append(debt)
         
         print(f"[PDF Extract] Total pages: {total_pages}, Pages avec tables: {pages_with_tables}, Tables trouvées: {total_tables}, Créances extraites: {len(context.debts)}")
