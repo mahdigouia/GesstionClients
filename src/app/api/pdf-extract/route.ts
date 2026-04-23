@@ -207,10 +207,14 @@ async function fallbackToLegacy(request: NextRequest, file: File): Promise<Respo
  */
 export async function GET() {
   try {
+    console.log(`[PDF Extract Health] Vérification service Python: ${PYTHON_SERVICE_URL}/health`);
+    
     const response = await fetch(`${PYTHON_SERVICE_URL}/health`, {
       method: 'GET',
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(60000) // 60s pour cold start Render
     });
+    
+    console.log(`[PDF Extract Health] Réponse: HTTP ${response.status}`);
 
     if (response.ok) {
       const data = await response.json();
@@ -228,11 +232,15 @@ export async function GET() {
       { status: 503 }
     );
 
-  } catch {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
+    console.error('[PDF Extract Health] Erreur:', errorMessage);
+    
     return NextResponse.json(
       { 
         python_service: 'disconnected',
-        error: 'Service Python non accessible'
+        error: 'Service Python non accessible',
+        details: errorMessage
       },
       { status: 503 }
     );
