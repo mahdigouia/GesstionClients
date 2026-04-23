@@ -550,7 +550,7 @@ async def extract_debts(file: UploadFile = File(...)):
         os.unlink(tmp_path)
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Vérification de santé du service"""
     return {
