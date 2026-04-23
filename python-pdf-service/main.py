@@ -474,16 +474,23 @@ async def extract_debts(file: UploadFile = File(...)):
                     pages_with_tables += 1
                     total_tables += len(tables)
                 
-                for table in tables:
+                for table_idx, table in enumerate(tables, 1):
+                    sample_logged = False
                     for row in table:
                         if not row:
                             continue
                         
                         row_text = ' '.join(str(cell or '') for cell in row)
                         
+                        # Log quelques exemples de lignes pour diagnostiquer
+                        if not sample_logged and row_text.strip():
+                            print(f"[PDF Extract] Table {table_idx} sample: {row_text[:80]}")
+                            sample_logged = True
+                        
                         # Détecter commercial
                         match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', row_text)
                         if match:
+                            print(f"[PDF Extract] Commercial trouvé: {match.group(1)} - {match.group(2).strip()}")
                             context.current_commercial = {
                                 "code": match.group(1),
                                 "name": match.group(2).strip()
@@ -494,13 +501,15 @@ async def extract_debts(file: UploadFile = File(...)):
                         if is_client_row(row):
                             client_info = extract_client_info(row)
                             if client_info:
+                                print(f"[PDF Extract] Client trouvé: {client_info['code']} - {client_info['name'][:30]}")
                                 context.current_client = client_info
                             continue
                         
-                        # Parser données
-                        if is_data_row(row) and context.current_client:
+                        # Parser données (si on a un client)
+                        if context.current_client and is_data_row(row):
                             debt = parse_data_row(row, context.current_client, context)
                             if debt:
+                                print(f"[PDF Extract] Créance trouvée: {debt.amount} TND pour {debt.client_name[:20]}")
                                 context.debts.append(debt)
                 
                 # Fallback: si aucune table trouvée, essayer d'extraire le texte brut
@@ -508,14 +517,20 @@ async def extract_debts(file: UploadFile = File(...)):
                     text = page.extract_text() or ""
                     lines = text.split('\n')
                     print(f"[PDF Extract] Page {page_idx}: Fallback texte, {len(lines)} lignes")
+                    sample_logged = False
                     for line in lines:
                         line = line.strip()
                         if not line:
                             continue
                         
+                        if not sample_logged:
+                            print(f"[PDF Extract] Sample ligne: {line[:80]}")
+                            sample_logged = True
+                        
                         # Détecter commercial
                         match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', line)
                         if match:
+                            print(f"[PDF Extract] Commercial trouvé (texte): {match.group(1)}")
                             context.current_commercial = {
                                 "code": match.group(1),
                                 "name": match.group(2).strip()
@@ -527,6 +542,7 @@ async def extract_debts(file: UploadFile = File(...)):
                         if words and re.match(r'^\d{4}$', words[0]):
                             client_info = extract_client_info(words)
                             if client_info:
+                                print(f"[PDF Extract] Client trouvé (texte): {client_info['code']}")
                                 context.current_client = client_info
                             continue
                         
@@ -534,9 +550,10 @@ async def extract_debts(file: UploadFile = File(...)):
                         if re.search(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', line):
                             # Simuler une ligne de tableau avec le texte
                             words = line.split()
-                            if is_data_row(words) and context.current_client:
+                            if context.current_client and is_data_row(words):
                                 debt = parse_data_row(words, context.current_client, context)
                                 if debt:
+                                    print(f"[PDF Extract] Créance trouvée (texte): {debt.amount} TND")
                                     context.debts.append(debt)
         
         print(f"[PDF Extract] Total pages: {total_pages}, Pages avec tables: {pages_with_tables}, Tables trouvées: {total_tables}, Créances extraites: {len(context.debts)}")
