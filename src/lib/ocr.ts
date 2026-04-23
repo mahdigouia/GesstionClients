@@ -20,17 +20,24 @@ export class OCRService {
       const formData = new FormData();
       formData.append('file', file);
 
+      console.log('[PDF Extract] Appel API /api/pdf-extract...');
+      
       // Essayer le nouveau endpoint pdf-extract
       const response = await fetch('/api/pdf-extract', {
         method: 'POST',
         body: formData,
       });
 
+      console.log(`[PDF Extract] Réponse API: HTTP ${response.status}`);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[PDF Extract] API erreur HTTP ${response.status}:`, errorText);
         throw new Error(`PDF Extract API failed: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('[PDF Extract] Données reçues:', { method: data.method, success: data.success, debtsCount: data.debts?.length });
 
       // Si extraction Python réussie
       if (data.success && data.debts && data.debts.length > 0) {
@@ -55,6 +62,7 @@ export class OCRService {
       }
 
       // Aucune donnée trouvée
+      console.log('[PDF Extract] Aucune donnée trouvée');
       return {
         debts: [],
         method: data.method || 'unknown',
@@ -62,7 +70,8 @@ export class OCRService {
       };
 
     } catch (error) {
-      console.warn('[PDF Extract] Service Python indisponible, fallback sur OCR legacy:', error);
+      console.error('[PDF Extract] Erreur lors appel API:', error);
+      console.warn('[PDF Extract] Fallback sur OCR legacy');
       
       // Fallback sur l'extraction legacy
       try {
