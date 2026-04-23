@@ -439,10 +439,12 @@ async def extract_debts(file: UploadFile = File(...)):
         
         with pdfplumber.open(tmp_path) as pdf:
             total_pages = len(pdf.pages)
+            print(f"[PDF Extract] PDF ouvert: {total_pages} pages")
             
             for page_idx, page in enumerate(pdf.pages, 1):
                 # Essayer d'abord avec les paramètres par défaut
                 tables = page.extract_tables()
+                print(f"[PDF Extract] Page {page_idx}: {len(tables) if tables else 0} tables (default)")
                 
                 # Si pas de tables, essayer avec des settings plus permissifs
                 if not tables:
@@ -452,6 +454,8 @@ async def extract_debts(file: UploadFile = File(...)):
                         "snap_tolerance": 3,
                         "join_tolerance": 3,
                     })
+                    if tables:
+                        print(f"[PDF Extract] Page {page_idx}: {len(tables)} tables (lines)")
                 
                 # Si toujours pas de tables, essayer avec text
                 if not tables:
@@ -463,6 +467,8 @@ async def extract_debts(file: UploadFile = File(...)):
                         "min_words_vertical": 2,
                         "min_words_horizontal": 2,
                     })
+                    if tables:
+                        print(f"[PDF Extract] Page {page_idx}: {len(tables)} tables (text)")
                 
                 if tables:
                     pages_with_tables += 1
@@ -501,6 +507,7 @@ async def extract_debts(file: UploadFile = File(...)):
                 if not tables:
                     text = page.extract_text() or ""
                     lines = text.split('\n')
+                    print(f"[PDF Extract] Page {page_idx}: Fallback texte, {len(lines)} lignes")
                     for line in lines:
                         line = line.strip()
                         if not line:
@@ -533,6 +540,10 @@ async def extract_debts(file: UploadFile = File(...)):
                                     context.debts.append(debt)
         
         print(f"[PDF Extract] Total pages: {total_pages}, Pages avec tables: {pages_with_tables}, Tables trouvées: {total_tables}, Créances extraites: {len(context.debts)}")
+        if context.current_commercial:
+            print(f"[PDF Extract] Commercial détecté: {context.current_commercial}")
+        if context.current_client:
+            print(f"[PDF Extract] Dernier client: {context.current_client}")
         
         return {
             "success": len(context.debts) > 0,
