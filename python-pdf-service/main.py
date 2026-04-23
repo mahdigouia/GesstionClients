@@ -431,18 +431,47 @@ async def extract_debts(file: UploadFile = File(...)):
     
     try:
         context = ExtractionContext()
+        total_pages = 0
+        pages_with_tables = 0
+        total_tables = 0
         
         with pdfplumber.open(tmp_path) as pdf:
-            for page in pdf.pages:
-                # Extraire tables et parser
+            total_pages = len(pdf.pages)
+            
+            for page_idx, page in enumerate(pdf.pages, 1):
+                # Essayer d'abord avec les paramètres par défaut
                 tables = page.extract_tables()
+                
+                # Si pas de tables, essayer avec des settings plus permissifs
+                if not tables:
+                    tables = page.extract_tables({
+                        "vertical_strategy": "lines",
+                        "horizontal_strategy": "lines",
+                        "snap_tolerance": 3,
+                        "join_tolerance": 3,
+                    })
+                
+                # Si toujours pas de tables, essayer avec text
+                if not tables:
+                    tables = page.extract_tables({
+                        "vertical_strategy": "text",
+                        "horizontal_strategy": "text",
+                        "snap_tolerance": 5,
+                        "join_tolerance": 5,
+                        "min_words_vertical": 2,
+                        "min_words_horizontal": 2,
+                    })
+                
+                if tables:
+                    pages_with_tables += 1
+                    total_tables += len(tables)
                 
                 for table in tables:
                     for row in table:
                         if not row:
                             continue
                         
-                        row_text = ' '.join(row)
+                        row_text = ' '.join(str(cell or '') for cell in row)
                         
                         # Détecter commercial
                         match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', row_text)
@@ -465,12 +494,54 @@ async def extract_debts(file: UploadFile = File(...)):
                             debt = parse_data_row(row, context.current_client, context)
                             if debt:
                                 context.debts.append(debt)
+                
+                # Fallback: si aucune table trouvée, essayer d'extraire le texte brut
+                if not tables:
+                    text = page.extract_text() or ""
+                    lines = text.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        
+                        # Détecter commercial
+                        match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', line)
+                        if match:
+                            context.current_commercial = {
+                                "code": match.group(1),
+                                "name": match.group(2).strip()
+                            }
+                            continue
+                        
+                        # Détecter client (simuler une ligne de tableau)
+                        words = line.split()
+                        if words and re.match(r'^\d{4}$', words[0]):
+                            client_info = extract_client_info(words)
+                            if client_info:
+                                context.current_client = client_info
+                            continue
+                        
+                        # Parser données
+                        if re.search(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', line):
+                            # Simuler une ligne de tableau avec le texte
+                            words = line.split()
+                            if is_data_row(words) and context.current_client:
+                                debt = parse_data_row(words, context.current_client, context)
+                                if debt:
+                                    context.debts.append(debt)
+        
+        print(f"[PDF Extract] Total pages: {total_pages}, Pages avec tables: {pages_with_tables}, Tables trouvées: {total_tables}, Créances extraites: {len(context.debts)}")
         
         return {
             "success": len(context.debts) > 0,
             "debts": [debt.dict() for debt in context.debts],
             "count": len(context.debts),
-            "commercial": context.current_commercial
+            "commercial": context.current_commercial,
+            "diagnostics": {
+                "total_pages": total_pages,
+                "pages_with_tables": pages_with_tables,
+                "total_tables": total_tables
+            }
         }
         
     finally:
