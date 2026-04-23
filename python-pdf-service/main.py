@@ -100,16 +100,16 @@ def parse_date(date_str: str) -> str:
     return date_str
 
 
-def is_client_row(row: List[str]) -> bool:
+def is_client_row(row: List[Any]) -> bool:
     """Détecte si une ligne contient des informations client"""
     if not row:
         return False
-    first_cell = row[0].strip() if row[0] else ""
+    first_cell = str(row[0] or '').strip()
     # Code client: 4 chiffres suivi d'un nom (pas une date, pas un montant)
     if not re.match(r'^\d{4}$', first_cell):
         return False
     # Vérifier que ce n'est pas une ligne de données (qui commence aussi par 4 chiffres parfois)
-    row_text = ' '.join(row)
+    row_text = ' '.join(str(cell or '') for cell in row)
     has_date = bool(re.search(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', row_text))
     has_amount = bool(re.search(r'\d+,\d{3}', row_text))  # Format TND avec virgule
     # Si ça a une date ET un montant, c'est une ligne de données, pas un client
@@ -163,12 +163,13 @@ def extract_client_info(row: List[str]) -> Optional[Dict[str, str]]:
     }
 
 
-def is_data_row(row: List[str]) -> bool:
+def is_data_row(row: List[Any]) -> bool:
     """Vérifie si une ligne contient des données de créance"""
     if not row or len(row) < 3:
         return False
     
-    row_text = ' '.join(row)
+    # Filtrer les None et convertir en str
+    row_text = ' '.join(str(cell or '') for cell in row)
     # Doit contenir une date et un montant tunisien
     has_date = bool(re.search(r'\d{2}[\/\-]\d{2}[\/\-]\d{4}', row_text))
     has_amount = bool(re.search(r'\d+[\s,]\d{3}', row_text))  # Format TND
@@ -176,13 +177,14 @@ def is_data_row(row: List[str]) -> bool:
 
 
 def parse_data_row(
-    row: List[str], 
+    row: List[Any], 
     client: Dict[str, str], 
     context: ExtractionContext
 ) -> Optional[DebtData]:
     """Parse une ligne de données de créance"""
     try:
-        row_text = ' '.join(row)
+        # Filtrer les None et convertir en str
+        row_text = ' '.join(str(cell or '') for cell in row)
         
         # Extraire les dates
         dates = re.findall(r'(\d{2}[\/\-]\d{2}[\/\-]\d{4})', row_text)
@@ -261,9 +263,9 @@ def parse_data_row(
         return None
 
 
-def detect_commercial(row: List[str]) -> Optional[Dict[str, str]]:
+def detect_commercial(row: List[Any]) -> Optional[Dict[str, str]]:
     """Détecte le commercial dans une ligne"""
-    row_text = ' '.join(row)
+    row_text = ' '.join(str(cell or '') for cell in row)
     
     # Pattern: C## NOM COMMERCIAL
     match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', row_text)
@@ -275,10 +277,10 @@ def detect_commercial(row: List[str]) -> Optional[Dict[str, str]]:
     return None
 
 
-def is_header_row(row: List[str]) -> bool:
+def is_header_row(row: List[Any]) -> bool:
     """Détecte si c'est une ligne d'en-tête de tableau"""
     header_keywords = ['echéance', 'date', 'pièce', 'montant', 'règlement', 'solde', 'intitulé']
-    row_text = ' '.join(row).lower()
+    row_text = ' '.join(str(cell or '') for cell in row).lower()
     return any(kw in row_text for kw in header_keywords)
 
 
