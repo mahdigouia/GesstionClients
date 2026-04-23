@@ -36,32 +36,55 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
 
   const handleFileProcess = async (files: File[]) => {
     setIsProcessing(true);
     setProgress(0);
     setError(null);
+    setWaitingMessage(null);
 
     try {
+      // Étape 1: Attendre que le service Python soit disponible
+      setProgress(10);
+      setWaitingMessage('Vérification du service...');
+      
+      const healthCheck = await OCRService.waitForPythonService(
+        (seconds, message) => {
+          setWaitingMessage(message);
+          const progressValue = Math.min(10 + (seconds * 40 / 90), 50);
+          setProgress(Math.round(progressValue));
+        },
+        90
+      );
+      
+      if (!healthCheck.available) {
+        throw new Error(`Le service n'est pas disponible après ${healthCheck.waitedSeconds} secondes. Veuillez réessayer plus tard.`);
+      }
+      
+      setWaitingMessage(null);
+      setProgress(50);
+      
       let allDebts: ClientDebt[] = [];
       const totalFiles = files.length;
       
       // Traiter chaque fichier
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileProgress = 20 + (60 * i / totalFiles);
+        const fileProgress = 50 + (40 * (i + 1) / totalFiles);
         setProgress(Math.round(fileProgress));
         
-        // Étape 1: Extraction OCR
-        const ocrText = await OCRService.extractTextFromPDF(file);
+        // Extraction via Python (PAS de fallback OCR)
+        const result = await OCRService.extractDebtsFromPDF(file);
         
-        // Étape 2: Parsing des données
-        const parsedDebts = OCRService.parseDebtData(ocrText, file.name);
-        
-        if (parsedDebts.length === 0) {
-          console.warn(`Aucune donnée trouvée dans le fichier: ${file.name}`);
+        if (!result.success || result.debts.length === 0) {
+          console.warn(`Aucune donnée trouvée dans: ${file.name}`);
+          if (result.error) {
+            console.error(`[Import] Erreur pour ${file.name}:`, result.error);
+          }
         } else {
-          allDebts = [...allDebts, ...parsedDebts];
+          console.log(`[Import] ${file.name}: ${result.debts.length} créances via ${result.method}`);
+          allDebts = [...allDebts, ...result.debts];
         }
       }
       
@@ -221,10 +244,12 @@ export default function Home() {
                     <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Traitement des fichiers en cours...
+                    {waitingMessage || 'Traitement des fichiers en cours...'}
                   </h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    Extraction OCR et analyse des données
+                    {waitingMessage && waitingMessage.includes('Démarrage') 
+                      ? 'Le service se réveille, cela peut prendre jusqu\'à 90 secondes...'
+                      : 'Extraction Python et analyse des données'}
                   </p>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
