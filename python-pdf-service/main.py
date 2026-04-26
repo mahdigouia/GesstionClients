@@ -600,13 +600,20 @@ async def extract_debts(file: UploadFile = File(...)):
                         continue
                     
                     # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
-                    # Pattern: début de ligne avec 4 chiffres suivis d'un nom en majuscules
+                    # Pattern: début de ligne avec 4 chiffres suivis d'un nom
+                    # Accepte: lettres, espaces, tirets, apostrophes
                     # Format: 0424 LA MANGEARIA Tél: 72 26 09 01
                     # ou: 0424 LA MANGEARIA (sans téléphone)
-                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s\-]+)', line)
+                    # ou: 3206 M'HEMDI IMED Tél : 98 22 39 25
+                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s\-\']+)', line)
                     if client_match:
                         code = client_match.group(1)
                         name = client_match.group(2).strip()
+                        
+                        # Nettoyer le nom: enlever le 'T' final s'il est suivi de "él" (début de Tél)
+                        # car parfois le texte est collé: "LA MANGEARIA T" au lieu de "LA MANGEARIA Tél"
+                        if name.endswith(' T') or name.endswith(" T"):
+                            name = name[:-2].strip()
                         
                         # Nettoyer le nom (arrêter avant Tél ou fin de ligne)
                         name = re.split(r'\s+T[eé]l', name)[0].strip()

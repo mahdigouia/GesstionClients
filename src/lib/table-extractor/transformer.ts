@@ -82,13 +82,26 @@ function createClientDebt(
     // Niveau de risque
     const riskLevel = classifyRisk(data.age, data.balance > 0);
 
+    // Valider et formater les dates
+    const formatDate = (dateStr: string): string => {
+      if (!dateStr) return '';
+      // Si déjà au format YYYY-MM-DD, retourner tel quel
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+      // Si au format DD/MM/YYYY, convertir
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month}-${day}`;
+      }
+      return dateStr;
+    };
+
     return {
       id: `debt_${id}`,
       clientCode: data.client_code,
       clientName: data.client_name,
       clientPhone: data.client_phone,
-      dueDate: data.due_date,
-      documentDate: data.document_date,
+      dueDate: formatDate(data.due_date),
+      documentDate: formatDate(data.document_date),
       documentNumber: data.document_number,
       documentType: classification.documentType,
       age: data.age,
