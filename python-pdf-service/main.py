@@ -331,37 +331,25 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         payment = numbers[-2]
         balance = numbers[-1]
         
-        # Chercher l'âge: entier simple entre 0-500 dans work_line (après suppression dates)
+        # Chercher l'âge: nombre au format tunisien (avec espace) ou simple entier
         # Format PDF: "14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277"
-        # Après suppression: " 2 436 0 1 264,277 0,000 1 264,277"
-        # Âge = 2 (années), Nbr.J.P = 436 (jours), puis intitulé = 0
+        # L'âge "2 436" doit être extrait comme 2436 (sans l'espace)
         age = 0
         
-        # Chercher tous les entiers simples (1-3 chiffres) dans work_line
-        # qui ne sont pas suivis par d'autres chiffres ou virgule (ce qui indiquerait un montant)
-        simple_integers = []
-        for match in re.finditer(r'\b(\d{1,4})\b(?!\s*\d|,)', work_line):
-            val = int(match.group(1))
-            if 0 <= val <= 1500:  # Âge peut être jusqu'à 1500 jours (~4 ans)
-                simple_integers.append(val)
-        
-        print(f"[PDF Extract] Simple integers in work_line: {simple_integers}")
-        
-        if simple_integers:
-            # Le premier entier est l'âge (en jours ou en années+jours à convertir)
-            first_val = simple_integers[0]
-            # Si le premier entier est > 365, c'est probablement déjà en jours
-            # Si <= 365, et qu'il y a un deuxième entier, c'est âge en années + Nbr.J.P
-            if first_val <= 365 and len(simple_integers) >= 2:
-                # Format: 2 436 => 2*365 + 436 = 1166 jours
-                second_val = simple_integers[1]
-                if second_val <= 500:  # Second entier semble être Nbr.J.P
-                    age = first_val * 365 + second_val
-                else:
-                    age = first_val
-            else:
-                age = first_val
-            print(f"[PDF Extract] Age trouvé: {age} (from {simple_integers})")
+        # Chercher l'âge avec format tunisien (espace comme séparateur de milliers)
+        # Ex: "2 436" = 2436 jours
+        age_match = re.search(r'\b(\d{1,3})\s(\d{3})\b(?!\s*\d|,)', work_line)
+        if age_match:
+            # Âge avec espace: "2 436" → 2436
+            age_str = age_match.group(1) + age_match.group(2)
+            age = int(age_str)
+            print(f"[PDF Extract] Age trouvé (format espace): {age}")
+        else:
+            # Chercher un entier simple (sans espace)
+            simple_int_match = re.search(r'\b(\d{1,4})\b(?!\s*\d|,)', work_line)
+            if simple_int_match:
+                age = int(simple_int_match.group(1))
+                print(f"[PDF Extract] Age trouvé (entier simple): {age}")
         
         # Générer ID unique
         debt_id = len(context.debts) + 1
