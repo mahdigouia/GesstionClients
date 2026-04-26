@@ -51,16 +51,17 @@ class ExtractResponse(BaseModel):
 
 class DebtData(BaseModel):
     """Structure d'une créance extraite"""
+    id: int
     client_code: str
     client_name: str
     client_phone: Optional[str] = None
     due_date: str
-    document_date: str
-    document_number: str
-    age: int
-    description: str
+    document_date: Optional[str] = ""
+    document_number: Optional[str] = ""
+    age: Optional[int] = 0
+    description: Optional[str] = ""
     amount: float
-    settlement: float
+    settlement: Optional[float] = 0.0
     balance: float
     commercial_code: Optional[str] = None
     commercial_name: Optional[str] = None
