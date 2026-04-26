@@ -309,14 +309,16 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         
         # Chercher les nombres avec espace mais SANS virgule après
         # Pattern: nombre + espace + 3 chiffres + (pas de virgule après)
+        # Ex: "2 436" matche, mais "1 264,277" ne matche pas (virgule après)
         candidates = []
-        for match in re.finditer(r'(\d{1,3})\s+(\d{3})(?!\s*\d)(?!\s*,)', work_line):
+        for match in re.finditer(r'(\d{1,3})\s+(\d{3})\b(?!\s*,)', work_line):
             val = int(match.group(1) + match.group(2))
             candidates.append((val, match.start()))
             print(f"[PDF Extract] Candidate (space): {val} at pos {match.start()}")
         
         # Chercher aussi les entiers simples (sans espace) SANS virgule après
-        for match in re.finditer(r'\b(\d{1,4})\b(?!\s*\d)(?!\s*,)', work_line):
+        # Ex: "336" matche, mais "1,264" ne matche pas
+        for match in re.finditer(r'\b(\d{1,4})\b(?!\s*,)', work_line):
             val = int(match.group(1))
             # Vérifier qu'on n'a pas déjà trouvé ce nombre avec espace
             already_found = any(c[0] == val for c in candidates)
