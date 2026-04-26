@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, ChangeEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -133,19 +133,19 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
   }, [debts, filters]);
 
   // Notify parent of filter changes
-  useMemo(() => {
+  useEffect(() => {
     onFilterChange(filteredDebts);
   }, [filteredDebts, onFilterChange]);
 
   const updateFilter = <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters((prev: FilterState) => ({ ...prev, [key]: value }));
   };
 
   const toggleRiskLevel = (risk: string) => {
-    setFilters(prev => ({
+    setFilters((prev: FilterState) => ({
       ...prev,
       riskLevels: prev.riskLevels.includes(risk)
-        ? prev.riskLevels.filter(r => r !== risk)
+        ? prev.riskLevels.filter((r: string) => r !== risk)
         : [...prev.riskLevels, risk]
     }));
   };
