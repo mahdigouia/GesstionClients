@@ -81,11 +81,11 @@ export default function ClientsPage() {
                           <div className="flex items-center space-x-4">
                             <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
                               <span className="text-lg font-bold text-gray-600">
-                                {client.clientName.charAt(0)}
+                                {(client.clientName || '?').charAt(0)}
                               </span>
                             </div>
                             <div>
-                              <h3 className="font-semibold text-gray-900">{client.clientName}</h3>
+                              <h3 className="font-semibold text-gray-900">{client.clientName || 'Client inconnu'}</h3>
                               <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                                 <span className="flex items-center space-x-1">
                                   <FileText className="h-3 w-3" />

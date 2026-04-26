@@ -368,11 +368,11 @@ export default function Home() {
                               <div className="flex items-center space-x-3">
                                 <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
                                   <span className="text-sm font-medium text-gray-600">
-                                    {client.clientName.charAt(0).toUpperCase()}
+                                    {(client.clientName || '?').charAt(0).toUpperCase()}
                                   </span>
                                 </div>
                                 <div>
-                                  <div className="font-medium">{client.clientName}</div>
+                                  <div className="font-medium">{client.clientName || 'Client inconnu'}</div>
                                   <div className="text-sm text-gray-500">{client.totalAmount.toFixed(2)} TND dû</div>
                                 </div>
                               </div>
