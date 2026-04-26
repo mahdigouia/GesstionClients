@@ -332,25 +332,36 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         balance = numbers[-1]
         
         # Chercher l'âge: entier simple entre 0-500 dans work_line (après suppression dates)
-        # Ex: work_line = "  2 436 0 1 264,277 0,000 1 264,277"
-        # Les entiers 2, 436, 0 sont l'âge, Nbr.J.P et intitulé
-        # Les montants sont: "1 264,277", "0,000", "1 264,277"
+        # Format PDF: "14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277"
+        # Après suppression: " 2 436 0 1 264,277 0,000 1 264,277"
+        # Âge = 2 (années), Nbr.J.P = 436 (jours), puis intitulé = 0
         age = 0
         
         # Chercher tous les entiers simples (1-3 chiffres) dans work_line
         # qui ne sont pas suivis par d'autres chiffres ou virgule (ce qui indiquerait un montant)
         simple_integers = []
-        for match in re.finditer(r'\b(\d{1,3})\b(?!\s*\d|,)', work_line):
+        for match in re.finditer(r'\b(\d{1,4})\b(?!\s*\d|,)', work_line):
             val = int(match.group(1))
-            if 0 <= val <= 500:
+            if 0 <= val <= 1500:  # Âge peut être jusqu'à 1500 jours (~4 ans)
                 simple_integers.append(val)
         
         print(f"[PDF Extract] Simple integers in work_line: {simple_integers}")
         
         if simple_integers:
-            # Le premier entier est généralement l'âge
-            age = simple_integers[0]
-            print(f"[PDF Extract] Age trouvé: {age}")
+            # Le premier entier est l'âge (en jours ou en années+jours à convertir)
+            first_val = simple_integers[0]
+            # Si le premier entier est > 365, c'est probablement déjà en jours
+            # Si <= 365, et qu'il y a un deuxième entier, c'est âge en années + Nbr.J.P
+            if first_val <= 365 and len(simple_integers) >= 2:
+                # Format: 2 436 => 2*365 + 436 = 1166 jours
+                second_val = simple_integers[1]
+                if second_val <= 500:  # Second entier semble être Nbr.J.P
+                    age = first_val * 365 + second_val
+                else:
+                    age = first_val
+            else:
+                age = first_val
+            print(f"[PDF Extract] Age trouvé: {age} (from {simple_integers})")
         
         # Générer ID unique
         debt_id = len(context.debts) + 1
