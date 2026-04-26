@@ -296,9 +296,19 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             work_line = work_line.replace(doc_match.group(1), ' ')
         
         # Trouver tous les nombres dans la ligne restante
-        # Pattern pour les entiers et décimaux tunisiens
+        # Pattern pour les entiers simples (Age, Nbr.J.P) - avant les montants
+        integers = []
+        pattern_int = r'\b(\d{1,3})\b(?!\s*\d|,\d)'  # Entiers 1-3 chiffres qui ne sont pas suivis d'autres chiffres ou virgule
+        for match in re.finditer(pattern_int, work_line):
+            try:
+                val = int(match.group(1))
+                if 0 <= val <= 999:  # Age et Nbr.J.P sont généralement < 1000
+                    integers.append(val)
+            except:
+                pass
+        
+        # Pattern pour les montants tunisiens (avec espace et virgule)
         numbers = []
-        # Pattern: nombre avec espace comme séparateur de milliers et virgule décimale
         pattern_tnd = r'\d{1,3}(?:\s\d{3})*,\d+'
         for match in re.finditer(pattern_tnd, work_line):
             val_str = match.group().replace(' ', '').replace(',', '.')
@@ -329,11 +339,14 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         payment = numbers[-2]
         balance = numbers[-1]
         
-        # Chercher l'âge (nombre entier généralement entre 0-500, avant les montants)
+        # Chercher l'âge parmi les entiers extraits (généralement entre 0-500)
         age = 0
-        age_candidates = [n for n in numbers[:-3] if n < 1000 and n == int(n)]
-        if age_candidates:
-            age = int(age_candidates[0])
+        if integers:
+            # Prendre le premier entier qui semble être un âge (0-500)
+            age_candidates = [n for n in integers if n <= 500]
+            if age_candidates:
+                age = age_candidates[0]
+                print(f"[PDF Extract] Age trouvé: {age} dans: {line[:60]}")
         
         # Générer ID unique
         debt_id = len(context.debts) + 1
