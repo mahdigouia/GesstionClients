@@ -28,7 +28,6 @@ const navigation = [
   { name: 'Clients', href: '/clients', icon: Users, color: 'bg-emerald-500' },
   { name: 'Factures', href: '/invoices', icon: FileText, color: 'bg-violet-500' },
   { name: 'Analyse', href: '/analysis', icon: BarChart3, color: 'bg-amber-500' },
-  { name: 'Assistant Vocal', href: '#voice', icon: Mic, color: 'bg-pink-500', special: true },
   { name: 'Contentieux', href: '/contentieux', icon: Scale, color: 'bg-red-500' },
   { name: 'Import OCR', href: '/import', icon: Upload, color: 'bg-cyan-500' },
   { name: 'Paramètres', href: '/settings', icon: Settings, color: 'bg-gray-500' },
@@ -68,9 +67,8 @@ export function Sidebar({ className }: SidebarProps) {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white tracking-wide">GesstionClients</h1>
-              <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-full shadow-lg flex items-center gap-1">
-                <Crown className="h-3 w-3" />
-                PRO
+              <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-lg">
+                MDS
               </span>
             </div>
             <p className="text-xs text-blue-200/80">Gestion des Créances</p>
@@ -121,12 +119,6 @@ export function Sidebar({ className }: SidebarProps) {
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                   </div>
-                )}
-                
-                {item.special && (
-                  <span className="px-2 py-0.5 text-xs font-bold bg-pink-100 text-pink-600 rounded-full">
-                    NEW
-                  </span>
                 )}
               </Link>
             );

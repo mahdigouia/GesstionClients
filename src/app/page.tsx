@@ -192,11 +192,6 @@ export default function Home() {
                 )}
               </Button>
 
-              {/* Settings */}
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4" />
-              </Button>
-
               {/* Export & Save */}
               {debts.length > 0 && (
                 <div className="flex items-center space-x-2">
