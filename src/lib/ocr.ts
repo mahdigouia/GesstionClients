@@ -45,8 +45,17 @@ export class OCRService {
       // Si extraction Python réussie
       if (data.success && data.debts && data.debts.length > 0) {
         console.log(`[PDF Extract] Succès avec Python: ${data.debts.length} créances trouvées`);
-        return {
+        
+        // Transformer les données Python (snake_case) en ClientDebt (camelCase)
+        const transformedDebts = transformExtractedDebts({
+          success: data.success,
           debts: data.debts,
+          commercial: data.commercial
+        }, file.name);
+        console.log(`[PDF Extract] ${transformedDebts.length} créances transformées`);
+        
+        return {
+          debts: transformedDebts,
           method: data.method || 'pdfplumber-python',
           success: true
         };
