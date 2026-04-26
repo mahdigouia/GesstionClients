@@ -295,19 +295,11 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         if doc_match:
             work_line = work_line.replace(doc_match.group(1), ' ')
         
-        # Trouver tous les nombres dans la ligne restante
-        # Pattern pour les entiers simples (Age, Nbr.J.P) - avant les montants
-        integers = []
-        pattern_int = r'\b(\d{1,3})\b(?!\s*\d|,\d)'  # Entiers 1-3 chiffres qui ne sont pas suivis d'autres chiffres ou virgule
-        for match in re.finditer(pattern_int, work_line):
-            try:
-                val = int(match.group(1))
-                if 0 <= val <= 999:  # Age et Nbr.J.P sont généralement < 1000
-                    integers.append(val)
-            except:
-                pass
+        # Debug: afficher la ligne de travail
+        print(f"[PDF Extract] Work line: {work_line[:80]}")
         
         # Pattern pour les montants tunisiens (avec espace et virgule)
+        # Format: "1 264,277" ou "0,000"
         numbers = []
         pattern_tnd = r'\d{1,3}(?:\s\d{3})*,\d+'
         for match in re.finditer(pattern_tnd, work_line):
@@ -339,14 +331,26 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         payment = numbers[-2]
         balance = numbers[-1]
         
-        # Chercher l'âge parmi les entiers extraits (généralement entre 0-500)
+        # Chercher l'âge: entier simple entre 0-500 dans work_line (après suppression dates)
+        # Ex: work_line = "  2 436 0 1 264,277 0,000 1 264,277"
+        # Les entiers 2, 436, 0 sont l'âge, Nbr.J.P et intitulé
+        # Les montants sont: "1 264,277", "0,000", "1 264,277"
         age = 0
-        if integers:
-            # Prendre le premier entier qui semble être un âge (0-500)
-            age_candidates = [n for n in integers if n <= 500]
-            if age_candidates:
-                age = age_candidates[0]
-                print(f"[PDF Extract] Age trouvé: {age} dans: {line[:60]}")
+        
+        # Chercher tous les entiers simples (1-3 chiffres) dans work_line
+        # qui ne sont pas suivis par d'autres chiffres ou virgule (ce qui indiquerait un montant)
+        simple_integers = []
+        for match in re.finditer(r'\b(\d{1,3})\b(?!\s*\d|,)', work_line):
+            val = int(match.group(1))
+            if 0 <= val <= 500:
+                simple_integers.append(val)
+        
+        print(f"[PDF Extract] Simple integers in work_line: {simple_integers}")
+        
+        if simple_integers:
+            # Le premier entier est généralement l'âge
+            age = simple_integers[0]
+            print(f"[PDF Extract] Age trouvé: {age}")
         
         # Générer ID unique
         debt_id = len(context.debts) + 1
