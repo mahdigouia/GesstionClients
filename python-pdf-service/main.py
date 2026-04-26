@@ -281,7 +281,7 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         
         # Chercher le numéro de pièce (FT######, IC######, FA######, etc.)
         doc_match = re.search(r'([A-Z]{2}\d{6})', line)
-        doc_number = doc_match.group(1) if doc_match else ""
+        document_number = doc_match.group(1) if doc_match else ""
         
         # Supprimer les dates et le numéro de pièce pour analyser le reste
         work_line = line
@@ -339,9 +339,9 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             client_code=client["code"],
             client_name=client["name"],
             client_phone=client.get("phone"),
-            doc_number=doc_number,
+            document_number=document_number,
             due_date=due_date,
-            doc_date=doc_date,
+            document_date=doc_date,
             amount=amount,
             payment=payment,
             balance=balance,
@@ -598,13 +598,18 @@ async def extract_debts(file: UploadFile = File(...)):
                     # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
                     # Pattern: début de ligne avec 4 chiffres suivis d'un nom en majuscules
                     # Format: 0424 LA MANGEARIA Tél: 72 26 09 01
-                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s\-]+?)(?:\s+T[eé]l|$)', line)
+                    # ou: 0424 LA MANGEARIA (sans téléphone)
+                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s\-]+)', line)
                     if client_match:
                         code = client_match.group(1)
                         name = client_match.group(2).strip()
+                        
+                        # Nettoyer le nom (arrêter avant Tél ou fin de ligne)
+                        name = re.split(r'\s+T[eé]l', name)[0].strip()
+                        
                         # Extraire téléphone si présent (format: 72 26 09 01 ou 72260901)
                         phone = None
-                        phone_match = re.search(r'T[eé]l\s*[:\s]\s*([\d\s\.]+)', line)
+                        phone_match = re.search(r'T[eé]l[:\s]+([\d\s\.]+)', line)
                         if phone_match:
                             phone = phone_match.group(1).replace(' ', '').replace('.', '')
                             # S'assurer que le téléphone a 8 chiffres
