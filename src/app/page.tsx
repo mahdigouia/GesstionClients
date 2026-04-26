@@ -324,6 +324,10 @@ export default function Home() {
 
                   <TabsContent value="dashboard" className="space-y-6">
                     <Dashboard analysis={analysis} />
+                    <DebtTable 
+                      debts={debts} 
+                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+                    />
                   </TabsContent>
 
                   <TabsContent value="aging" className="space-y-6">
@@ -393,10 +397,7 @@ export default function Home() {
                   </TabsContent>
 
                   <TabsContent value="table" className="space-y-6">
-                    <DebtTable 
-                      debts={debts} 
-                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
-                    />
+                    {/* Detail content moved to dashboard */}
                   </TabsContent>
                 </Tabs>
               )}
