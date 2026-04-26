@@ -298,6 +298,30 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         # Debug: afficher la ligne de travail
         print(f"[PDF Extract] Work line: {work_line[:80]}")
         
+        # D'ABORD chercher l'âge (avant d'extraire les montants)
+        # Format PDF: "14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277"
+        # L'âge "2 436" doit être extrait comme 2436 (sans l'espace)
+        age = 0
+        
+        # Chercher l'âge: nombre avec espace SANS virgule (différent des montants)
+        # Ex: "2 436" est l'âge, "1 264,277" est un montant
+        age_match = re.search(r'(\d{1,3})\s+(\d{3})(?!\s*\d)(?!\s*,)', work_line)
+        if age_match:
+            age_str = age_match.group(1) + age_match.group(2)
+            age = int(age_str)
+            print(f"[PDF Extract] Age trouvé: {age}")
+            # Supprimer l'âge de work_line pour ne pas l'inclure dans les montants
+            age_full = age_match.group(0)
+            work_line = work_line.replace(age_full, ' ', 1)
+            print(f"[PDF Extract] Work line after age removal: {work_line[:80]}")
+        else:
+            # Chercher un entier simple sans espace et sans virgule
+            simple_match = re.search(r'\b(\d{1,4})\b(?!\s*\d)(?!\s*,)', work_line)
+            if simple_match:
+                age = int(simple_match.group(1))
+                print(f"[PDF Extract] Age trouvé (simple): {age}")
+                work_line = work_line.replace(simple_match.group(0), ' ', 1)
+        
         # Pattern pour les montants tunisiens (avec espace et virgule)
         # Format: "1 264,277" ou "0,000"
         numbers = []
@@ -330,28 +354,6 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         amount = numbers[-3]
         payment = numbers[-2]
         balance = numbers[-1]
-        
-        # Chercher l'âge: nombre au format tunisien (avec espace) ou simple entier
-        # Format PDF: "14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277"
-        # L'âge "2 436" doit être extrait comme 2436 (sans l'espace)
-        age = 0
-        
-        # Chercher TOUS les nombres avec espace comme séparateur de milliers
-        # qui ne sont pas suivis d'une virgule (donc pas des montants)
-        space_numbers = re.findall(r'(\d{1,3})\s+(\d{3})(?!\s*\d)(?!\s*,)', work_line)
-        print(f"[PDF Extract] Space-separated numbers found: {space_numbers}")
-        
-        if space_numbers:
-            # Prendre le premier nombre avec espace
-            age_str = space_numbers[0][0] + space_numbers[0][1]
-            age = int(age_str)
-            print(f"[PDF Extract] Age trouvé (format espace): {age}")
-        else:
-            # Chercher un entier simple (sans espace) qui n'est pas suivi d'une virgule
-            simple_int_match = re.search(r'\b(\d{1,4})\b(?!\s*\d)(?!\s*,)', work_line)
-            if simple_int_match:
-                age = int(simple_int_match.group(1))
-                print(f"[PDF Extract] Age trouvé (entier simple): {age}")
         
         # Générer ID unique
         debt_id = len(context.debts) + 1
