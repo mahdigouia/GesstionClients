@@ -243,7 +243,11 @@ def parse_data_row(
                             description = desc
                             break
         
+        # Générer ID unique
+        debt_id = len(context.debts) + 1
+        
         return DebtData(
+            id=debt_id,
             client_code=client.get("code", ""),
             client_name=client.get("name", ""),
             client_phone=client.get("phone"),
