@@ -31,6 +31,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 
 export default function Home() {
   const { debts, analysis, setDebts, setAnalysis } = useDebtContext();
@@ -310,27 +311,42 @@ export default function Home() {
                 </Card>
               )}
 
-              {/* Tabs Content */}
+              {/* Tabs Content - Modern glassmorphism design */}
               {debts.length > 0 && analysis && (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="dashboard" className="flex items-center space-x-2">
-                      <LayoutDashboard className="h-4 w-4" />
-                      <span>Vue d'ensemble</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="aging" className="flex items-center space-x-2">
-                      <BarChart3 className="h-4 w-4" />
-                      <span>Analyse</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="clients" className="flex items-center space-x-2">
-                      <Users className="h-4 w-4" />
-                      <span>Clients</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="table" className="flex items-center space-x-2">
-                      <FileText className="h-4 w-4" />
-                      <span>Détail</span>
-                    </TabsTrigger>
-                  </TabsList>
+                  {/* Modern Tabs with glassmorphism */}
+                  <div className="p-2 bg-white/50 backdrop-blur-xl rounded-2xl shadow-lg border border-white/60">
+                    <TabsList className="grid w-full grid-cols-4 bg-transparent p-1 gap-1">
+                      <TabsTrigger 
+                        value="dashboard" 
+                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span className="font-semibold">Vue d'ensemble</span>
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="aging" 
+                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                        <span className="font-semibold">Analyse</span>
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="clients" 
+                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-violet-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                      >
+                        <Users className="h-4 w-4" />
+                        <span className="font-semibold">Clients</span>
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="table" 
+                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <span className="font-semibold">Détail</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
                   <TabsContent value="dashboard" className="space-y-6">
                     {/* Boutons de génération de rapports */}
@@ -368,27 +384,60 @@ export default function Home() {
                   </TabsContent>
 
                   <TabsContent value="aging" className="space-y-6">
-                    <Card>
-                      <CardContent className="p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
-                          Répartition par Ancienneté
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Glassmorphism Card */}
+                    <Card className="overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-white to-slate-50">
+                      <CardContent className="p-8">
+                        <div className="flex items-center gap-3 mb-8">
+                          <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg">
+                            <BarChart3 className="h-6 w-6 text-white" />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-slate-800">Répartition par Ancienneté</h3>
+                            <p className="text-slate-500">Analyse détaillée des créances selon leur âge</p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {analysis.agingBreakdown?.map((range: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                              <div className="flex items-center space-x-3">
-                                <div className={`w-3 h-3 rounded-full ${
-                                  index === 0 ? 'bg-green-500' :
-                                  index === 1 ? 'bg-yellow-500' :
-                                  index === 2 ? 'bg-orange-500' :
-                                  'bg-red-500'
-                                }`}></div>
-                                <span className="text-sm font-medium">{range.range}</span>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-lg font-bold">{range.count}</div>
-                                <div className="text-sm text-gray-500">{range.amount.toFixed(0)} TND</div>
-                                <div className="text-xs text-gray-400">{range.percentage.toFixed(1)}%</div>
+                            <div key={index} className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
+                              {/* Gradient background */}
+                              <div className={`
+                                absolute inset-0 opacity-10
+                                ${index === 0 ? 'bg-gradient-to-r from-emerald-500 to-green-600' :
+                                  index === 1 ? 'bg-gradient-to-r from-amber-500 to-yellow-600' :
+                                  index === 2 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
+                                  'bg-gradient-to-r from-red-600 to-rose-600'}
+                              `} />
+                              
+                              <div className="relative p-6 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  <div className={`
+                                    w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg
+                                    ${index === 0 ? 'bg-gradient-to-br from-emerald-500 to-green-600' :
+                                      index === 1 ? 'bg-gradient-to-br from-amber-500 to-yellow-600' :
+                                      index === 2 ? 'bg-gradient-to-br from-orange-500 to-red-500' :
+                                      'bg-gradient-to-br from-red-600 to-rose-600'}
+                                  `}>
+                                    <span className="text-white font-bold text-lg">{range.count}</span>
+                                  </div>
+                                  <div>
+                                    <span className="block text-sm font-bold text-slate-700">{range.range}</span>
+                                    <span className="text-xs text-slate-500">{range.count} créances</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-slate-800">{range.amount.toLocaleString('fr-FR')} <span className="text-sm font-normal text-slate-500">TND</span></div>
+                                  <div className={`
+                                    inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold
+                                    ${index === 0 ? 'bg-emerald-100 text-emerald-700' :
+                                      index === 1 ? 'bg-amber-100 text-amber-700' :
+                                      index === 2 ? 'bg-orange-100 text-orange-700' :
+                                      'bg-red-100 text-red-700'}
+                                  `}>
+                                    {range.percentage.toFixed(1)}%
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -398,32 +447,81 @@ export default function Home() {
                   </TabsContent>
 
                   <TabsContent value="clients" className="space-y-6">
-                    <Card>
-                      <CardContent className="p-6">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">
-                          Liste des Clients et Portefeuille de Créances
-                        </h3>
-                        <div className="space-y-3">
+                    {/* Modern Clients Card with glassmorphism */}
+                    <Card className="overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-white to-violet-50/30">
+                      <CardContent className="p-8">
+                        <div className="flex items-center justify-between mb-8">
+                          <div className="flex items-center gap-3">
+                            <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
+                              <Users className="h-6 w-6 text-white" />
+                            </div>
+                            <div>
+                              <h3 className="text-2xl font-bold text-slate-800">Portefeuille Clients</h3>
+                              <p className="text-slate-500">{analysis.clientBreakdown?.length || 0} clients actifs</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Badge className="bg-emerald-100 text-emerald-700 px-3 py-1">
+                              {analysis.clientBreakdown?.filter((c: any) => c.totalBalance === 0).length || 0} Sains
+                            </Badge>
+                            <Badge className="bg-red-100 text-red-700 px-3 py-1">
+                              {analysis.clientBreakdown?.filter((c: any) => c.totalBalance > 0).length || 0} À risque
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 gap-3">
                           {analysis.clientBreakdown?.map((client: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                                  <span className="text-sm font-medium text-gray-600">
-                                    {(client.clientName || '?').charAt(0).toUpperCase()}
-                                  </span>
+                            <div key={index} className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+                              <div className={`
+                                absolute left-0 top-0 bottom-0 w-1
+                                ${client.totalBalance > 1000 ? 'bg-gradient-to-b from-red-500 to-rose-600' :
+                                  client.totalBalance > 500 ? 'bg-gradient-to-b from-amber-500 to-orange-500' :
+                                  'bg-gradient-to-b from-emerald-500 to-green-600'}
+                              `} />
+                              
+                              <div className="p-5 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                  {/* Avatar with gradient */}
+                                  <div className={`
+                                    w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg
+                                    ${client.totalBalance > 1000 ? 'bg-gradient-to-br from-red-500 to-rose-600' :
+                                      client.totalBalance > 500 ? 'bg-gradient-to-br from-amber-500 to-orange-500' :
+                                      'bg-gradient-to-br from-emerald-500 to-green-600'}
+                                  `}>
+                                    <span className="text-white font-bold text-lg">
+                                      {(client.clientName || '?').charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  
+                                  <div>
+                                    <div className="font-bold text-slate-800 text-lg">{client.clientName || 'Client inconnu'}</div>
+                                    <div className="flex items-center gap-3 text-sm">
+                                      <span className="text-slate-500">
+                                        <span className="font-semibold text-slate-700">{client.debtCount}</span> factures
+                                      </span>
+                                      <span className="text-slate-300">|</span>
+                                      <span className="text-slate-500">
+                                        Délai moy: <span className="font-semibold text-slate-700">{Math.round(client.averagePaymentDelay)}j</span>
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div>
-                                  <div className="font-medium">{client.clientName || 'Client inconnu'}</div>
-                                  <div className="text-sm text-gray-500">{client.totalAmount.toFixed(2)} TND dû</div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className={`px-2 py-1 rounded text-xs font-medium ${
-                                  client.totalBalance > 1000 ? 'bg-red-100 text-red-800' :
-                                  client.totalBalance > 500 ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
-                                }`}>
-                                  {client.totalBalance > 0 ? 'À risque' : 'Sain'}
+                                
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-slate-800">
+                                    {client.totalBalance.toLocaleString('fr-FR')} <span className="text-sm font-normal text-slate-500">TND</span>
+                                  </div>
+                                  <div className={`
+                                    inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-1
+                                    ${client.totalBalance > 1000 ? 'bg-red-100 text-red-700' :
+                                      client.totalBalance > 500 ? 'bg-amber-100 text-amber-700' :
+                                      'bg-emerald-100 text-emerald-700'}
+                                  `}>
+                                    {client.totalBalance > 1000 ? '🔴 Risque élevé' :
+                                      client.totalBalance > 500 ? '🟠 Surveillance' :
+                                      '🟢 Client sain'}
+                                  </div>
                                 </div>
                               </div>
                             </div>
