@@ -15,9 +15,9 @@ export default function InvoicesPage() {
 
   const filteredDebts = debts.filter(debt => {
     const matchesSearch = searchTerm === '' || 
-      debt.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      debt.documentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      debt.description.toLowerCase().includes(searchTerm.toLowerCase());
+      (debt.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (debt.documentNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (debt.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRisk = filterRisk === 'all' || debt.riskLevel === filterRisk;
     return matchesSearch && matchesRisk;
   });

@@ -28,9 +28,9 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
 
   const filteredDebts = debts.filter(debt => {
     const matchesSearch = 
-      debt.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      debt.clientCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      debt.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+      (debt.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (debt.clientCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (debt.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesRisk = filterRisk === 'all' || debt.riskLevel === filterRisk;
     
