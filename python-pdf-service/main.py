@@ -336,17 +336,19 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         # L'âge "2 436" doit être extrait comme 2436 (sans l'espace)
         age = 0
         
-        # Chercher l'âge avec format tunisien (espace comme séparateur de milliers)
-        # Ex: "2 436" = 2436 jours
-        age_match = re.search(r'\b(\d{1,3})\s(\d{3})\b(?!\s*\d|,)', work_line)
-        if age_match:
-            # Âge avec espace: "2 436" → 2436
-            age_str = age_match.group(1) + age_match.group(2)
+        # Chercher TOUS les nombres avec espace comme séparateur de milliers
+        # qui ne sont pas suivis d'une virgule (donc pas des montants)
+        space_numbers = re.findall(r'(\d{1,3})\s+(\d{3})(?!\s*\d)(?!\s*,)', work_line)
+        print(f"[PDF Extract] Space-separated numbers found: {space_numbers}")
+        
+        if space_numbers:
+            # Prendre le premier nombre avec espace
+            age_str = space_numbers[0][0] + space_numbers[0][1]
             age = int(age_str)
             print(f"[PDF Extract] Age trouvé (format espace): {age}")
         else:
-            # Chercher un entier simple (sans espace)
-            simple_int_match = re.search(r'\b(\d{1,4})\b(?!\s*\d|,)', work_line)
+            # Chercher un entier simple (sans espace) qui n'est pas suivi d'une virgule
+            simple_int_match = re.search(r'\b(\d{1,4})\b(?!\s*\d)(?!\s*,)', work_line)
             if simple_int_match:
                 age = int(simple_int_match.group(1))
                 print(f"[PDF Extract] Age trouvé (entier simple): {age}")
