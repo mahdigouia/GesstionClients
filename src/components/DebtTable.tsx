@@ -204,9 +204,9 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
                   </TableCell>
                   <TableCell className="text-center">
                     <span className="text-xs text-gray-500">
-                      {debt.sourceFile.length > 15 ? 
-                        debt.sourceFile.substring(0, 12) + '...' : 
-                        debt.sourceFile
+                      {(debt.sourceFile || '').length > 15 ? 
+                        (debt.sourceFile || '').substring(0, 12) + '...' : 
+                        (debt.sourceFile || '-')
                       }
                     </span>
                   </TableCell>

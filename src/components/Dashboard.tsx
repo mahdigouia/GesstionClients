@@ -73,10 +73,10 @@ export function Dashboard({ analysis }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analysis.clientBreakdown.length}
+              {analysis.clientBreakdown?.length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {analysis.clientBreakdown.filter(c => c.totalBalance > 0).length} avec solde
+              {analysis.clientBreakdown?.filter(c => c.totalBalance > 0).length || 0} avec solde
             </p>
           </CardContent>
         </Card>
@@ -88,10 +88,10 @@ export function Dashboard({ analysis }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {analysis.alerts.filter(a => a.severity === 'high').length}
+              {analysis.alerts?.filter(a => a.severity === 'high').length || 0}
             </div>
             <p className="text-xs text-muted-foreground">
-              {analysis.alerts.length} alertes totales
+              {analysis.alerts?.length || 0} alertes totales
             </p>
           </CardContent>
         </Card>
