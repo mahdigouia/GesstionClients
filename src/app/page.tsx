@@ -332,6 +332,30 @@ export default function Home() {
                   </TabsList>
 
                   <TabsContent value="dashboard" className="space-y-6">
+                    {/* Boutons de génération de rapports */}
+                    <div className="flex flex-wrap gap-3 mb-4">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => ExportService.exportToExcelByCommercial(debts)}
+                        className="gap-2 bg-blue-50 hover:bg-blue-100 border-blue-200"
+                      >
+                        <svg className="h-4 w-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        <span>📊 Rapport Excel par Commercial</span>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => ExportService.generateWordReportWithAI(debts)}
+                        className="gap-2 bg-indigo-50 hover:bg-indigo-100 border-indigo-200"
+                      >
+                        <svg className="h-4 w-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        <span>📝 Rapport Word IA par Document</span>
+                      </Button>
+                    </div>
+                    
                     <QuickFilters 
                       debts={debts}
                       onFilterChange={(filtered, activeFilter) => {

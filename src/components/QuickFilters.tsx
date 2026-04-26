@@ -3,9 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { 
-  Search, 
   Filter, 
   AlertTriangle, 
   Clock, 
@@ -16,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
 import { useState } from 'react';
+import { AutocompleteSearch } from './AutocompleteSearch';
 
 interface QuickFiltersProps {
   debts: ClientDebt[];
@@ -108,9 +107,31 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
       filtered = filtered.filter(d => 
         (d.clientName || '').toLowerCase().includes(searchLower) ||
         (d.clientCode || '').toLowerCase().includes(searchLower) ||
-        (d.documentNumber || '').toLowerCase().includes(searchLower)
+        (d.documentNumber || '').toLowerCase().includes(searchLower) ||
+        (d.commercialName || '').toLowerCase().includes(searchLower) ||
+        (d.clientPhone || '').toLowerCase().includes(searchLower)
       );
     }
+    
+    onFilterChange(filtered, activeFilter);
+  };
+
+  const handleSelectSuggestion = (value: string) => {
+    setSearchTerm(value);
+    
+    let filtered = debts;
+    if (activeFilter !== 'all') {
+      filtered = debts.filter(d => d.riskLevel === activeFilter);
+    }
+    
+    const searchLower = value.toLowerCase();
+    filtered = filtered.filter(d => 
+      (d.clientName || '').toLowerCase().includes(searchLower) ||
+      (d.clientCode || '').toLowerCase().includes(searchLower) ||
+      (d.documentNumber || '').toLowerCase().includes(searchLower) ||
+      (d.commercialName || '').toLowerCase().includes(searchLower) ||
+      (d.clientPhone || '').includes(searchLower)
+    );
     
     onFilterChange(filtered, activeFilter);
   };
@@ -138,14 +159,14 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
           </Button>
         </div>
 
-        {/* Search bar */}
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Rechercher un client, code, ou N° pièce..."
+        {/* Search bar with Autocomplete - sous le label Filtres Rapides */}
+        <div className="mb-4">
+          <AutocompleteSearch
+            debts={debts}
             value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
-            className="pl-10 h-12 text-base"
+            onChange={handleSearch}
+            onSelect={handleSelectSuggestion}
+            placeholder="Rechercher N° pièce, client, représentant, téléphone..."
           />
         </div>
 

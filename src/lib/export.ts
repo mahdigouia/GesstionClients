@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Packer } from 'docx';
+import { saveAs } from 'file-saver';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 
 export class ExportService {
@@ -224,5 +226,254 @@ Source: ${debt.sourceFile}
     
     this.downloadTextFile(jsonContent, defaultFileName);
     console.log(`Analyse sauvegardée: ${defaultFileName}`);
+  }
+
+  // Export Excel par Commercial avec résumé contentieux/non-contentieux
+  static async exportToExcelByCommercial(debts: ClientDebt[]): Promise<void> {
+    const workbook = XLSX.utils.book_new();
+    
+    // Grouper par commercial
+    const commercialGroups = new Map<string, ClientDebt[]>();
+    debts.forEach(debt => {
+      const commercial = debt.commercialName || 'Non assigné';
+      if (!commercialGroups.has(commercial)) {
+        commercialGroups.set(commercial, []);
+      }
+      commercialGroups.get(commercial)?.push(debt);
+    });
+    
+    // Feuille récapitulative
+    const summaryData = Array.from(commercialGroups.entries()).map(([commercial, commercialDebts]) => {
+      const contentieuxDebts = commercialDebts.filter(d => d.isContentieux);
+      const nonContentieuxDebts = commercialDebts.filter(d => !d.isContentieux);
+      const uniqueClients = new Set(commercialDebts.map(d => d.clientCode)).size;
+      
+      return {
+        'Représentant Commercial': commercial,
+        'Nombre de Clients': uniqueClients,
+        'Nombre de Documents': commercialDebts.length,
+        'Total Créances (TND)': commercialDebts.reduce((sum, d) => sum + d.balance, 0),
+        'Contentieux (TND)': contentieuxDebts.reduce((sum, d) => sum + d.balance, 0),
+        'Non-Contentieux (TND)': nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0),
+        'Nb Contentieux': contentieuxDebts.length,
+        'Nb Non-Contentieux': nonContentieuxDebts.length,
+        'Âge Moyen (jours)': Math.round(commercialDebts.reduce((sum, d) => sum + d.age, 0) / commercialDebts.length) || 0
+      };
+    }).sort((a, b) => b['Total Créances (TND)'] - a['Total Créances (TND)']);
+    
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Résumé par Commercial');
+    
+    // Feuilles détaillées par commercial
+    commercialGroups.forEach((commercialDebts, commercial) => {
+      const sheetName = commercial.substring(0, 30).replace(/[\\/*?:\[\]]/g, '-');
+      
+      const detailData = commercialDebts.map(debt => ({
+        'N° Pièce': debt.documentNumber,
+        'Code Client': debt.clientCode,
+        'Nom Client': debt.clientName,
+        'Téléphone': debt.clientPhone || '',
+        'Date Document': new Date(debt.documentDate).toLocaleDateString('fr-FR'),
+        'Date Échéance': new Date(debt.dueDate).toLocaleDateString('fr-FR'),
+        'Montant (TND)': debt.amount,
+        'Solde (TND)': debt.balance,
+        'Âge (jours)': debt.age,
+        'Contentieux': debt.isContentieux ? 'Oui' : 'Non',
+        'Niveau Risque': this.getRiskLabel(debt.riskLevel),
+        'Description': debt.description
+      }));
+      
+      const detailSheet = XLSX.utils.json_to_sheet(detailData);
+      XLSX.utils.book_append_sheet(workbook, detailSheet, sheetName);
+    });
+    
+    const fileName = `rapport-commercial-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+  }
+
+  // Analyse IA simulée pour le rapport Word
+  private static generateAIAnalysis(debt: ClientDebt): string {
+    const analyses = [
+      `Le document ${debt.documentNumber} présente un solde de ${debt.balance.toFixed(2)} TND avec un âge de ${debt.age} jours. `,
+      debt.age > 90 ? `Cette créance est fortement en retard et nécessite une attention immédiate. ` : 
+      debt.age > 60 ? `Le délai de paiement dépasse la norme recommandée. ` : 
+      `Le délai de paiement est dans les limites acceptables. `,
+      debt.isContentieux ? `Le statut contentieux indique des difficultés de recouvrement. ` : ``,
+      debt.riskLevel === 'critical' ? `Le niveau de risque critique suggère une procédure de recouvrement renforcée.` :
+      debt.riskLevel === 'overdue' ? `Le statut en retard nécessite un suivi rapproché.` :
+      debt.riskLevel === 'monitoring' ? `Une surveillance régulière est recommandée.` :
+      `Le client présente un bon historique de paiement.`
+    ];
+    return analyses.join('');
+  }
+
+  private static generateGlobalInsights(debts: ClientDebt[]): string {
+    const criticalCount = debts.filter(d => d.riskLevel === 'critical').length;
+    const overdueCount = debts.filter(d => d.riskLevel === 'overdue').length;
+    const totalBalance = debts.reduce((sum, d) => sum + d.balance, 0);
+    const avgAge = Math.round(debts.reduce((sum, d) => sum + d.age, 0) / debts.length);
+    
+    return `ANALYSE GLOBALE DES CRÉANCES\n\n` +
+      `Sur un total de ${debts.length} documents représentant ${totalBalance.toFixed(2)} TND, ` +
+      `l'analyse révèle ${criticalCount} créances critiques et ${overdueCount} créances en retard. ` +
+      `L'âge moyen des créances est de ${avgAge} jours. ` +
+      (criticalCount > 0 ? `\n\nPRIORITÉS D'ACTION :\n` +
+        `1. Traiter en priorité les ${criticalCount} créances critiques\n` +
+        `2. Mettre en place un suivi renforcé pour les créances dépassant 90 jours\n` +
+        `3. Envisager des actions contentieuses si nécessaire` : 
+        `\n\nLa situation globale est sous contrôle avec un niveau de risque modéré.`);
+  }
+
+  // Générer rapport Word avec analyse IA
+  static async generateWordReportWithAI(debts: ClientDebt[]): Promise<void> {
+    const reportDate = new Date().toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    // Trier par risque (critique d'abord)
+    const sortedDebts = [...debts].sort((a, b) => {
+      const riskOrder = { critical: 0, overdue: 1, monitoring: 2, healthy: 3 };
+      return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
+    });
+    
+    const criticalDebts = sortedDebts.filter(d => d.riskLevel === 'critical');
+    
+    // Créer le document
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          // Titre
+          new Paragraph({
+            text: 'RAPPORT D\'ANALYSE DES CRÉANCES',
+            heading: HeadingLevel.TITLE,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 }
+          }),
+          
+          // Date
+          new Paragraph({
+            text: `Généré le ${reportDate}`,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 600 }
+          }),
+          
+          // Synthèse globale avec IA
+          new Paragraph({
+            text: '1. SYNTHÈSE GLOBALE',
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 400, after: 200 }
+          }),
+          ...this.generateGlobalInsights(debts).split('\n\n').map(para => 
+            new Paragraph({
+              children: [new TextRun({ text: para, size: 22 })],
+              spacing: { after: 200 }
+            })
+          ),
+          
+          // Analyse par document
+          new Paragraph({
+            text: '2. ANALYSE DÉTAILLÉE PAR DOCUMENT',
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 600, after: 200 }
+          }),
+          
+          // Documents critiques
+          ...(criticalDebts.length > 0 ? [
+            new Paragraph({
+              text: '2.1 DOCUMENTS À RISQUE CRITIQUE',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 }
+            }),
+            ...criticalDebts.flatMap((debt, index) => [
+              new Paragraph({
+                text: `Document ${index + 1} : ${debt.documentNumber}`,
+                heading: HeadingLevel.HEADING_3,
+                spacing: { before: 300, after: 100 }
+              }),
+              new Paragraph({
+                children: [
+                  new TextRun({ text: 'Client : ', bold: true }),
+                  new TextRun({ text: `${debt.clientName} (${debt.clientCode})\n` }),
+                  new TextRun({ text: 'Solde : ', bold: true }),
+                  new TextRun({ text: `${debt.balance.toFixed(2)} TND\n` }),
+                  new TextRun({ text: 'Âge : ', bold: true }),
+                  new TextRun({ text: `${debt.age} jours\n` }),
+                  new TextRun({ text: 'Contentieux : ', bold: true }),
+                  new TextRun({ text: `${debt.isContentieux ? 'Oui' : 'Non'}\n\n` }),
+                ],
+                spacing: { after: 100 }
+              }),
+              new Paragraph({
+                text: 'Analyse IA :',
+                spacing: { before: 100, after: 100 },
+                border: { bottom: { color: 'CCCCCC', size: 1, style: 'single' } }
+              }),
+              new Paragraph({
+                text: this.generateAIAnalysis(debt),
+                spacing: { after: 300 },
+                shading: { fill: 'F5F5F5' }
+              })
+            ])
+          ] : [new Paragraph({ text: 'Aucun document à risque critique identifié.', spacing: { after: 200 } })]),
+          
+          // Recommandations
+          new Paragraph({
+            text: '3. RECOMMANDATIONS STRATÉGIQUES',
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 600, after: 200 }
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ 
+                text: `Basé sur l'analyse de ${debts.length} documents, les actions suivantes sont recommandées :\n\n`,
+                size: 22
+              }),
+              new TextRun({ text: '• ', size: 22 }),
+              new TextRun({ 
+                text: `Prioriser le recouvrement des ${criticalDebts.length} créances critiques\n`,
+                size: 22
+              }),
+              new TextRun({ text: '• ', size: 22 }),
+              new TextRun({ 
+                text: 'Mettre en place un suivi hebdomadaire des créances dépassant 60 jours\n',
+                size: 22
+              }),
+              new TextRun({ text: '• ', size: 22 }),
+              new TextRun({ 
+                text: 'Évaluer la nécessité de passer en contentieux pour les créances > 120 jours\n',
+                size: 22
+              }),
+              new TextRun({ text: '• ', size: 22 }),
+              new TextRun({ 
+                text: 'Renforcer la relation client avec les débiteurs à risque élevé',
+                size: 22
+              })
+            ],
+            spacing: { after: 200 }
+          }),
+          
+          // Conclusion
+          new Paragraph({
+            text: '4. CONCLUSION',
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 600, after: 200 }
+          }),
+          new Paragraph({
+            text: `Ce rapport, généré avec assistance IA, identifie les priorités de recouvrement et propose des actions ciblées. ` +
+                  `Un suivi régulier est essentiel pour maintenir la santé financière du portefeuille client.`,
+            spacing: { after: 200 }
+          })
+        ]
+      }]
+    });
+    
+    // Générer et télécharger
+    const blob = await Packer.toBlob(doc);
+    const fileName = `rapport-ia-documents-${new Date().toISOString().split('T')[0]}.docx`;
+    saveAs(blob, fileName);
   }
 }

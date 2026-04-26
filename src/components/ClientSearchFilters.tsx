@@ -190,7 +190,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
   return (
     <Card className="mb-6">
       <CardContent className="p-4 space-y-4">
-        {/* Quick Stats & Filters */}
+        {/* Quick Stats & Filters - Garder uniquement les badges de risque */}
         <div className="flex flex-wrap gap-2">
           {quickFilters.map((filter) => (
             <Button
@@ -208,24 +208,15 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
           ))}
         </div>
 
-        {/* Main Search */}
+        {/* Filtres avancés toggle uniquement - sans recherche principale */}
         <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Rechercher par client, code, facture, commercial..."
-              value={filters.searchTerm}
-              onChange={(e) => updateFilter('searchTerm', e.target.value)}
-              className="pl-10"
-            />
-          </div>
           <Button
             variant="outline"
             onClick={() => setShowAdvanced(!showAdvanced)}
             className="gap-2"
           >
             <Filter className="h-4 w-4" />
-            Filtres
+            Filtres avancés
             {activeFiltersCount > 0 && (
               <Badge variant="default" className="ml-1">{activeFiltersCount}</Badge>
             )}
