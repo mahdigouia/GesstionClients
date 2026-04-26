@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/lib/AuthContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, color: 'bg-blue-500' },
@@ -40,6 +41,7 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { initials, fullName, user } = useAuth();
 
   return (
     <div className={cn(
@@ -60,18 +62,18 @@ export function Sidebar({ className }: SidebarProps) {
           <Avatar className="h-12 w-12 border-2 border-white/20 shadow-lg ring-2 ring-blue-500/30">
             <AvatarImage src="/avatar.png" />
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white font-bold text-lg">
-              AD
+              {initials}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white tracking-wide">GesstionClients</h1>
+              <h1 className="text-lg font-bold text-white tracking-wide">{fullName || 'GesstionClients'}</h1>
               <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-lg">
                 MDS
               </span>
             </div>
-            <p className="text-xs text-blue-200/80">Gestion des Créances</p>
+            <p className="text-xs text-blue-200/80">{user?.email || 'Gestion des Créances'}</p>
           </div>
           
           <Button

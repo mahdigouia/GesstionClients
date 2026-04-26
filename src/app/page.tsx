@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
-import { KPICards } from '@/components/KPICards';
 import { FileUpload } from '@/components/FileUpload';
 import { Dashboard } from '@/components/Dashboard';
 import { DebtTable } from '@/components/DebtTable';
@@ -271,19 +270,6 @@ export default function Home() {
             </Card>
           ) : (
             <>
-              {/* KPI Cards */}
-              {analysis && (
-                <div className="mb-8">
-                  <KPICards
-                    totalDebts={analysis.totalDebts}
-                    totalBalance={analysis.totalBalance}
-                    criticalDebts={analysis.alerts?.filter((a: any) => a.severity === 'high').length || 0}
-                    recoveryRate={analysis.recoveryRate}
-                    clientCount={analysis.clientBreakdown?.length || 0}
-                  />
-                </div>
-              )}
-
               {/* File Upload */}
               {!debts.length && (
                 <Card className="mb-8">

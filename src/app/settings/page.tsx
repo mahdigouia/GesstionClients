@@ -1,14 +1,19 @@
 'use client';
 
 import { useDebtContext } from '@/lib/DebtContext';
+import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Settings, Trash2, Download, Upload, Info } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ExportService } from '@/lib/export';
+import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
   const { debts, analysis, clearAll } = useDebtContext();
+  const { user, initials, fullName, logout } = useAuth();
+  const router = useRouter();
 
   const handleExportData = () => {
     if (analysis && debts.length > 0) {
@@ -48,6 +53,15 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar />
@@ -60,6 +74,52 @@ export default function SettingsPage() {
         </header>
 
         <main className="p-6 space-y-6">
+          {/* Profil utilisateur */}
+          <Card className="border-0 shadow-xl bg-gradient-to-br from-blue-600 to-violet-600 text-white overflow-hidden relative">
+            <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-3xl" />
+            
+            <CardHeader className="relative z-10">
+              <CardTitle className="flex items-center gap-2 text-white">
+                <User className="h-5 w-5" />
+                Profil Utilisateur
+              </CardTitle>
+              <CardDescription className="text-blue-100">
+                Informations de votre compte
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="relative z-10">
+              <div className="flex items-center gap-4 mb-6">
+                <Avatar className="h-16 w-16 border-4 border-white/30 shadow-xl">
+                  <AvatarFallback className="bg-white text-blue-600 font-bold text-2xl">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-bold">{fullName}</h3>
+                  <div className="flex items-center gap-2 text-blue-100 text-sm mt-1">
+                    <Mail className="h-4 w-4" />
+                    {user?.email}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <Shield className="h-5 w-5 text-green-300" />
+                <span className="text-sm">Compte vérifié via Firebase Authentication</span>
+              </div>
+              
+              <Button 
+                onClick={handleLogout}
+                variant="outline" 
+                className="mt-4 w-full bg-white/20 border-white/30 text-white hover:bg-white/30"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Se déconnecter
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Informations système */}
           <Card>
             <CardHeader>

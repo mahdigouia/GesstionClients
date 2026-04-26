@@ -1,6 +1,8 @@
 import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { DebtProvider } from '@/lib/DebtContext';
+import { AuthProvider } from '@/lib/AuthContext';
+import { AuthGuard } from '@/components/AuthGuard';
 
 export const metadata: Metadata = {
   title: 'GesstionClients - Analyse des Créances',
@@ -37,7 +39,11 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
       </head>
       <body className="font-body antialiased">
-        <DebtProvider>{children}</DebtProvider>
+        <AuthProvider>
+          <DebtProvider>
+            <AuthGuard>{children}</AuthGuard>
+          </DebtProvider>
+        </AuthProvider>
       </body>
     </html>
   );
