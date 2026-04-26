@@ -303,24 +303,44 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         # L'âge "2 436" doit être extrait comme 2436 (sans l'espace)
         age = 0
         
-        # Chercher l'âge: nombre avec espace SANS virgule (différent des montants)
-        # Ex: "2 436" est l'âge, "1 264,277" est un montant
-        age_match = re.search(r'(\d{1,3})\s+(\d{3})(?!\s*\d)(?!\s*,)', work_line)
-        if age_match:
-            age_str = age_match.group(1) + age_match.group(2)
-            age = int(age_str)
-            print(f"[PDF Extract] Age trouvé: {age}")
-            # Supprimer l'âge de work_line pour ne pas l'inclure dans les montants
-            age_full = age_match.group(0)
-            work_line = work_line.replace(age_full, ' ', 1)
+        # Approche simple: chercher tous les nombres qui ne sont pas des montants (pas de virgule)
+        # Un montant tunisien a toujours une virgule: "1 264,277" ou "0,000"
+        # L'âge n'a pas de virgule: "2 436" ou "209" ou "336"
+        
+        # Chercher les nombres avec espace mais SANS virgule après
+        # Pattern: nombre + espace + 3 chiffres + (pas de virgule après)
+        candidates = []
+        for match in re.finditer(r'(\d{1,3})\s+(\d{3})(?!\s*\d)(?!\s*,)', work_line):
+            val = int(match.group(1) + match.group(2))
+            candidates.append((val, match.start()))
+            print(f"[PDF Extract] Candidate (space): {val} at pos {match.start()}")
+        
+        # Chercher aussi les entiers simples (sans espace) SANS virgule après
+        for match in re.finditer(r'\b(\d{1,4})\b(?!\s*\d)(?!\s*,)', work_line):
+            val = int(match.group(1))
+            # Vérifier qu'on n'a pas déjà trouvé ce nombre avec espace
+            already_found = any(c[0] == val for c in candidates)
+            if not already_found and val > 0:
+                candidates.append((val, match.start()))
+                print(f"[PDF Extract] Candidate (simple): {val} at pos {match.start()}")
+        
+        # Trier par position et prendre le premier (l'âge est toujours avant les montants)
+        if candidates:
+            candidates.sort(key=lambda x: x[1])
+            age = candidates[0][0]
+            print(f"[PDF Extract] Age sélectionné: {age}")
+            
+            # Supprimer l'âge de work_line
+            age_str = str(age)
+            if ' ' in work_line and age >= 1000:
+                # L'âge avait un espace, reconstruire le pattern
+                age_part1 = age_str[:-3]
+                age_part2 = age_str[-3:]
+                age_pattern = f"{age_part1} {age_part2}"
+                work_line = work_line.replace(age_pattern, ' ', 1)
+            else:
+                work_line = work_line.replace(age_str, ' ', 1)
             print(f"[PDF Extract] Work line after age removal: {work_line[:80]}")
-        else:
-            # Chercher un entier simple sans espace et sans virgule
-            simple_match = re.search(r'\b(\d{1,4})\b(?!\s*\d)(?!\s*,)', work_line)
-            if simple_match:
-                age = int(simple_match.group(1))
-                print(f"[PDF Extract] Age trouvé (simple): {age}")
-                work_line = work_line.replace(simple_match.group(0), ' ', 1)
         
         # Pattern pour les montants tunisiens (avec espace et virgule)
         # Format: "1 264,277" ou "0,000"
