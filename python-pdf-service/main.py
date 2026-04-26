@@ -270,53 +270,66 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
     Ex: 14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277
     """
     try:
-        # Extraire toutes les dates
+        # Extraire toutes les dates au format DD/MM/YYYY
         dates = re.findall(r'(\d{2})[\/](\d{2})[\/](\d{4})', line)
         if len(dates) < 1:
             return None
         
-        # Convertir dates en format standard
-        date_objects = []
-        for d in dates:
-            date_objects.append(f"{d[2]}-{d[1]}-{d[0]}")  # YYYY-MM-DD
+        # Convertir dates en format standard YYYY-MM-DD
+        due_date = f"{dates[0][2]}-{dates[0][1]}-{dates[0][0]}"
+        doc_date = f"{dates[1][2]}-{dates[1][1]}-{dates[1][0]}" if len(dates) > 1 else due_date
         
-        due_date = date_objects[0]  # Première date = échéance
-        doc_date = date_objects[1] if len(date_objects) > 1 else due_date  # Deuxième = date doc
-        
-        # Chercher le numéro de pièce (FT######, IC######, etc.)
+        # Chercher le numéro de pièce (FT######, IC######, FA######, etc.)
         doc_match = re.search(r'([A-Z]{2}\d{6})', line)
         doc_number = doc_match.group(1) if doc_match else ""
         
-        # Extraire tous les montants (nombres avec espaces ou virgules)
-        # Pattern: chiffres avec espaces comme séparateurs de milliers et virgule pour décimales
-        amounts = []
-        # Chercher les patterns comme "1 264,277" ou "0,000"
-        amount_pattern = r'\d{1,3}(?:\s\d{3})*,\d+'
-        for match in re.finditer(amount_pattern, line):
-            amount_str = match.group().replace(' ', '').replace(',', '.')
+        # Supprimer les dates et le numéro de pièce pour analyser le reste
+        work_line = line
+        for d in dates:
+            date_str = f"{d[0]}/{d[1]}/{d[2]}"
+            work_line = work_line.replace(date_str, ' ', 1)
+        if doc_match:
+            work_line = work_line.replace(doc_match.group(1), ' ')
+        
+        # Trouver tous les nombres dans la ligne restante
+        # Pattern pour les entiers et décimaux tunisiens
+        numbers = []
+        # Pattern: nombre avec espace comme séparateur de milliers et virgule décimale
+        pattern_tnd = r'\d{1,3}(?:\s\d{3})*,\d+'
+        for match in re.finditer(pattern_tnd, work_line):
+            val_str = match.group().replace(' ', '').replace(',', '.')
             try:
-                amounts.append(float(amount_str))
+                numbers.append(float(val_str))
             except:
                 pass
         
-        if len(amounts) < 3:
-            # Essayer un pattern alternatif sans espaces
-            amount_pattern2 = r'\d{1,3}(?:,\d{3})*\.\d+|\d+\.\d+|\d+'
-            for match in re.finditer(amount_pattern2, line):
+        # Si on n'a pas trouvé assez de nombres, essayer avec juste la virgule
+        if len(numbers) < 3:
+            pattern_simple = r'\d+,\d+'
+            for match in re.finditer(pattern_simple, work_line):
+                val_str = match.group().replace(',', '.')
                 try:
-                    val = float(match.group().replace(',', ''))
-                    if val > 0:
-                        amounts.append(val)
+                    val = float(val_str)
+                    if val not in numbers:
+                        numbers.append(val)
                 except:
                     pass
         
-        if len(amounts) < 3:
+        if len(numbers) < 3:
+            print(f"[PDF Extract] Pas assez de montants trouvés: {len(numbers)} dans: {line[:60]}")
             return None
         
-        # Les 3 derniers montants sont généralement: Montant, Règlement, Solde
-        amount = amounts[-3] if len(amounts) >= 3 else 0
-        payment = amounts[-2] if len(amounts) >= 3 else 0
-        balance = amounts[-1] if len(amounts) >= 1 else 0
+        # Structure: [Age, Nbr.J.P, (Intitulé optionnel), Montant, Règlement, Solde]
+        # Les 3 derniers sont toujours: Montant, Règlement, Solde
+        amount = numbers[-3]
+        payment = numbers[-2]
+        balance = numbers[-1]
+        
+        # Chercher l'âge (nombre entier généralement entre 0-500, avant les montants)
+        age = 0
+        age_candidates = [n for n in numbers[:-3] if n < 1000 and n == int(n)]
+        if age_candidates:
+            age = int(age_candidates[0])
         
         # Générer ID unique
         debt_id = len(context.debts) + 1
@@ -332,12 +345,15 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             amount=amount,
             payment=payment,
             balance=balance,
+            age=age,
+            description="",
+            settlement=payment,
             commercial_code=context.current_commercial.get("code") if context.current_commercial else None,
             commercial_name=context.current_commercial.get("name") if context.current_commercial else None
         )
         
     except Exception as e:
-        print(f"[PDF Extract] Erreur parse_text_line: {e} sur ligne: {line[:50]}")
+        print(f"[PDF Extract] Erreur parse_text_line: {e} sur ligne: {line[:60]}")
         return None
 
 
@@ -580,21 +596,27 @@ async def extract_debts(file: UploadFile = File(...)):
                         continue
                     
                     # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
-                    # Pattern: début de ligne avec 4 chiffres suivis d'au moins 2 mots
-                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s]+?)(?:\s+T[eé]l|$)', line)
+                    # Pattern: début de ligne avec 4 chiffres suivis d'un nom en majuscules
+                    # Format: 0424 LA MANGEARIA Tél: 72 26 09 01
+                    client_match = re.match(r'^(\d{4})\s+([A-Z][A-Z\s\-]+?)(?:\s+T[eé]l|$)', line)
                     if client_match:
                         code = client_match.group(1)
                         name = client_match.group(2).strip()
-                        # Extraire téléphone si présent
-                        phone_match = re.search(r'T[eé]l\s*:\s*([\d\s]+)', line)
-                        phone = phone_match.group(1).replace(' ', '') if phone_match else None
+                        # Extraire téléphone si présent (format: 72 26 09 01 ou 72260901)
+                        phone = None
+                        phone_match = re.search(r'T[eé]l\s*[:\s]\s*([\d\s\.]+)', line)
+                        if phone_match:
+                            phone = phone_match.group(1).replace(' ', '').replace('.', '')
+                            # S'assurer que le téléphone a 8 chiffres
+                            if len(phone) >= 8:
+                                phone = phone[:8]
                         
                         context.current_client = {
                             "code": code,
                             "name": name,
                             "phone": phone
                         }
-                        print(f"[PDF Extract] Client trouvé: {code} - {name[:30]}")
+                        print(f"[PDF Extract] Client trouvé: {code} - {name[:30]} - Tél: {phone}")
                         continue
                     
                     # Parser données de créance

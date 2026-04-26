@@ -173,13 +173,13 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
                     {new Date(debt.dueDate).toLocaleDateString('fr-FR')}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {debt.amount.toFixed(2)}{debt.currency || 'EUR'}
+                    {debt.amount.toFixed(2)} TND
                   </TableCell>
                   <TableCell className="text-right text-green-600">
-                    {debt.settlement.toFixed(2)}{debt.currency || 'EUR'}
+                    {debt.settlement?.toFixed(2) || '0.00'} TND
                   </TableCell>
                   <TableCell className="text-right font-bold text-red-600">
-                    {debt.balance.toFixed(2)}{debt.currency || 'EUR'}
+                    {debt.balance.toFixed(2)} TND
                   </TableCell>
                   <TableCell className="text-center">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
