@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Sidebar';
 import { KPICards } from '@/components/KPICards';
 import { FileUpload } from '@/components/FileUpload';
 import { Dashboard } from '@/components/Dashboard';
 import { DebtTable } from '@/components/DebtTable';
+import { QuickFilters } from '@/components/QuickFilters';
 import { OCRService } from '@/lib/ocr';
 import { AnalysisService } from '@/lib/analysis';
 import { ExportService } from '@/lib/export';
@@ -36,7 +37,15 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>([]);
+  const [notifications, setNotifications] = useState<string[]>([]);
+
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
+
+  // Initialize filtered debts when debts change
+  useEffect(() => {
+    setFilteredDebts(debts);
+  }, [debts]);
 
   const handleFileProcess = async (files: File[]) => {
     setIsProcessing(true);
@@ -323,11 +332,14 @@ export default function Home() {
                   </TabsList>
 
                   <TabsContent value="dashboard" className="space-y-6">
-                    <Dashboard analysis={analysis} />
-                    <DebtTable 
-                      debts={debts} 
-                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+                    <QuickFilters 
+                      debts={debts}
+                      onFilterChange={(filtered, activeFilter) => {
+                        setFilteredDebts(filtered);
+                      }}
+                      onNavigateToDetail={() => setActiveTab('table')}
                     />
+                    <Dashboard analysis={analysis} />
                   </TabsContent>
 
                   <TabsContent value="aging" className="space-y-6">
@@ -397,7 +409,10 @@ export default function Home() {
                   </TabsContent>
 
                   <TabsContent value="table" className="space-y-6">
-                    {/* Detail content moved to dashboard */}
+                    <DebtTable 
+                      debts={filteredDebts.length > 0 ? filteredDebts : debts} 
+                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+                    />
                   </TabsContent>
                 </Tabs>
               )}
