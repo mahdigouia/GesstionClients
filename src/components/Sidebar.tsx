@@ -68,7 +68,9 @@ export function Sidebar({ className }: SidebarProps) {
           
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white tracking-wide">{fullName || 'GesstionClients'}</h1>
+              <Link href="/" className="hover:opacity-80 transition-opacity cursor-pointer">
+                <h1 className="text-lg font-bold text-white tracking-wide">Gestion Clients</h1>
+              </Link>
               <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-lg">
                 MDS
               </span>
