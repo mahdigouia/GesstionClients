@@ -1,10 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { 
   Table, 
   TableBody, 
@@ -13,9 +12,10 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Search, Download, Filter } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
+import { ClientSearchFilters } from './ClientSearchFilters';
 
 interface DebtTableProps {
   debts: ClientDebt[];
@@ -23,19 +23,12 @@ interface DebtTableProps {
 }
 
 export function DebtTable({ debts, onExport }: DebtTableProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRisk, setFilterRisk] = useState<string>('all');
+  const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>(debts);
 
-  const filteredDebts = debts.filter(debt => {
-    const matchesSearch = 
-      (debt.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (debt.clientCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (debt.invoiceNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRisk = filterRisk === 'all' || debt.riskLevel === filterRisk;
-    
-    return matchesSearch && matchesRisk;
-  });
+  // Update filtered debts when parent debts change
+  useEffect(() => {
+    setFilteredDebts(debts);
+  }, [debts]);
 
   const riskColors = {
     healthy: 'bg-green-100 text-green-800 border-green-200',
@@ -49,6 +42,8 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
 
   return (
     <Card>
+      <ClientSearchFilters debts={debts} onFilterChange={setFilteredDebts} />
+      
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle>Liste des Créances ({filteredDebts.length})</CardTitle>
@@ -60,51 +55,6 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
             >
               <Download className="h-4 w-4 mr-2" />
               Exporter
-            </Button>
-          </div>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Rechercher client, code ou facture..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-          
-          <div className="flex space-x-2">
-            <Button
-              variant={filterRisk === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterRisk('all')}
-            >
-              Tous
-            </Button>
-            <Button
-              variant={filterRisk === 'critical' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterRisk('critical')}
-            >
-              Critique
-            </Button>
-            <Button
-              variant={filterRisk === 'overdue' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterRisk('overdue')}
-            >
-              En retard
-            </Button>
-            <Button
-              variant={filterRisk === 'monitoring' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setFilterRisk('monitoring')}
-            >
-              Surveillance
             </Button>
           </div>
         </div>
