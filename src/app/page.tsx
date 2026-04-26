@@ -7,6 +7,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { Dashboard } from '@/components/Dashboard';
 import { DebtTable } from '@/components/DebtTable';
 import { QuickFilters } from '@/components/QuickFilters';
+import { VoiceAssistant } from '@/components/VoiceAssistant';
 import { OCRService } from '@/lib/ocr';
 import { AnalysisService } from '@/lib/analysis';
 import { ExportService } from '@/lib/export';
@@ -443,6 +444,14 @@ export default function Home() {
             </>
           )}
         </main>
+        
+        {/* Voice Assistant - visible when data is loaded */}
+        {debts.length > 0 && (
+          <VoiceAssistant 
+            debts={debts} 
+            analysis={analysis} 
+          />
+        )}
       </div>
     </div>
   );
