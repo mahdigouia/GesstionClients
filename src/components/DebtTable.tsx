@@ -152,25 +152,29 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
               {filteredDebts.map((debt) => (
                 <TableRow key={debt.id} className="hover:bg-gray-50">
                   <TableCell className="font-medium">
-                    {debt.clientName}
+                    {debt.clientName || '-'}
                   </TableCell>
                   <TableCell className="text-gray-600">
-                    {debt.clientCode}
+                    {debt.clientCode || '-'}
                   </TableCell>
                   <TableCell className="text-gray-600">
                     {debt.clientPhone || '-'}
                   </TableCell>
                   <TableCell className="font-mono text-sm">
-                    {debt.documentNumber}
+                    {debt.documentNumber || '-'}
                   </TableCell>
                   <TableCell className="max-w-xs truncate" title={debt.description}>
                     {debt.description}
                   </TableCell>
                   <TableCell>
-                    {new Date(debt.documentDate).toLocaleDateString('fr-FR')}
+                    {debt.documentDate && !isNaN(new Date(debt.documentDate).getTime()) 
+                      ? new Date(debt.documentDate).toLocaleDateString('fr-FR') 
+                      : '-'}
                   </TableCell>
                   <TableCell>
-                    {new Date(debt.dueDate).toLocaleDateString('fr-FR')}
+                    {debt.dueDate && !isNaN(new Date(debt.dueDate).getTime()) 
+                      ? new Date(debt.dueDate).toLocaleDateString('fr-FR') 
+                      : '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {debt.amount.toFixed(2)} TND

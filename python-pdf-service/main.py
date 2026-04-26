@@ -627,6 +627,10 @@ async def extract_debts(file: UploadFile = File(...)):
                         }
                         print(f"[PDF Extract] Client trouvé: {code} - {name[:30]} - Tél: {phone}")
                         continue
+                    else:
+                        # Log pour debug: montrer les lignes qui pourraient être des clients
+                        if re.match(r'^\d{4}', line):
+                            print(f"[PDF Extract] Ligne avec code 4 chiffres non matchée: {line[:60]}")
                     
                     # Parser données de créance
                     # Pattern: Date Echéance (DD/MM/YYYY) + Date Doc (DD/MM/YYYY) + N°pièce + Montants
