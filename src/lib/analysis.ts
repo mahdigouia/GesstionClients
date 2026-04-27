@@ -3,15 +3,21 @@ import { format, differenceInDays } from 'date-fns';
 
 export class AnalysisService {
   static analyzeDebts(debts: ClientDebt[]): AnalysisResult {
-    const totalDebts = debts.reduce((sum, debt) => sum + debt.amount, 0);
-    const totalPaid = debts.reduce((sum, debt) => sum + debt.settlement, 0);
-    const totalBalance = debts.reduce((sum, debt) => sum + debt.balance, 0);
+    // S'assurer que chaque ligne a son statut contentieux à jour selon l'âge (> 365 jours)
+    const processedDebts = debts.map(d => ({
+      ...d,
+      isContentieux: d.age > 365
+    }));
+
+    const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
+    const totalPaid = processedDebts.reduce((sum, debt) => sum + debt.settlement, 0);
+    const totalBalance = processedDebts.reduce((sum, debt) => sum + debt.balance, 0);
     
     // Taux de recouvrement = (Somme des Règlements / Somme des Montants Initiaux)
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
 
     // Taux impayés hors contentieux
-    const nonContentieuxDebts = debts.filter(d => !d.isContentieux);
+    const nonContentieuxDebts = processedDebts.filter(d => !d.isContentieux);
     const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + d.amount, 0);
     const totalNonContentieuxPaid = nonContentieuxDebts.reduce((sum, d) => sum + d.settlement, 0);
     const totalNonContentieuxBalance = nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
@@ -158,10 +164,10 @@ export class AnalysisService {
 
     // Distribution des risques
     const riskDistribution = {
-      healthy: debts.filter(d => d.riskLevel === 'healthy').length,
-      monitoring: debts.filter(d => d.riskLevel === 'monitoring').length,
-      overdue: debts.filter(d => d.riskLevel === 'overdue').length,
-      critical: debts.filter(d => d.riskLevel === 'critical').length
+      healthy: processedDebts.filter(d => d.riskLevel === 'healthy').length,
+      monitoring: processedDebts.filter(d => d.riskLevel === 'monitoring').length,
+      overdue: processedDebts.filter(d => d.riskLevel === 'overdue').length,
+      critical: processedDebts.filter(d => d.riskLevel === 'critical').length
     };
 
     return {
