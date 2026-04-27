@@ -80,12 +80,15 @@ class ExtractionContext:
 
 
 def parse_tunisian_amount(amount_str: str) -> float:
-    """Convertit un montant tunisien en nombre: '1 264,277' -> 1264.277"""
+    """Convertit un montant tunisien en nombre: '1 264,277' -> 1264.277, '-28,808' -> -28.808"""
     if not amount_str:
         return 0.0
-    cleaned = amount_str.replace(' ', '').replace(',', '.')
+    # Préserver le signe négatif
+    negative = '-' in amount_str
+    cleaned = amount_str.replace('-', '').replace(' ', '').replace(',', '.')
     try:
-        return float(cleaned)
+        value = float(cleaned)
+        return -value if negative else value
     except ValueError:
         return 0.0
 
@@ -196,7 +199,7 @@ def parse_data_row(
         doc_date = dates[-1] if len(dates) > 1 else due_date
         
         # Extraire le numéro de pièce (FT######, IC######, AV######)
-        doc_match = re.search(r'(FT\d{6}|IC\d{6}|AV\d{5,8})', row_text, re.IGNORECASE)
+        doc_match = re.search(r'(FT\d{6}|IC\d{6}|AVT\d{5,8}|AV\d{5,8})', row_text, re.IGNORECASE)
         doc_number = doc_match.group(1).upper() if doc_match else "DOC"
         
         # Extraire l'âge (nombre avant "jours" ou après les dates)
@@ -208,8 +211,8 @@ def parse_data_row(
         # Extraire les montants (chercher tous les nombres avec virgule)
         amounts = []
         for cell in row:
-            # Pattern montant tunisien: 1 264,277 ou 264,277 ou 0,000
-            amount_matches = re.findall(r'(?:\d{1,3}(?:\s\d{3})*,\d{3}|\d+,\d{3})', cell)
+            # Pattern montant tunisien: 1 264,277 ou 264,277 ou 0,000 ou -28,808
+            amount_matches = re.findall(r'(?:-?\d{1,3}(?:\s\d{3})*,\d{3}|-?\d+,\d{3})', cell)
             for match in amount_matches:
                 amounts.append(parse_tunisian_amount(match))
         
@@ -283,8 +286,8 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         due_date = f"{dates[0][2]}-{dates[0][1]}-{dates[0][0]}"
         doc_date = f"{dates[1][2]}-{dates[1][1]}-{dates[1][0]}" if len(dates) > 1 else due_date
         
-        # Chercher le numéro de pièce (FT######, IC######, FA######, etc.)
-        doc_match = re.search(r'([A-Z]{2}\d{6})', line)
+        # Chercher le numéro de pièce (FT######, IC######, AVT######, AV######, etc.)
+        doc_match = re.search(r'(AVT\d{5,8}|[A-Z]{2}\d{6})', line)
         document_number = doc_match.group(1) if doc_match else ""
         
         # Supprimer les dates et le numéro de pièce pour analyser le reste
@@ -345,9 +348,9 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             print(f"[PDF Extract] Work line after age removal: {work_line[:80]}")
         
         # Pattern pour les montants tunisiens (avec espace et virgule)
-        # Format: "1 264,277" ou "0,000"
+        # Format: "1 264,277" ou "0,000" ou "-28,808"
         numbers = []
-        pattern_tnd = r'\d{1,3}(?:\s\d{3})*,\d+'
+        pattern_tnd = r'-?\d{1,3}(?:\s\d{3})*,\d+'
         for match in re.finditer(pattern_tnd, work_line):
             val_str = match.group().replace(' ', '').replace(',', '.')
             try:
@@ -643,10 +646,11 @@ async def extract_debts(file: UploadFile = File(...)):
                     
                     # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
                     # Pattern: début de ligne avec 4 chiffres suivis d'un nom
-                    # Accepte: lettres majuscules, minuscules, espaces, tirets, apostrophes
+                    # Accepte: lettres, chiffres, espaces, tirets, apostrophes, parenthèses, points
                     # Format: 0424 LA MANGEARIA Tél: 72 26 09 01
                     # ou: 3206 M'HEMDI IMED Tél : 98 22 39 25
-                    client_match = re.match(r'^(\d{4})\s+([A-Za-z\s\-\']+?)(?:\s+T[eé]l|\s*$)', line)
+                    # ou: 2691 VIVARIUM 2 COMMERCE Tél: 26 99 22 10
+                    client_match = re.match(r'^(\d{4})\s+([A-Za-z][A-Za-z0-9\s\-\'().]+?)(?:\s+T[eé]l|\s*$)', line)
                     if client_match:
                         code = client_match.group(1)
                         name = client_match.group(2).strip()

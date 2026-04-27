@@ -33,6 +33,7 @@ interface FilterState {
   minAge: string;
   maxAge: string;
   riskLevels: string[];
+  retainedOnly: boolean;
   sortBy: 'name' | 'amount' | 'age' | 'balance';
   sortOrder: 'asc' | 'desc';
 }
@@ -55,6 +56,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     minAge: '',
     maxAge: '',
     riskLevels: [],
+    retainedOnly: false,
     sortBy: 'name',
     sortOrder: 'asc'
   });
@@ -104,9 +106,12 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesRisk = filters.riskLevels.length === 0 || 
         filters.riskLevels.includes(debt.riskLevel);
 
+      // Retained filter
+      const matchesRetained = !filters.retainedOnly || debt.paymentStatus === 'retained';
+
       return matchesSearch && matchesCode && matchesPhone && matchesDoc && 
              matchesCommercial && matchesMinAmount && matchesMaxAmount &&
-             matchesMinAge && matchesMaxAge && matchesRisk;
+             matchesMinAge && matchesMaxAge && matchesRisk && matchesRetained;
     });
 
     // Sort
@@ -162,6 +167,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       minAge: '',
       maxAge: '',
       riskLevels: [],
+      retainedOnly: false,
       sortBy: 'name',
       sortOrder: 'asc'
     });
@@ -177,7 +183,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.maxAmount,
     filters.minAge,
     filters.maxAge
-  ].filter(Boolean).length + filters.riskLevels.length;
+  ].filter(Boolean).length + filters.riskLevels.length + (filters.retainedOnly ? 1 : 0);
 
   const quickFilters = [
     { label: 'Tous', count: debts.length, risk: null },
@@ -374,6 +380,22 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                    risk === 'overdue' ? 'En retard' : 'Critique'}
                 </Badge>
               ))}
+            </div>
+
+            {/* Retenue Filter */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-sm text-gray-500">Statut paiement:</span>
+              <Badge
+                variant={filters.retainedOnly ? 'default' : 'outline'}
+                className={`cursor-pointer ${
+                  filters.retainedOnly
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                }`}
+                onClick={() => updateFilter('retainedOnly', !filters.retainedOnly)}
+              >
+                🛡️ Retenue ({debts.filter(d => d.paymentStatus === 'retained').length})
+              </Badge>
             </div>
           </div>
         )}

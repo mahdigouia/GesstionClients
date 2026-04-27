@@ -10,7 +10,8 @@ import {
   Users, 
   CheckCircle2,
   FileText,
-  ArrowRight
+  ArrowRight,
+  Shield
 } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
 import { useState } from 'react';
@@ -71,16 +72,28 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
       color: 'bg-green-500',
       bgColor: 'bg-green-50',
       textColor: 'text-green-700'
+    },
+    { 
+      id: 'retained', 
+      label: 'Retenue', 
+      count: debts.filter(d => d.paymentStatus === 'retained').length,
+      icon: Shield,
+      color: 'bg-purple-500',
+      bgColor: 'bg-purple-50',
+      textColor: 'text-purple-700'
     }
   ];
+
+  const applyFilter = (filterId: string, data: ClientDebt[]): ClientDebt[] => {
+    if (filterId === 'all') return data;
+    if (filterId === 'retained') return data.filter(d => d.paymentStatus === 'retained');
+    return data.filter(d => d.riskLevel === filterId);
+  };
 
   const handleFilterClick = (filterId: string) => {
     setActiveFilter(filterId);
     
-    let filtered = debts;
-    if (filterId !== 'all') {
-      filtered = debts.filter(d => d.riskLevel === filterId);
-    }
+    let filtered = applyFilter(filterId, debts);
     
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -97,10 +110,7 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     
-    let filtered = debts;
-    if (activeFilter !== 'all') {
-      filtered = debts.filter(d => d.riskLevel === activeFilter);
-    }
+    let filtered = applyFilter(activeFilter, debts);
     
     if (value) {
       const searchLower = value.toLowerCase();
@@ -119,10 +129,7 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
   const handleSelectSuggestion = (value: string) => {
     setSearchTerm(value);
     
-    let filtered = debts;
-    if (activeFilter !== 'all') {
-      filtered = debts.filter(d => d.riskLevel === activeFilter);
-    }
+    let filtered = applyFilter(activeFilter, debts);
     
     const searchLower = value.toLowerCase();
     filtered = filtered.filter(d => 
@@ -171,7 +178,7 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
         </div>
 
         {/* Quick filter cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
           {quickStats.map((stat) => {
             const Icon = stat.icon;
             const isActive = activeFilter === stat.id;
@@ -220,7 +227,11 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
             <span className="text-sm text-gray-500">Solde total filtré: </span>
             <span className="text-lg font-bold text-red-600">
               {debts
-                .filter(d => activeFilter === 'all' || d.riskLevel === activeFilter)
+                .filter(d => {
+                  if (activeFilter === 'all') return true;
+                  if (activeFilter === 'retained') return d.paymentStatus === 'retained';
+                  return d.riskLevel === activeFilter;
+                })
                 .filter(d => {
                   if (!searchTerm) return true;
                   const searchLower = searchTerm.toLowerCase();

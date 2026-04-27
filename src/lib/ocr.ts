@@ -351,7 +351,7 @@ export class OCRService {
     // --- TOKENIZER DE PRÉCISION ---
     
     // 1. On isole le numéro de pièce et on l'enlève de la ligne pour éviter les collisions
-    const docMatch = line.match(/(FT\d{6}|IC\d{6}|AV\d{5,8})/i);
+    const docMatch = line.match(/(FT\d{6}|IC\d{6}|AVT\d{5,8}|AV\d{5,8})/i);
     const docNumber = docMatch ? docMatch[1].toUpperCase() : "DOC";
     let workingLine = line.replace(docNumber, " [PIECE] ");
 
@@ -367,7 +367,7 @@ export class OCRService {
         if (tokens[i].includes(',')) {
             let fullAmount = tokens[i];
             // Si le mot précédent est un petit chiffre (millier), on fusionne
-            if (i > 0 && /^\d{1,3}$/.test(tokens[i-1])) {
+            if (i > 0 && /^-?\d{1,3}$/.test(tokens[i-1])) {
                 fullAmount = tokens[i-1] + fullAmount;
             }
             amountTokens.push(fullAmount);
@@ -496,15 +496,19 @@ export class OCRService {
 
   /**
    * Convertit une chaîne montant TND en nombre.
-   * Gère: "1 264,277" → 1264.277, "0,000" → 0, "43,523" → 43.523
+   * Gère: "1 264,277" → 1264.277, "0,000" → 0, "43,523" → 43.523, "-28,808" → -28.808
    */
   private static parseAmount(amountStr: string): number {
+    // Préserver le signe négatif
+    const negative = amountStr.includes('-');
     const cleaned = amountStr
       .trim()
+      .replace(/-/g, '')       // Retirer le signe pour le parsing
       .replace(/\s/g, '')      // Supprimer les espaces (séparateurs de milliers)
       .replace(',', '.');       // Remplacer la virgule décimale par un point
     const value = parseFloat(cleaned);
-    return isNaN(value) ? 0 : value;
+    if (isNaN(value)) return 0;
+    return negative ? -value : value;
   }
 
   /**
@@ -570,6 +574,15 @@ export class OCRService {
         documentType: isContentieux ? 'unpaid_old' : 'invoice',
         paymentStatus: balance > 0 ? 'unpaid' : 'paid',
         isContentieux,
+      };
+    }
+
+    // ── AVT: Avoir sur Vente (montant négatif) ────────────────────────────────
+    if (upper.startsWith('AVT')) {
+      return {
+        documentType: 'credit_note',
+        paymentStatus: 'paid',
+        isContentieux: false,
       };
     }
 

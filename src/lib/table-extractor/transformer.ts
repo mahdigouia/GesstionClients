@@ -151,6 +151,15 @@ function classifyDocument(
     };
   }
 
+  // AVT: Avoir sur Vente (montant négatif, ex: AVT250102)
+  if (upper.startsWith('AVT')) {
+    return {
+      documentType: 'credit_note',
+      paymentStatus: 'paid',
+      isContentieux: false,
+    };
+  }
+
   // AV: Avoirs / Notes de crédit
   if (upper.startsWith('AV')) {
     return {
