@@ -571,6 +571,8 @@ export default function Home() {
         onClose={() => setIsFilterModalOpen(false)}
         debts={modalFilteredDebts}
         filterName={activeFilterName}
+      />
+
       {/* Client History Modal */}
       <ClientHistoryModal 
         isOpen={isHistoryModalOpen}
