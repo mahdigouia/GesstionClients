@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   Bell,
   Search,
-  Filter,
   Download,
   Settings,
   Save,
@@ -32,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { FilteredResultsModal } from '@/components/FilteredResultsModal';
 
 export default function Home() {
   const { debts, analysis, setDebts, setAnalysis } = useDebtContext();
@@ -42,6 +42,9 @@ export default function Home() {
   const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>([]);
   const [notifications, setNotifications] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [modalFilteredDebts, setModalFilteredDebts] = useState<ClientDebt[]>([]);
+  const [activeFilterName, setActiveFilterName] = useState('');
 
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
 
@@ -153,9 +156,9 @@ export default function Home() {
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto flex flex-col">
         {/* Top Navigation Bar */}
-        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3 md:space-x-4">
+            <div className="flex items-center space-x-3">
               {/* Hamburger menu - mobile only */}
               <Button
                 variant="ghost"
@@ -165,54 +168,45 @@ export default function Home() {
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">
-                Tableau de Bord
-              </h1>
-              {debts.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-500">
-                    {debts.length} créances analysées
-                  </span>
-                </div>
-              )}
+              <div className="flex flex-col">
+                <h1 className="text-base md:text-xl font-bold text-gray-900 leading-tight">
+                  Tableau de Bord
+                </h1>
+                {debts.length > 0 && (
+                  <Badge variant="secondary" className="mt-0.5 md:mt-1 bg-blue-50 text-blue-700 border-blue-100 text-[10px] md:text-xs py-0 px-1.5 w-fit">
+                    {debts.length} créances
+                  </Badge>
+                )}
+              </div>
             </div>
             
-            <div className="flex items-center space-x-3">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 text-gray-400" />
+            <div className="flex items-center space-x-2 md:space-x-3">
+              {/* Search Bar - Hidden on small screens to save space */}
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Rechercher un client, une facture..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
+                  placeholder="Rechercher..."
+                  className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-32 md:w-64 bg-gray-50/50"
                 />
               </div>
 
-              {/* Filters */}
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filtres
-              </Button>
-
               {/* Notifications */}
-              <Button variant="outline" size="sm" className="relative">
-                <Bell className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full bg-gray-50">
+                <Bell className="h-4 w-4 text-gray-600" />
                 {analysis?.alerts?.filter((a: any) => a.severity === 'high').length > 0 && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
                 )}
               </Button>
 
-              {/* Export & Save */}
+              {/* Export & Save - Icon only on mobile */}
               {debts.length > 0 && (
-                <div className="flex items-center space-x-2">
-                  <Button onClick={handleSaveAnalysis} variant="outline" size="sm" title="Sauvegarder l'analyse">
-                    <Save className="h-4 w-4" />
+                <div className="flex items-center space-x-1 md:space-x-2">
+                  <Button onClick={handleSaveAnalysis} variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-gray-50" title="Sauvegarder">
+                    <Save className="h-4 w-4 text-gray-600" />
                   </Button>
-                  <Button onClick={handleExportExcel} variant="outline" size="sm" title="Exporter Excel">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  <Button onClick={handleExportPDF} variant="outline" size="sm" title="Exporter PDF">
-                    <Download className="h-4 w-4" />
+                  <Button onClick={handleExportExcel} variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-gray-50" title="Excel">
+                    <Download className="h-4 w-4 text-green-600" />
                   </Button>
                 </div>
               )}
@@ -369,6 +363,12 @@ export default function Home() {
                       debts={debts}
                       onFilterChange={(filtered, activeFilter) => {
                         setFilteredDebts(filtered);
+                        // Open modal if not 'all'
+                        if (activeFilter !== 'all') {
+                          setModalFilteredDebts(filtered);
+                          setActiveFilterName(activeFilter);
+                          setIsFilterModalOpen(true);
+                        }
                       }}
                       onNavigateToDetail={() => setActiveTab('table')}
                     />
@@ -543,6 +543,14 @@ export default function Home() {
           />
         )}
       </div>
+
+      {/* Filter Modal */}
+      <FilteredResultsModal 
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        debts={modalFilteredDebts}
+        filterName={activeFilterName}
+      />
     </div>
   );
 }
