@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,11 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Download } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { ClientSearchFilters } from './ClientSearchFilters';
+import { AutocompleteSearch } from './AutocompleteSearch';
 
 interface DebtTableProps {
   debts: ClientDebt[];
@@ -23,12 +24,47 @@ interface DebtTableProps {
 }
 
 export function DebtTable({ debts, onExport }: DebtTableProps) {
-  const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>(debts);
+  const [advancedFilteredDebts, setAdvancedFilteredDebts] = useState<ClientDebt[]>(debts);
+  const [selectedClient, setSelectedClient] = useState<string>('');
+  const [clientSearchValue, setClientSearchValue] = useState<string>('');
 
-  // Update filtered debts when parent debts change
+  // Update when parent debts change
   useEffect(() => {
-    setFilteredDebts(debts);
+    setAdvancedFilteredDebts(debts);
+    setSelectedClient('');
+    setClientSearchValue('');
   }, [debts]);
+
+  // Final filtered debts = advanced filters + client selection
+  const filteredDebts = useMemo(() => {
+    if (!selectedClient) return advancedFilteredDebts;
+    return advancedFilteredDebts.filter(d => 
+      (d.clientName || '').toLowerCase() === selectedClient.toLowerCase()
+    );
+  }, [advancedFilteredDebts, selectedClient]);
+
+  const handleClientSelect = useCallback((value: string) => {
+    // Check if the selected value is an actual client name
+    const isClientName = debts.some(d => 
+      (d.clientName || '').toLowerCase() === value.toLowerCase()
+    );
+    if (isClientName) {
+      setSelectedClient(value);
+    }
+    setClientSearchValue(value);
+  }, [debts]);
+
+  const handleClientSearchChange = useCallback((value: string) => {
+    setClientSearchValue(value);
+    if (!value) {
+      setSelectedClient('');
+    }
+  }, []);
+
+  const clearClientFilter = useCallback(() => {
+    setSelectedClient('');
+    setClientSearchValue('');
+  }, []);
 
   const riskColors = {
     healthy: 'bg-green-100 text-green-800 border-green-200',
@@ -39,10 +75,11 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
 
   const totalBalance = filteredDebts.reduce((sum, debt) => sum + debt.balance, 0);
   const totalAmount = filteredDebts.reduce((sum, debt) => sum + debt.amount, 0);
+  const totalSettlement = filteredDebts.reduce((sum, debt) => sum + (debt.settlement || 0), 0);
 
   return (
     <Card>
-      <ClientSearchFilters debts={debts} onFilterChange={setFilteredDebts} />
+      <ClientSearchFilters debts={debts} onFilterChange={setAdvancedFilteredDebts} />
       
       <CardHeader>
         <div className="flex justify-between items-center">
@@ -61,19 +98,57 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
       </CardHeader>
       
       <CardContent>
-        {/* Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="text-2xl font-bold">
-              {totalAmount.toFixed(2)} TND
+        {/* Client Autocomplete Filter */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <AutocompleteSearch
+                debts={debts}
+                value={clientSearchValue}
+                onChange={handleClientSearchChange}
+                onSelect={handleClientSelect}
+                placeholder="🔍 Filtrer par client (tapez 2 lettres pour l'autocomplétion)..."
+              />
             </div>
-            <div className="text-sm text-gray-600">Total Facturé</div>
+            {selectedClient && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearClientFilter}
+                className="gap-1 h-12 px-4 border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700"
+              >
+                <span className="font-medium">{selectedClient}</span>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          <div className="text-center p-4 bg-red-50 rounded-lg">
-            <div className="text-2xl font-bold text-red-600">
-              {totalBalance.toFixed(2)} TND
+        </div>
+
+        {/* Summary - 4 cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="text-sm text-blue-600 font-medium mb-1">Créances</div>
+            <div className="text-2xl font-bold text-blue-800">
+              {filteredDebts.length}
             </div>
-            <div className="text-sm text-gray-600">Solde Restant</div>
+          </div>
+          <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-100">
+            <div className="text-sm text-gray-600 font-medium mb-1">Total Facturé</div>
+            <div className="text-2xl font-bold text-gray-800">
+              {totalAmount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm font-normal">TND</span>
+            </div>
+          </div>
+          <div className="text-center p-4 bg-green-50 rounded-lg border border-green-100">
+            <div className="text-sm text-green-600 font-medium mb-1">Total Réglé</div>
+            <div className="text-2xl font-bold text-green-700">
+              {totalSettlement.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm font-normal">TND</span>
+            </div>
+          </div>
+          <div className="text-center p-4 bg-red-50 rounded-lg border border-red-100">
+            <div className="text-sm text-red-600 font-medium mb-1">Solde Restant</div>
+            <div className="text-2xl font-bold text-red-600">
+              {totalBalance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-sm font-normal">TND</span>
+            </div>
           </div>
         </div>
 
@@ -127,13 +202,13 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
                       : '-'}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {debt.amount.toFixed(2)} TND
+                    {debt.amount.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TND
                   </TableCell>
                   <TableCell className="text-right text-green-600">
-                    {debt.settlement?.toFixed(2) || '0.00'} TND
+                    {(debt.settlement || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TND
                   </TableCell>
                   <TableCell className="text-right font-bold text-red-600">
-                    {debt.balance.toFixed(2)} TND
+                    {debt.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TND
                   </TableCell>
                   <TableCell className="text-center">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
