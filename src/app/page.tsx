@@ -33,9 +33,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { FilteredResultsModal } from '@/components/FilteredResultsModal';
 import { NotificationPopover } from '@/components/NotificationPopover';
+import { useToast } from '@/components/ui/use-toast';
 
 export default function Home() {
-  const { debts, analysis, setDebts, setAnalysis } = useDebtContext();
+  const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis } = useDebtContext();
+  const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export default function Home() {
     setProgress(0);
     setError(null);
     setWaitingMessage(null);
-
+    
     try {
       // Étape 1: Attendre que le service Python soit disponible
       setProgress(10);
@@ -81,47 +83,59 @@ export default function Home() {
       setWaitingMessage(null);
       setProgress(50);
       
-      let allDebts: ClientDebt[] = [];
-      const totalFiles = files.length;
+      let filesProcessed = 0;
       
-      // Traiter chaque fichier
+      // Traiter chaque fichier un par un avec fusion intelligente
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const fileProgress = 50 + (40 * (i + 1) / totalFiles);
+        const fileProgress = 50 + (50 * (i + 1) / files.length);
         setProgress(Math.round(fileProgress));
+        setWaitingMessage(`Traitement de ${file.name}...`);
         
-        // Extraction via Python (PAS de fallback OCR)
+        // Extraction via Python
         const result = await OCRService.extractDebtsFromPDF(file);
         
-        if (!result.success || result.debts.length === 0) {
-          console.warn(`Aucune donnée trouvée dans: ${file.name}`);
-          if (result.error) {
-            console.error(`[Import] Erreur pour ${file.name}:`, result.error);
+        if (result.success && result.debts.length > 0) {
+          // Fusion intelligente (remplace les anciennes données de ce fichier)
+          const stats = updateDebtsFromFile(file.name, result.debts);
+          filesProcessed++;
+          
+          // Notification détaillée pour l'utilisateur
+          if (stats.new > 0 || stats.updated > 0 || stats.removed > 0) {
+            toast({
+              title: `Mise à jour : ${file.name}`,
+              description: `${stats.new} nouvelles factures, ${stats.updated} mises à jour, ${stats.removed} soldées.`,
+              variant: "default",
+            });
+          } else {
+            toast({
+              title: `Fichier ${file.name}`,
+              description: "Aucun changement détecté par rapport à l'import précédent.",
+            });
           }
-        } else {
-          console.log(`[Import] ${file.name}: ${result.debts.length} créances via ${result.method}`);
-          allDebts = [...allDebts, ...result.debts];
+        } else if (result.error) {
+          console.error(`[Import] Erreur pour ${file.name}:`, result.error);
         }
       }
       
-      if (allDebts.length === 0) {
-        throw new Error('Aucune donnée de créance trouvée dans les fichiers');
+      if (filesProcessed === 0) {
+        throw new Error('Aucune donnée valide n\'a pu être extraite des fichiers.');
       }
-
-      // Étape 3: Analyse agrégée
-      setProgress(90);
-      const analysisResult = AnalysisService.analyzeDebts(allDebts);
       
-      // Étape 4: Finalisation
+      // Étape finale
       setProgress(100);
-      setDebts(allDebts);
-      setAnalysis(analysisResult as any);
+      setWaitingMessage("Finalisation...");
+      
+      setTimeout(() => {
+        setIsProcessing(false);
+        setWaitingMessage(null);
+        setActiveTab('dashboard');
+      }, 800);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement';
       setError(errorMessage);
       console.error('Processing error:', err);
-    } finally {
       setIsProcessing(false);
       setProgress(0);
     }

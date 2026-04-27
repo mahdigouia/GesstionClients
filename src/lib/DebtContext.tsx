@@ -13,6 +13,12 @@ interface DebtContextType {
   setDebts: (debts: ClientDebt[]) => void;
   setAnalysis: (analysis: AnalysisResult | null) => void;
   addDebts: (newDebts: ClientDebt[]) => void;
+  updateDebtsFromFile: (filename: string, newDebts: ClientDebt[]) => { 
+    updated: number, 
+    new: number, 
+    removed: number, 
+    totalChange: number 
+  };
   clearAll: () => void;
   lastUpdatedBy: string | null;
 }
@@ -119,6 +125,42 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const addDebts = (newDebts: ClientDebt[]) => {
     const updatedDebts = [...debts, ...newDebts];
     setDebts(updatedDebts);
+  };
+
+  const updateDebtsFromFile = (filename: string, newDebts: ClientDebt[]) => {
+    const existingDebtsForFile = debts.filter(d => d.sourceFile === filename);
+    const otherDebts = debts.filter(d => d.sourceFile !== filename);
+    
+    // Stats for the user
+    let updatedCount = 0;
+    let newCount = 0;
+    let totalChange = 0;
+
+    newDebts.forEach(newDebt => {
+      const existing = existingDebtsForFile.find(d => d.documentNumber === newDebt.documentNumber);
+      if (existing) {
+        if (existing.balance !== newDebt.balance) {
+          updatedCount++;
+          totalChange += (newDebt.balance - existing.balance);
+        }
+      } else {
+        newCount++;
+        totalChange += newDebt.balance;
+      }
+    });
+
+    const removedCount = Math.max(0, existingDebtsForFile.length - (newDebts.length - newCount));
+
+    // Update state
+    const updatedTotalDebts = [...otherDebts, ...newDebts];
+    setDebts(updatedTotalDebts);
+
+    return {
+      updated: updatedCount,
+      new: newCount,
+      removed: removedCount,
+      totalChange
+    };
   };
 
   const clearAll = async () => {
