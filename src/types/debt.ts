@@ -32,6 +32,7 @@ export interface AnalysisResult {
   totalPaid: number;
   totalBalance: number;
   recoveryRate: number;
+  unpaidRateNoContentieux: number;
   clientBreakdown: {
     clientName: string;
     totalAmount: number;

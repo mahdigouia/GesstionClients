@@ -59,14 +59,16 @@ Pour traiter les relevés de comptes locaux, l'Extracteur OCR suit des règles s
 
 Pour garantir la fiabilité des rapports, les formules suivantes sont appliquées dans l'application :
 
-### 1. Taux de Recouvrement (Performance)
-Il mesure la capacité de l'entreprise à transformer ses créances en liquidités. C'est l'indicateur affiché dans la barre de performance et sur le tableau de bord.
+### 1. Taux de Recouvrement Global (Sidebar)
+Il mesure la performance historique totale de l'entreprise sur l'ensemble de ses créances.
 *   **Formule** : `(Somme des Règlements / Somme des Montants Initiaux) * 100`
-*   **Signification** : Un taux de 75% signifie que sur 100 TND facturés historiquement, 75 TND ont déjà été encaissés.
+*   **Affichage** : Barre "Performance" dans la barre latérale gauche.
 
-### 2. Taux d'Impayés (Reste à recouvrer)
-*   **Formule** : `(Somme des Soldes Restants / Somme des Montants Initiaux) * 100`
-*   **Note** : C'est le complément du taux de recouvrement. Si le taux de recouvrement est de 74%, le taux d'impayés est de 26%.
+### 2. Taux d'Impayés Courants (Dashboard)
+Cet indicateur se concentre sur la santé de l'activité actuelle en excluant les dossiers juridiques anciens.
+*   **Formule** : `(Solde Restant Hors Contentieux / Montant Initial Hors Contentieux) * 100`
+*   **Affichage** : Carte verte centrale "Taux Impayés (Sans contentieux)".
+*   **Note** : Permet de voir si vos clients actuels paient bien, sans être "pollué" par les vieux dossiers de plus d'un an.
 
 ## 7. Règle d'Unicité des Sources
 

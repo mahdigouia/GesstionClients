@@ -10,6 +10,14 @@ export class AnalysisService {
     // Taux de recouvrement = (Somme des Règlements / Somme des Montants Initiaux)
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
 
+    // Taux impayés hors contentieux
+    const nonContentieuxDebts = debts.filter(d => !d.isContentieux);
+    const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + d.amount, 0);
+    const totalNonContentieuxBalance = nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
+    const unpaidRateNoContentieux = totalNonContentieuxAmount > 0 
+      ? (totalNonContentieuxBalance / totalNonContentieuxAmount) * 100 
+      : 0;
+
     // Analyse par client avancée
     const clientMap = new Map<string, any>();
     debts.forEach(debt => {
@@ -155,6 +163,7 @@ export class AnalysisService {
       totalPaid,
       totalBalance,
       recoveryRate,
+      unpaidRateNoContentieux,
       clientBreakdown,
       agingBreakdown,
       amountRanges: amountRangesResult,
