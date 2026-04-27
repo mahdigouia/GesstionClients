@@ -47,6 +47,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   const { analysis } = useDebtContext();
   
   const recoveryRate = analysis?.recoveryRate || 0;
+  const currentRecoveryRate = analysis?.recoveryRateNoContentieux || 0;
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -143,24 +144,40 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
         </nav>
         
         {/* Quick Stats Card */}
-        <div className="mt-6 p-4 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
-          <div className="absolute top-0 right-0 w-20 h-20 bg-white/20 rounded-full blur-2xl" />
+        <div className="mt-6 p-4 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-xl relative overflow-hidden border border-white/10">
+          <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px]" />
+          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-3xl" />
           
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap className="h-5 w-5 text-yellow-300" />
-              <span className="font-bold text-sm">Performance</span>
+          <div className="relative z-10 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="h-4 w-4 text-yellow-300 fill-yellow-300" />
+              <span className="font-bold text-xs uppercase tracking-wider opacity-90">Performance</span>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-blue-100">Taux Recouv.</span>
+
+            {/* Global Recovery */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-blue-100/90">Recouvrement Global</span>
                 <span className="font-bold">{recoveryRate.toFixed(1)}%</span>
               </div>
-              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-1000" 
+                  className="h-full bg-gradient-to-r from-blue-400 to-blue-300 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(255,255,255,0.4)]" 
                   style={{ width: `${Math.min(recoveryRate, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Current Recovery (Sans Contentieux) */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-emerald-100/90 font-medium italic">Courant (Sans contentieux)</span>
+                <span className="font-bold text-emerald-300">{currentRecoveryRate.toFixed(1)}%</span>
+              </div>
+              <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-400 to-green-300 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
+                  style={{ width: `${Math.min(currentRecoveryRate, 100)}%` }}
                 />
               </div>
             </div>

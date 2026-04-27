@@ -13,9 +13,15 @@ export class AnalysisService {
     // Taux impayés hors contentieux
     const nonContentieuxDebts = debts.filter(d => !d.isContentieux);
     const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + d.amount, 0);
+    const totalNonContentieuxPaid = nonContentieuxDebts.reduce((sum, d) => sum + d.settlement, 0);
     const totalNonContentieuxBalance = nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
+    
     const unpaidRateNoContentieux = totalNonContentieuxAmount > 0 
       ? (totalNonContentieuxBalance / totalNonContentieuxAmount) * 100 
+      : 0;
+
+    const recoveryRateNoContentieux = totalNonContentieuxAmount > 0
+      ? (totalNonContentieuxPaid / totalNonContentieuxAmount) * 100
       : 0;
 
     // Analyse par client avancée
@@ -163,6 +169,7 @@ export class AnalysisService {
       totalPaid,
       totalBalance,
       recoveryRate,
+      recoveryRateNoContentieux,
       unpaidRateNoContentieux,
       clientBreakdown,
       agingBreakdown,
