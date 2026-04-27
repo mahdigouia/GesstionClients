@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { FilteredResultsModal } from '@/components/FilteredResultsModal';
 import { NotificationPopover } from '@/components/NotificationPopover';
 import { ClientHistoryModal } from '@/components/ClientHistoryModal';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Home() {
   const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis } = useDebtContext();
