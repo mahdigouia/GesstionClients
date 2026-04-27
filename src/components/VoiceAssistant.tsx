@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { 
   Mic, 
   MicOff, 
@@ -12,7 +13,8 @@ import {
   X, 
   MessageCircle,
   Copy,
-  CheckCircle2
+  CheckCircle2,
+  Send
 } from 'lucide-react';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 import { voiceNLP, VoiceResponse } from '@/lib/voiceNLP';
@@ -64,6 +66,7 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState('');
   
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -173,6 +176,22 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
     }, 500);
   }, [debts, analysis, isMuted]);
 
+  // Handle text input submission
+  const handleTextSubmit = () => {
+    const trimmed = textInput.trim();
+    if (!trimmed) return;
+    setTextInput('');
+    handleVoiceCommand(trimmed);
+  };
+
+  // Handle Enter key in text input
+  const handleTextKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleTextSubmit();
+    }
+  };
+
   // Add message to conversation
   const addMessage = (type: 'user' | 'assistant', text: string, data?: VoiceResponse) => {
     const newMessage: ConversationMessage = {
@@ -222,7 +241,7 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
         console.error('Error starting recognition:', error);
       }
     } else {
-      addMessage('assistant', 'Désolé, la reconnaissance vocale n\'est pas supportée sur votre navigateur. Essayez Chrome ou Safari.');
+      addMessage('assistant', 'La reconnaissance vocale n\'est pas supportée. Utilisez le champ texte ci-dessous pour poser vos questions.');
     }
   };
 
@@ -256,20 +275,15 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
 
   // Suggested questions
   const suggestedQuestions = [
-    'Factures non payées de...',
     'Total des créances',
     'Alertes critiques',
     'Contentieux',
-    'Créances en retard'
+    'Créances en retard',
+    'Clients à risque'
   ];
 
   const handleSuggestedQuestion = (question: string) => {
-    if (question.includes('...')) {
-      // For questions requiring input, just start listening
-      startListening();
-    } else {
-      handleVoiceCommand(question);
-    }
+    handleVoiceCommand(question);
   };
 
   return (
@@ -278,25 +292,25 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
       <button
         onClick={() => setIsOpen(true)}
         className={`
-          fixed bottom-6 right-6 z-50
+          fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50
           w-14 h-14 rounded-full
-          bg-blue-600 hover:bg-blue-700
+          bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700
           text-white shadow-lg hover:shadow-xl
           flex items-center justify-center
           transition-all duration-300
-          ${voiceState === 'listening' ? 'animate-pulse scale-110' : ''}
-          ${voiceState === 'speaking' ? 'bg-green-600' : ''}
+          ${voiceState === 'listening' ? 'animate-pulse scale-110 ring-4 ring-red-300' : ''}
+          ${voiceState === 'speaking' ? 'bg-gradient-to-br from-green-500 to-emerald-600 ring-4 ring-green-300' : ''}
         `}
         aria-label="Ouvrir l'assistant vocal"
       >
         <Mic className="h-6 w-6" />
       </button>
 
-      {/* Voice Assistant Modal */}
+      {/* Voice Assistant Modal - Full screen on mobile */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <Card className="w-full max-w-lg max-h-[80vh] flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/50">
+          <Card className="w-full md:max-w-lg h-[100dvh] md:h-auto md:max-h-[80vh] flex flex-col rounded-none md:rounded-lg">
+            <CardHeader className="flex flex-row items-center justify-between border-b pb-4 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <div className={`
                   p-2 rounded-full
@@ -357,7 +371,7 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
                         <Badge
                           key={i}
                           variant="outline"
-                          className="cursor-pointer hover:bg-blue-50"
+                          className="cursor-pointer hover:bg-blue-50 text-xs md:text-sm"
                           onClick={() => handleSuggestedQuestion(q)}
                         >
                           {q}
@@ -414,13 +428,32 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
               </div>
 
               {/* Input Area */}
-              <div className="border-t p-4 bg-gray-50">
+              <div className="border-t p-3 md:p-4 bg-gray-50 flex-shrink-0">
                 {/* Live transcript when listening */}
                 {voiceState === 'listening' && transcript && (
                   <div className="mb-3 p-2 bg-yellow-50 rounded text-sm text-yellow-800">
                     🎤 {transcript}
                   </div>
                 )}
+
+                {/* Text input for typing questions */}
+                <div className="flex items-center gap-2 mb-3">
+                  <Input
+                    placeholder="Tapez votre question..."
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    onKeyDown={handleTextKeyDown}
+                    className="flex-1 h-10"
+                  />
+                  <Button
+                    onClick={handleTextSubmit}
+                    disabled={!textInput.trim() || voiceState === 'processing'}
+                    size="icon"
+                    className="h-10 w-10 bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
 
                 <div className="flex items-center gap-2">
                   <Button
@@ -452,7 +485,7 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
                 </div>
 
                 <p className="text-xs text-gray-400 mt-2 text-center">
-                  Appuyez sur le bouton et parlez en français
+                  Parlez ou tapez votre question en français
                 </p>
               </div>
             </CardContent>

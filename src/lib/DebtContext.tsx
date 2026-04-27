@@ -3,6 +3,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/lib/AuthContext';
+import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 interface DebtContextType {
   debts: ClientDebt[];
@@ -11,21 +14,68 @@ interface DebtContextType {
   setAnalysis: (analysis: AnalysisResult | null) => void;
   addDebts: (newDebts: ClientDebt[]) => void;
   clearAll: () => void;
+  lastUpdatedBy: string | null;
 }
 
 const DebtContext = createContext<DebtContextType | undefined>(undefined);
 
-export function DebtProvider({ children }: { children: ReactNode }) {
-  const [debts, setDebts] = useState<ClientDebt[]>([]);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+const FIRESTORE_COLLECTION = 'shared_data';
+const FIRESTORE_DOC = 'current_debts';
 
-  // Charger depuis localStorage au démarrage
+export function DebtProvider({ children }: { children: ReactNode }) {
+  const [debts, setDebtsState] = useState<ClientDebt[]>([]);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [lastUpdatedBy, setLastUpdatedBy] = useState<string | null>(null);
+  const [firestoreReady, setFirestoreReady] = useState(false);
+  const { user } = useAuth();
+
+  // Écouter les changements Firestore en temps réel (collaboratif)
   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      unsubscribe = onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          const firestoreDebts = data.debts || [];
+          setDebtsState(firestoreDebts);
+          setLastUpdatedBy(data.updatedBy || null);
+          
+          // Recalculer l'analyse localement
+          if (firestoreDebts.length > 0) {
+            const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts);
+            setAnalysis(newAnalysis);
+          } else {
+            setAnalysis(null);
+          }
+        } else {
+          // Pas encore de données Firestore, charger depuis localStorage comme fallback
+          loadFromLocalStorage();
+        }
+        setFirestoreReady(true);
+      }, (error) => {
+        console.warn('[DebtContext] Firestore error, falling back to localStorage:', error);
+        loadFromLocalStorage();
+        setFirestoreReady(true);
+      });
+    } catch (error) {
+      console.warn('[DebtContext] Firestore init error, falling back to localStorage:', error);
+      loadFromLocalStorage();
+      setFirestoreReady(true);
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  const loadFromLocalStorage = () => {
     try {
       const savedDebts = localStorage.getItem('gc_debts');
       const savedAnalysis = localStorage.getItem('gc_analysis');
       if (savedDebts) {
-        setDebts(JSON.parse(savedDebts));
+        setDebtsState(JSON.parse(savedDebts));
       }
       if (savedAnalysis) {
         setAnalysis(JSON.parse(savedAnalysis));
@@ -33,37 +83,65 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Erreur chargement données sauvegardées:', e);
     }
-  }, []);
+  };
 
-  // Sauvegarder dans localStorage à chaque changement
-  useEffect(() => {
-    if (debts.length > 0) {
-      localStorage.setItem('gc_debts', JSON.stringify(debts));
-    }
-  }, [debts]);
+  // Sauvegarder dans Firestore + localStorage
+  const saveToFirestore = async (newDebts: ClientDebt[]) => {
+    // Toujours sauvegarder en local comme fallback
+    localStorage.setItem('gc_debts', JSON.stringify(newDebts));
 
-  useEffect(() => {
-    if (analysis) {
-      localStorage.setItem('gc_analysis', JSON.stringify(analysis));
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      await setDoc(docRef, {
+        debts: newDebts,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.email || 'unknown',
+        debtCount: newDebts.length,
+      });
+      console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances dans Firestore par ${user?.email}`);
+    } catch (error) {
+      console.warn('[DebtContext] Erreur sauvegarde Firestore:', error);
     }
-  }, [analysis]);
+  };
+
+  const setDebts = (newDebts: ClientDebt[]) => {
+    setDebtsState(newDebts);
+    saveToFirestore(newDebts);
+    
+    // Analyse locale
+    if (newDebts.length > 0) {
+      const newAnalysis = AnalysisService.analyzeDebts(newDebts);
+      setAnalysis(newAnalysis);
+      localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
+    }
+  };
 
   const addDebts = (newDebts: ClientDebt[]) => {
     const updatedDebts = [...debts, ...newDebts];
     setDebts(updatedDebts);
-    const newAnalysis = AnalysisService.analyzeDebts(updatedDebts);
-    setAnalysis(newAnalysis);
   };
 
-  const clearAll = () => {
-    setDebts([]);
+  const clearAll = async () => {
+    setDebtsState([]);
     setAnalysis(null);
     localStorage.removeItem('gc_debts');
     localStorage.removeItem('gc_analysis');
+
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      await setDoc(docRef, {
+        debts: [],
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.email || 'unknown',
+        debtCount: 0,
+      });
+    } catch (error) {
+      console.warn('[DebtContext] Erreur suppression Firestore:', error);
+    }
   };
 
   return (
-    <DebtContext.Provider value={{ debts, analysis, setDebts, setAnalysis, addDebts, clearAll }}>
+    <DebtContext.Provider value={{ debts, analysis, setDebts, setAnalysis, addDebts, clearAll, lastUpdatedBy }}>
       {children}
     </DebtContext.Provider>
   );

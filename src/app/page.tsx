@@ -25,7 +25,8 @@ import {
   Download,
   Settings,
   Save,
-  X
+  X,
+  Menu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,6 +41,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [filteredDebts, setFilteredDebts] = useState<ClientDebt[]>([]);
   const [notifications, setNotifications] = useState<string[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
 
@@ -146,15 +148,24 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto flex flex-col">
         {/* Top Navigation Bar */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-semibold text-gray-900">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              {/* Hamburger menu - mobile only */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden p-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <h1 className="text-lg md:text-xl font-semibold text-gray-900">
                 Tableau de Bord
               </h1>
               {debts.length > 0 && (
@@ -210,7 +221,7 @@ export default function Home() {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-3 md:p-6">
           {/* Error Alert */}
           {error && (
             <Card className="mb-6 border-red-200 bg-red-50">
@@ -297,31 +308,31 @@ export default function Home() {
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   {/* Modern Tabs with glassmorphism */}
                   <div className="p-2 bg-white/50 backdrop-blur-xl rounded-2xl shadow-lg border border-white/60">
-                    <TabsList className="grid w-full grid-cols-4 bg-transparent p-1 gap-1">
+                    <TabsList className="flex w-full bg-transparent p-1 gap-1 overflow-x-auto">
                       <TabsTrigger 
                         value="dashboard" 
-                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
                       >
                         <LayoutDashboard className="h-4 w-4" />
                         <span className="font-semibold">Vue d'ensemble</span>
                       </TabsTrigger>
                       <TabsTrigger 
                         value="aging" 
-                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
                       >
                         <BarChart3 className="h-4 w-4" />
                         <span className="font-semibold">Analyse</span>
                       </TabsTrigger>
                       <TabsTrigger 
                         value="clients" 
-                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-violet-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-violet-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
                       >
                         <Users className="h-4 w-4" />
                         <span className="font-semibold">Clients</span>
                       </TabsTrigger>
                       <TabsTrigger 
                         value="table" 
-                        className="flex items-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-3"
+                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
                       >
                         <FileText className="h-4 w-4" />
                         <span className="font-semibold">Détail</span>

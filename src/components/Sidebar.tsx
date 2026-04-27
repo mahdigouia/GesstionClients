@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -36,20 +36,25 @@ const navigation = [
 
 interface SidebarProps {
   className?: string;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const { initials, fullName, user } = useAuth();
 
-  return (
-    <div className={cn(
-      "pb-12 min-h-screen bg-gray-50 border-r border-gray-200",
-      className
-    )}>
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    if (mobileOpen && onMobileClose) {
+      onMobileClose();
+    }
+  }, [pathname]);
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
       {/* Header - Dark blue professional */}
-      <div className="flex h-20 items-center px-6 bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
+      <div className="flex h-20 items-center px-6 bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden flex-shrink-0">
         {/* Glassmorphism overlay */}
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
         
@@ -78,14 +83,17 @@ export function Sidebar({ className }: SidebarProps) {
             <p className="text-xs text-blue-200/80">{user?.email || 'Gestion des Créances'}</p>
           </div>
           
-          <Button
-            variant="ghost"
-            size="sm"
-            className="md:hidden text-white/80 hover:text-white hover:bg-white/10"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+          {/* Close button on mobile */}
+          {onMobileClose && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white/80 hover:text-white hover:bg-white/10 md:hidden"
+              onClick={onMobileClose}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -100,6 +108,7 @@ export function Sidebar({ className }: SidebarProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onMobileClose}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300",
                   "hover:shadow-lg hover:scale-[1.02]",
@@ -153,7 +162,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Footer - Glassmorphism */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-white/20">
+      <div className="p-4 bg-white/80 backdrop-blur-xl border-t border-white/20 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
@@ -171,5 +180,32 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
       </div>
     </div>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar - always visible */}
+      <div className={cn(
+        "hidden md:block md:w-72 min-h-screen bg-gray-50 border-r border-gray-200 relative",
+        className
+      )}>
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar - overlay drawer */}
+      {mobileOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+            onClick={onMobileClose}
+          />
+          {/* Drawer */}
+          <div className="fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] bg-gray-50 shadow-2xl md:hidden animate-in slide-in-from-left duration-300">
+            {sidebarContent}
+          </div>
+        </>
+      )}
+    </>
   );
 }
