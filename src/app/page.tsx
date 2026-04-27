@@ -146,6 +146,13 @@ export default function Home() {
     }
   };
 
+  const handleShowClientHistory = (clientName: string) => {
+    const history = debts.filter(d => d.clientName === clientName);
+    setSelectedClientName(clientName);
+    setClientHistoryDebts(history);
+    setIsHistoryModalOpen(true);
+  };
+
   const handleExportExcel = () => {
     if (debts.length > 0) {
       ExportService.exportToExcel(debts, analysis);
