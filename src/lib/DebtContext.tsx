@@ -128,9 +128,16 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const updateDebtsFromFile = (filename: string, newDebts: ClientDebt[]) => {
+    const normName = filename.toLowerCase();
     const today = new Date().toISOString();
+    
+    // Filter existing debts by normalized filename
+    const existingDebtsForFile = debts.filter(d => (d.sourceFile || '').toLowerCase() === normName);
+    const otherDebts = debts.filter(d => (d.sourceFile || '').toLowerCase() !== normName);
+    
     const debtsWithDate = newDebts.map(d => ({ 
       ...d, 
+      sourceFile: filename, // Keep original casing for display
       lastImportDate: today,
       isRecentlyUpdated: true
     }));

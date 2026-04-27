@@ -68,3 +68,11 @@ Il mesure la capacité de l'entreprise à transformer ses créances en liquidit�
 *   **Formule** : `(Somme des Soldes Restants / Somme des Montants Initiaux) * 100`
 *   **Note** : C'est le complément du taux de recouvrement. Si le taux de recouvrement est de 74%, le taux d'impayés est de 26%.
 
+## 7. Règle d'Unicité des Sources
+
+Pour éviter les doublons et garantir l'exactitude des statistiques (notamment quand plusieurs utilisateurs importent les mêmes fichiers), l'application applique la règle suivante :
+
+*   **Identifiant Unique** : Le **nom du fichier** (insensible à la casse, ex: `C01.pdf` = `c01.PDF`) sert d'identifiant unique pour une source de données.
+*   **Écrasement Automatique** : Tout nouvel import d'un fichier portant un nom déjà existant dans la base de données entraîne la suppression immédiate des anciennes données de ce fichier et leur remplacement par les nouvelles.
+*   **Conséquence** : Si vous importez deux fois le fichier "C01", seule la version la plus récente est conservée pour les calculs du Dashboard et de la Performance.
+
