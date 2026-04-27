@@ -32,6 +32,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { FilteredResultsModal } from '@/components/FilteredResultsModal';
+import { NotificationPopover } from '@/components/NotificationPopover';
 
 export default function Home() {
   const { debts, analysis, setDebts, setAnalysis } = useDebtContext();
@@ -192,12 +193,7 @@ export default function Home() {
               </div>
 
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full bg-gray-50">
-                <Bell className="h-4 w-4 text-gray-600" />
-                {analysis?.alerts?.filter((a: any) => a.severity === 'high').length > 0 && (
-                  <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
-                )}
-              </Button>
+              <NotificationPopover />
 
               {/* Export & Save - Icon only on mobile */}
               {debts.length > 0 && (
