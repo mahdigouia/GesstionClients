@@ -54,3 +54,17 @@ Pour traiter les relevés de comptes locaux, l'Extracteur OCR suit des règles s
 *   **Montants négatifs** : Les documents `AVT` peuvent avoir un montant négatif (ex: `-28,808`). Le signe `-` doit être préservé lors du parsing.
 *   **Noms de clients avec chiffres** : Un nom de client peut contenir des chiffres (ex: `VIVARIUM 2 COMMERCE`). Le parser ne doit pas confondre ces chiffres avec un code client ou un nouveau bloc.
 *   **Cohérence Mathématique** : L'algorithme valide que `Montant - Règlement ≈ Solde` (avec une tolérance de 1 TND) pour être certain de ne pas capturer de mauvais chiffres sur des documents mal scannés.
+
+## 6. Méthodes de Calcul des Indicateurs (KPI)
+
+Pour garantir la fiabilité des rapports, les formules suivantes sont appliquées dans l'application :
+
+### 1. Taux de Recouvrement (Performance)
+Il mesure la capacité de l'entreprise à transformer ses créances en liquidités. C'est l'indicateur affiché dans la barre de performance et sur le tableau de bord.
+*   **Formule** : `(Somme des Règlements / Somme des Montants Initiaux) * 100`
+*   **Signification** : Un taux de 75% signifie que sur 100 TND facturés historiquement, 75 TND ont déjà été encaissés.
+
+### 2. Taux d'Impayés (Reste à recouvrer)
+*   **Formule** : `(Somme des Soldes Restants / Somme des Montants Initiaux) * 100`
+*   **Note** : C'est le complément du taux de recouvrement. Si le taux de recouvrement est de 74%, le taux d'impayés est de 26%.
+

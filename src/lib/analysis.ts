@@ -6,6 +6,8 @@ export class AnalysisService {
     const totalDebts = debts.reduce((sum, debt) => sum + debt.amount, 0);
     const totalPaid = debts.reduce((sum, debt) => sum + debt.settlement, 0);
     const totalBalance = debts.reduce((sum, debt) => sum + debt.balance, 0);
+    
+    // Taux de recouvrement = (Somme des Règlements / Somme des Montants Initiaux)
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
 
     // Analyse par client avancée

@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/AuthContext';
+import { useDebtContext } from '@/lib/DebtContext';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, color: 'bg-blue-500' },
@@ -43,6 +44,9 @@ interface SidebarProps {
 export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { initials, fullName, user } = useAuth();
+  const { analysis } = useDebtContext();
+  
+  const recoveryRate = analysis?.recoveryRate || 0;
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -151,10 +155,13 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-blue-100">Taux Recouv.</span>
-                <span className="font-bold">85%</span>
+                <span className="font-bold">{recoveryRate.toFixed(1)}%</span>
               </div>
               <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                <div className="h-full w-[85%] bg-gradient-to-r from-green-400 to-emerald-500 rounded-full" />
+                <div 
+                  className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-1000" 
+                  style={{ width: `${Math.min(recoveryRate, 100)}%` }}
+                />
               </div>
             </div>
           </div>
