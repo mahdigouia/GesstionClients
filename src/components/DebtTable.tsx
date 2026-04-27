@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Download, X } from 'lucide-react';
+import { Download, X, History, Calendar } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { ClientSearchFilters } from './ClientSearchFilters';
@@ -21,9 +21,10 @@ import { AutocompleteSearch } from './AutocompleteSearch';
 interface DebtTableProps {
   debts: ClientDebt[];
   onExport?: (debts: ClientDebt[]) => void;
+  onClientClick?: (clientName: string) => void;
 }
 
-export function DebtTable({ debts, onExport }: DebtTableProps) {
+export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
   const [advancedFilteredDebts, setAdvancedFilteredDebts] = useState<ClientDebt[]>(debts);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [clientSearchValue, setClientSearchValue] = useState<string>('');
@@ -175,9 +176,29 @@ export function DebtTable({ debts, onExport }: DebtTableProps) {
             </TableHeader>
             <TableBody>
               {filteredDebts.map((debt) => (
-                <TableRow key={debt.id} className="hover:bg-gray-50">
+                <TableRow 
+                  key={debt.id} 
+                  className="hover:bg-blue-50/50 cursor-pointer transition-colors group"
+                  onClick={() => onClientClick?.(debt.clientName)}
+                >
                   <TableCell className="font-medium">
-                    {debt.clientName || '-'}
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-900 group-hover:text-blue-700 transition-colors">
+                          {debt.clientName || '-'}
+                        </span>
+                        {debt.isRecentlyUpdated && (
+                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[8px] h-3 px-1">
+                            Mis à jour
+                          </Badge>
+                        )}
+                      </div>
+                      {debt.lastImportDate && (
+                        <span className="text-[9px] text-gray-400 font-normal">
+                          Importé le {new Date(debt.lastImportDate).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-gray-600">
                     {debt.clientCode || '-'}

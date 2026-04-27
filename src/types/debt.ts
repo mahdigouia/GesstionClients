@@ -22,6 +22,9 @@ export interface ClientDebt {
   commercialName?: string;
   // Contentieux flag
   isContentieux?: boolean;
+  // Tracking
+  lastImportDate?: string;
+  isRecentlyUpdated?: boolean;
 }
 
 export interface AnalysisResult {

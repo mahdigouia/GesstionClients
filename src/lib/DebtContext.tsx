@@ -128,15 +128,21 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const updateDebtsFromFile = (filename: string, newDebts: ClientDebt[]) => {
-    const existingDebtsForFile = debts.filter(d => d.sourceFile === filename);
-    const otherDebts = debts.filter(d => d.sourceFile !== filename);
-    
+    const today = new Date().toISOString();
+    const debtsWithDate = newDebts.map(d => ({ 
+      ...d, 
+      lastImportDate: today,
+      isRecentlyUpdated: true
+    }));
+
+    const otherDebtsReset = otherDebts.map(d => ({ ...d, isRecentlyUpdated: false }));
+
     // Stats for the user
     let updatedCount = 0;
     let newCount = 0;
     let totalChange = 0;
 
-    newDebts.forEach(newDebt => {
+    debtsWithDate.forEach(newDebt => {
       const existing = existingDebtsForFile.find(d => d.documentNumber === newDebt.documentNumber);
       if (existing) {
         if (existing.balance !== newDebt.balance) {
@@ -152,7 +158,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     const removedCount = Math.max(0, existingDebtsForFile.length - (newDebts.length - newCount));
 
     // Update state
-    const updatedTotalDebts = [...otherDebts, ...newDebts];
+    const updatedTotalDebts = [...otherDebtsReset, ...debtsWithDate];
     setDebts(updatedTotalDebts);
 
     return {

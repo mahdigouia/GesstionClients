@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { FilteredResultsModal } from '@/components/FilteredResultsModal';
 import { NotificationPopover } from '@/components/NotificationPopover';
+import { ClientHistoryModal } from '@/components/ClientHistoryModal';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function Home() {
@@ -48,6 +49,10 @@ export default function Home() {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [modalFilteredDebts, setModalFilteredDebts] = useState<ClientDebt[]>([]);
   const [activeFilterName, setActiveFilterName] = useState('');
+  
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedClientName, setSelectedClientName] = useState('');
+  const [clientHistoryDebts, setClientHistoryDebts] = useState<ClientDebt[]>([]);
 
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
 
@@ -537,6 +542,7 @@ export default function Home() {
                     <DebtTable 
                       debts={filteredDebts.length > 0 ? filteredDebts : debts} 
                       onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+                      onClientClick={handleShowClientHistory}
                     />
                   </TabsContent>
                 </Tabs>
@@ -565,6 +571,12 @@ export default function Home() {
         onClose={() => setIsFilterModalOpen(false)}
         debts={modalFilteredDebts}
         filterName={activeFilterName}
+      {/* Client History Modal */}
+      <ClientHistoryModal 
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        clientName={selectedClientName}
+        clientDebts={clientHistoryDebts}
       />
     </div>
   );
