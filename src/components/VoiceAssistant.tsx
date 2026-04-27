@@ -14,7 +14,8 @@ import {
   MessageCircle,
   Copy,
   CheckCircle2,
-  Send
+  Send,
+  ArrowRight
 } from 'lucide-react';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 import { voiceNLP, VoiceResponse } from '@/lib/voiceNLP';
@@ -47,6 +48,7 @@ interface ISpeechRecognition extends EventTarget {
 interface VoiceAssistantProps {
   debts: ClientDebt[];
   analysis: AnalysisResult | null;
+  onShowResults?: (results: ClientDebt[], title: string) => void;
 }
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
@@ -59,7 +61,7 @@ interface ConversationMessage {
   data?: VoiceResponse;
 }
 
-export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
+export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -418,6 +420,19 @@ export function VoiceAssistant({ debts, analysis }: VoiceAssistantProps) {
                                 <><Copy className="h-3 w-3 mr-1" /> Copier</>
                               )}
                             </Button>
+                            
+                            {/* View Results Button */}
+                            {onShowResults && message.data?.data?.invoices && message.data.data.invoices.length > 0 && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onShowResults(message.data?.data?.invoices || [], message.data?.data?.clientName || 'Résultats')}
+                                className="h-6 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                              >
+                                <ArrowRight className="h-3 w-3 mr-1" />
+                                Voir les détails
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

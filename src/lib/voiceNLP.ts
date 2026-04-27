@@ -384,24 +384,28 @@ export const voiceNLP = {
     }
     
     // Default fallback
-    return {
+    const response = {
       message: 'Je n\'ai pas compris votre demande. Essayez:\n• "Factures non payées de [client]"\n• "Total des créances"\n• "Alertes critiques"\n• "Contentieux"\n• "Créances en retard"',
       intent: 'UNKNOWN'
     };
+    return processResponse(response as VoiceResponse);
   },
   
   executeIntent(intent: string, entity: string | undefined, debts: ClientDebt[], analysis: AnalysisResult | null): VoiceResponse {
+    let response: VoiceResponse;
+
     switch (intent) {
       case 'GET_UNPAID_INVOICES_BY_CLIENT': {
         const clientName = entity || '';
         const clientMatch = findBestClientMatch(clientName, debts);
         
         if (!clientMatch) {
-          return {
+          response = {
             message: `Je n'ai pas trouvé de client correspondant à "${clientName}".`,
             intent,
             data: { clientName, invoices: [], total: 0 }
           };
+          break;
         }
         
         const invoices = debts.filter(d => 
@@ -410,7 +414,7 @@ export const voiceNLP = {
         
         const total = invoices.reduce((sum, d) => sum + d.balance, 0);
         
-        return {
+        response = {
           message: '',
           intent,
           data: {
@@ -419,24 +423,27 @@ export const voiceNLP = {
             total
           }
         };
+        break;
       }
       
       case 'GET_TOTAL_DEBTS': {
         const total = debts.reduce((sum, d) => sum + d.balance, 0);
-        return {
+        response = {
           message: '',
           intent,
           data: { total, count: debts.length }
         };
+        break;
       }
       
       case 'GET_CRITICAL_ALERTS': {
         const alerts = analysis?.alerts?.filter(a => a.severity === 'high') || [];
-        return {
+        response = {
           message: '',
           intent,
           data: { alerts, count: alerts.length }
         };
+        break;
       }
       
       case 'GET_CLIENT_BALANCE': {
@@ -444,17 +451,18 @@ export const voiceNLP = {
         const clientMatch = findBestClientMatch(clientName, debts);
         
         if (!clientMatch) {
-          return {
+          response = {
             message: `Je n'ai pas trouvé de client correspondant à "${clientName}".`,
             intent,
             data: { clientName, total: 0, count: 0 }
           };
+          break;
         }
         
         const clientDebts = debts.filter(d => d.clientCode === clientMatch.code && d.balance > 0);
         const total = clientDebts.reduce((sum, d) => sum + d.balance, 0);
         
-        return {
+        response = {
           message: '',
           intent,
           data: {
@@ -463,6 +471,7 @@ export const voiceNLP = {
             count: clientDebts.length
           }
         };
+        break;
       }
       
       case 'GET_INVOICES_BY_COMMERCIAL': {
@@ -470,16 +479,17 @@ export const voiceNLP = {
         const commercialMatch = findBestCommercialMatch(commercialName, debts);
         
         if (!commercialMatch) {
-          return {
+          response = {
             message: `Je n'ai pas trouvé de commercial correspondant à "${commercialName}".`,
             intent,
             data: { commercialName, invoices: [] }
           };
+          break;
         }
         
         const invoices = debts.filter(d => d.commercialName === commercialMatch?.name);
         
-        return {
+        response = {
           message: '',
           intent,
           data: {
@@ -488,17 +498,19 @@ export const voiceNLP = {
             count: invoices.length
           }
         };
+        break;
       }
       
       case 'GET_OVERDUE_INVOICES': {
         const invoices = debts.filter(d => d.riskLevel === 'overdue' || d.riskLevel === 'critical');
         const total = invoices.reduce((sum, d) => sum + d.balance, 0);
         
-        return {
+        response = {
           message: '',
           intent,
           data: { invoices, total, count: invoices.length }
         };
+        break;
       }
       
       case 'GET_INVOICE_DETAILS': {
@@ -507,22 +519,24 @@ export const voiceNLP = {
           d.documentNumber.toLowerCase() === docNumber.toLowerCase()
         );
         
-        return {
+        response = {
           message: '',
           intent,
           data: { documentNumber: docNumber, invoice }
         };
+        break;
       }
       
       case 'GET_CONTENTIEUX': {
         const invoices = debts.filter(d => d.isContentieux);
         const total = invoices.reduce((sum, d) => sum + d.balance, 0);
         
-        return {
+        response = {
           message: '',
           intent,
           data: { invoices, total, count: invoices.length }
         };
+        break;
       }
       
       case 'GET_AGING_SUMMARY': {
@@ -531,29 +545,32 @@ export const voiceNLP = {
           ? Math.round(debts.reduce((sum, d) => sum + d.age, 0) / debts.length)
           : 0;
         
-        return {
+        response = {
           message: '',
           intent,
           data: { breakdown, avgAge }
         };
+        break;
       }
       
       case 'GET_ALL_CLIENTS': {
         const uniqueClients = new Set(debts.map(d => d.clientCode)).size;
-        return {
+        response = {
           message: '',
           intent,
           data: { count: uniqueClients }
         };
+        break;
       }
       
       case 'GET_ALL_COMMERCIALS': {
         const uniqueCommerciaux = new Set(debts.filter(d => d.commercialName).map(d => d.commercialName)).size;
-        return {
+        response = {
           message: '',
           intent,
           data: { count: uniqueCommerciaux }
         };
+        break;
       }
       
       case 'GET_TOP_RISKS': {
@@ -561,19 +578,22 @@ export const voiceNLP = {
           .filter(d => d.riskLevel === 'critical' || d.riskLevel === 'overdue')
           .sort((a, b) => b.balance - a.balance);
         
-        return {
+        response = {
           message: '',
           intent,
           data: { clients, count: clients.length }
         };
+        break;
       }
       
       default:
-        return {
+        response = {
           message: 'Je ne peux pas traiter cette demande pour le moment.',
           intent: 'ERROR'
         };
     }
+
+    return processResponse(response);
   }
 };
 

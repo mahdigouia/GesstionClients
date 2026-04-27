@@ -540,6 +540,11 @@ export default function Home() {
           <VoiceAssistant 
             debts={debts} 
             analysis={analysis} 
+            onShowResults={(results, title) => {
+              setModalFilteredDebts(results);
+              setActiveFilterName(title);
+              setIsFilterModalOpen(true);
+            }}
           />
         )}
       </div>
