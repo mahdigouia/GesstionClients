@@ -109,7 +109,8 @@ function createClientDebt(
       description: data.description || 'FACTURE',
       amount: data.amount,
       settlement: data.settlement,
-      balance: data.balance,
+      // Forcer le calcul du solde (Impayé) car l'OCR peut inverser les colonnes Règlement/Solde
+      balance: data.amount - data.settlement,
       paymentStatus: classification.paymentStatus,
       riskLevel: riskLevel,
       sourceFile: fileName,

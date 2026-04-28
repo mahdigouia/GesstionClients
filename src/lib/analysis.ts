@@ -11,7 +11,8 @@ export class AnalysisService {
 
     const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
     const totalPaid = processedDebts.reduce((sum, debt) => sum + debt.settlement, 0);
-    const totalBalance = processedDebts.reduce((sum, debt) => sum + debt.balance, 0);
+    // Calculer le solde total comme la différence pour éviter les erreurs d'extraction
+    const totalBalance = totalDebts - totalPaid;
     
     // Taux de recouvrement = (Somme des Règlements / Somme des Montants Initiaux)
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
@@ -23,7 +24,7 @@ export class AnalysisService {
     const totalNonContentieuxBalance = nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
     
     const unpaidRateNoContentieux = totalNonContentieuxAmount > 0 
-      ? (totalNonContentieuxBalance / totalNonContentieuxAmount) * 100 
+      ? ((totalNonContentieuxAmount - totalNonContentieuxPaid) / totalNonContentieuxAmount) * 100 
       : 0;
 
     const recoveryRateNoContentieux = totalNonContentieuxAmount > 0
