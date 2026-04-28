@@ -229,11 +229,6 @@ def parse_data_row(
         elif len(amounts) == 1:
             amount = amounts[0]
             balance = amounts[0]
-            settlement = 0.0
-        
-        # FORCER la règle métier: Impayé = Montant - Règlement
-        # car l'OCR peut inverser les colonnes (souvent Montant | Impayé | Règlement)
-        balance = amount - settlement
         
         # Vérification cohérence: solde devrait être ≈ montant - règlement
         if abs((amount - settlement) - balance) > 1.0:
@@ -398,7 +393,7 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             document_date=doc_date,
             amount=amount,
             payment=payment,
-            balance=amount - payment, # Forcer le calcul (Montant - Règlement)
+            balance=balance,
             age=age,
             description="",
             settlement=payment,

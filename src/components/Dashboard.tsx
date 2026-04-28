@@ -80,7 +80,7 @@ export function Dashboard({ analysis, onViewDetail }: DashboardProps) {
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-emerald-100 leading-tight">
               Taux d'Impayés Global <br />
-              <span className="text-[10px] font-normal opacity-80">(Formule: Σ Impayé / Σ Montant)</span>
+              <span className="text-[10px] font-normal opacity-80">(Formule: Σ Solde / Σ Montant)</span>
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-emerald-200" />
           </CardHeader>
