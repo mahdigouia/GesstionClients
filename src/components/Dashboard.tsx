@@ -67,11 +67,11 @@ export function Dashboard({ analysis, onViewDetail }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {analysis.totalDebts.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-lg">TND</span>
+              {Number(analysis.totalDebts || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-lg">TND</span>
             </div>
             <div className="flex items-center gap-1 mt-2 text-blue-100 text-sm">
               <ArrowUpRight className="h-4 w-4" />
-              <span>{analysis.totalBalance.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TND en attente</span>
+              <span>{Number(analysis.totalBalance || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TND en attente</span>
             </div>
           </CardContent>
         </Card>
@@ -86,13 +86,13 @@ export function Dashboard({ analysis, onViewDetail }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {isNaN(analysis.globalUnpaidRate) ? '0.0' : analysis.globalUnpaidRate.toFixed(1)}%
+              {Number(analysis.globalUnpaidRate || 0).toFixed(1)}%
             </div>
             <div className="mt-3">
               <div className="h-2 bg-white/30 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-white rounded-full transition-all duration-500"
-                  style={{ width: `${Math.max(0, 100 - (analysis.globalUnpaidRate || 0))}%` }}
+                  style={{ width: `${Math.max(0, 100 - Number(analysis.globalUnpaidRate || 0))}%` }}
                 />
               </div>
             </div>

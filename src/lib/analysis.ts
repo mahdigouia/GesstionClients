@@ -9,8 +9,8 @@ export class AnalysisService {
       isContentieux: Number(d.age) > 365
     }));
 
-    const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
-    const totalPaid = processedDebts.reduce((sum, debt) => sum + debt.settlement, 0);
+    const totalDebts = processedDebts.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
+    const totalPaid = processedDebts.reduce((sum, debt) => sum + Number(debt.settlement || 0), 0);
     // Calculer le solde total comme la différence pour éviter les erreurs d'extraction
     const totalBalance = totalDebts - totalPaid;
     
@@ -22,9 +22,9 @@ export class AnalysisService {
 
     // Taux impayés hors contentieux
     const nonContentieuxDebts = processedDebts.filter(d => !d.isContentieux);
-    const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + d.amount, 0);
-    const totalNonContentieuxPaid = nonContentieuxDebts.reduce((sum, d) => sum + d.settlement, 0);
-    const totalNonContentieuxBalance = nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
+    const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const totalNonContentieuxPaid = nonContentieuxDebts.reduce((sum, d) => sum + Number(d.settlement || 0), 0);
+    const totalNonContentieuxBalance = nonContentieuxDebts.reduce((sum, d) => sum + Number(d.balance || 0), 0);
     
     const unpaidRateNoContentieux = totalNonContentieuxAmount > 0 
       ? ((totalNonContentieuxAmount - totalNonContentieuxPaid) / totalNonContentieuxAmount) * 100 
