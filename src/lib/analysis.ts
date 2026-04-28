@@ -3,15 +3,18 @@ import { format, differenceInDays } from 'date-fns';
 
 export class AnalysisService {
   static analyzeDebts(debts: ClientDebt[]): AnalysisResult {
-    // S'assurer que chaque ligne a son statut contentieux à jour selon l'âge (> 365 jours)
     const processedDebts = debts.map(d => ({
       ...d,
-      isContentieux: Number(d.age) > 365
+      amount: Number(d.amount || 0),
+      settlement: Number(d.settlement || 0),
+      balance: Number(d.balance || 0),
+      age: Number(d.age || 0),
+      isContentieux: Number(d.age || 0) > 365
     }));
 
-    const totalDebts = processedDebts.reduce((sum, debt) => sum + Number(debt.amount || 0), 0);
-    const totalPaid = processedDebts.reduce((sum, debt) => sum + Number(debt.settlement || 0), 0);
-    const totalBalance = processedDebts.reduce((sum, debt) => sum + Number(debt.balance || 0), 0);
+    const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
+    const totalPaid = processedDebts.reduce((sum, debt) => sum + debt.settlement, 0);
+    const totalBalance = processedDebts.reduce((sum, debt) => sum + debt.balance, 0);
     
     // Taux de recouvrement = (Somme des Règlements / Somme des Montants Initiaux)
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
