@@ -7,11 +7,24 @@ import { FileText, Search, Filter, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExportService } from '@/lib/export';
+import { ClientHistoryModal } from '@/components/ClientHistoryModal';
+import { ClientDebt } from '@/types/debt';
 
 export default function InvoicesPage() {
   const { debts, analysis } = useDebtContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRisk, setFilterRisk] = useState('all');
+  
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedClientName, setSelectedClientName] = useState('');
+  const [clientHistoryDebts, setClientHistoryDebts] = useState<ClientDebt[]>([]);
+
+  const handleShowClientHistory = (clientName: string) => {
+    const history = debts.filter(d => d.clientName === clientName);
+    setSelectedClientName(clientName);
+    setClientHistoryDebts(history);
+    setIsHistoryModalOpen(true);
+  };
 
   const filteredDebts = debts.filter(debt => {
     const matchesSearch = searchTerm === '' || 
@@ -85,13 +98,17 @@ export default function InvoicesPage() {
               {filteredDebts.map((debt) => {
                 const riskColor = debt.riskLevel === 'critical' ? 'red' : debt.riskLevel === 'overdue' ? 'orange' : debt.riskLevel === 'monitoring' ? 'yellow' : 'green';
                 return (
-                  <Card key={debt.id} className="hover:shadow-sm transition-shadow">
+                  <Card 
+                    key={debt.id} 
+                    className="hover:shadow-md transition-all cursor-pointer hover:border-blue-300 group"
+                    onClick={() => handleShowClientHistory(debt.clientName)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className={`w-2 h-8 rounded-full bg-${riskColor}-500`} />
+                          <div className={`w-2 h-8 rounded-full bg-${riskColor}-500 group-hover:scale-y-110 transition-transform`} />
                           <div>
-                            <div className="font-medium text-gray-900">{debt.documentNumber}</div>
+                            <div className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{debt.documentNumber}</div>
                             <div className="text-sm text-gray-500">{debt.clientName}</div>
                             <div className="text-xs text-gray-400">{debt.description}</div>
                           </div>
@@ -124,6 +141,13 @@ export default function InvoicesPage() {
           )}
         </main>
       </div>
+
+      <ClientHistoryModal 
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        clientName={selectedClientName}
+        clientDebts={clientHistoryDebts}
+      />
     </div>
   );
 }

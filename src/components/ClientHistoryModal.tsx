@@ -192,5 +192,3 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
     </Dialog>
   );
 }
-  );
-}
