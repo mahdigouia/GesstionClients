@@ -78,15 +78,13 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
                 Dossier Client : {clientName}
               </DialogTitle>
             </div>
-            {activeTab === 'journal' && (
-              <Button 
-                onClick={() => setIsAddActionOpen(true)}
-                className="bg-white text-blue-700 hover:bg-blue-50 font-bold gap-2 rounded-xl"
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">Nouvelle Action</span>
-              </Button>
-            )}
+            <Button 
+              onClick={() => setIsAddActionOpen(true)}
+              className="bg-white text-blue-700 hover:bg-blue-50 font-bold gap-2 rounded-xl"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Nouvelle Action</span>
+            </Button>
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
