@@ -431,10 +431,9 @@ export class OCRService {
       description: description || 'FACTURE',
       amount,
       settlement,
-      // Toujours calculer le solde (impayé) = montant - règlement
-      balance: amount - settlement,
+      balance,
       paymentStatus: classification.paymentStatus,
-      riskLevel: this.classifyRisk(ageDays, (amount - settlement) > 0.001),
+      riskLevel: this.classifyRisk(ageDays, balance > 0.001),
       sourceFile: fileName,
       currency: 'TND',
       commercialCode: this.currentCommercial?.code,

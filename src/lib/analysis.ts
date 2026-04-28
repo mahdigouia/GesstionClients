@@ -48,10 +48,10 @@ export class AnalysisService {
         });
       }
       const client = clientMap.get(debt.clientName);
-      client.totalAmount += debt.amount;
-      client.totalBalance += debt.balance;
-      client.totalPaid += debt.settlement;
-      client.paymentDelays.push(debt.paymentDays);
+      client.totalAmount += Number(debt.amount || 0);
+      client.totalBalance += Number(debt.balance || 0);
+      client.totalPaid += Number(debt.settlement || 0);
+      client.paymentDelays.push(Number(debt.paymentDays || 0));
       client.debtCount++;
       
       // Déterminer le niveau de risque le plus élevé pour ce client
@@ -132,7 +132,7 @@ export class AnalysisService {
       .slice(0, 10);
 
     // Génération des alertes
-    const alerts = this.generateAlerts(debts, clientBreakdown);
+    const alerts = AnalysisService.generateAlerts(processedDebts, clientBreakdown);
 
     // Statistiques avancées
     const allAges = debts.map(d => d.age);
@@ -212,7 +212,7 @@ export class AnalysisService {
           id: `alert_${alertId++}`,
           type: 'critical_debt',
           clientName: debt.clientName,
-          message: `Créance critique de ${debt.balance.toFixed(2)} TND (${debt.age} jours)`,
+          message: `Créance critique de ${Number(debt.balance || 0).toFixed(2)} TND (${debt.age} jours)`,
           severity: 'high',
           recommendation: 'Action immédiate requise - Contact téléphonique et mise en demeure'
         });
@@ -228,7 +228,7 @@ export class AnalysisService {
             id: `alert_${alertId++}`,
             type: 'frequent_delays',
             clientName: client.clientName,
-            message: `${clientDebts.length} factures en retard pour un total de ${client.totalBalance.toFixed(2)} TND`,
+            message: `${clientDebts.length} factures en retard pour un total de ${Number(client.totalBalance || 0).toFixed(2)} TND`,
             severity: 'high',
             recommendation: 'Suspendre les livraisons et négocier un plan de paiement'
           });
@@ -243,7 +243,7 @@ export class AnalysisService {
           id: `alert_${alertId++}`,
           type: 'old_debt',
           clientName: debt.clientName,
-          message: `Créance très ancienne (${Math.floor(debt.age / 365)} ans) de ${debt.balance.toFixed(2)} TND`,
+          message: `Créance très ancienne (${Math.floor(debt.age / 365)} ans) de ${Number(debt.balance || 0).toFixed(2)} TND`,
           severity: 'medium',
           recommendation: 'Évaluer la possibilité de recouvrement juridique ou provision'
         });
@@ -259,7 +259,7 @@ export class AnalysisService {
             id: `alert_${alertId++}`,
             type: 'partial_payment',
             clientName: debt.clientName,
-            message: `Paiement partiel de ${paymentRate.toFixed(1)}% (${debt.settlement.toFixed(2)} TND/${debt.amount.toFixed(2)} TND)`,
+            message: `Paiement partiel de ${Number(paymentRate || 0).toFixed(1)}% (${Number(debt.settlement || 0).toFixed(2)} TND/${Number(debt.amount || 0).toFixed(2)} TND)`,
             severity: 'medium',
             recommendation: 'Contacter le client pour comprendre les raisons du paiement partiel'
           });
