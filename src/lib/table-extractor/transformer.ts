@@ -107,9 +107,9 @@ function createClientDebt(
       age: data.age,
       paymentDays: 0, // Sera calculé si nécessaire
       description: data.description || 'FACTURE',
-      amount: Number(data.amount || 0),
-      settlement: Number(data.settlement || 0),
-      balance: Number(data.balance || 0),
+      amount: data.amount,
+      settlement: data.settlement,
+      balance: data.balance,
       paymentStatus: classification.paymentStatus,
       riskLevel: riskLevel,
       sourceFile: fileName,

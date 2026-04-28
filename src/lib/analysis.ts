@@ -1,5 +1,4 @@
 import { ClientDebt, AnalysisResult, Alert } from '@/types/debt';
-import { format, differenceInDays } from 'date-fns';
 
 export class AnalysisService {
   static analyzeDebts(debts: ClientDebt[]): AnalysisResult {
@@ -205,74 +204,23 @@ export class AnalysisService {
 
   private static generateAlerts(debts: ClientDebt[], clientBreakdown: any[]): Alert[] {
     const alerts: Alert[] = [];
-    let alertId = 1;
-
-    // Alertes pour créances critiques
-    debts
-      .filter(debt => debt.riskLevel === 'critical' && debt.balance > 0)
-      .forEach(debt => {
+    try {
+      let alertId = 1;
+      // Alertes simples pour tester la stabilité
+      debts.filter(d => Number(d.balance || 0) > 10000).forEach(d => {
         alerts.push({
-          id: `alert_${alertId++}`,
+          id: `a${alertId++}`,
           type: 'critical_debt',
-          clientName: debt.clientName,
-          message: `Créance critique de ${Number(debt.balance || 0).toFixed(2)} TND (${debt.age} jours)`,
+          clientName: d.clientName,
+          message: `Solde important: ${Number(d.balance).toFixed(2)}`,
           severity: 'high',
-          recommendation: 'Action immédiate requise - Contact téléphonique et mise en demeure'
+          recommendation: 'Suivi requis'
         });
       });
-
-    // Alertes pour retards fréquents
-    clientBreakdown
-      .filter(client => client.riskLevel === 'critical' || client.riskLevel === 'overdue')
-      .forEach(client => {
-        const clientDebts = debts.filter(d => d.clientName === client.clientName && d.balance > 0);
-        if (clientDebts.length > 1) {
-          alerts.push({
-            id: `alert_${alertId++}`,
-            type: 'frequent_delays',
-            clientName: client.clientName,
-            message: `${clientDebts.length} factures en retard pour un total de ${Number(client.totalBalance || 0).toFixed(2)} TND`,
-            severity: 'high',
-            recommendation: 'Suspendre les livraisons et négocier un plan de paiement'
-          });
-        }
-      });
-
-    // Alertes pour créances anciennes
-    debts
-      .filter(debt => debt.age > 730 && debt.balance > 0) // Plus de 2 ans
-      .forEach(debt => {
-        alerts.push({
-          id: `alert_${alertId++}`,
-          type: 'old_debt',
-          clientName: debt.clientName,
-          message: `Créance très ancienne (${Math.floor(debt.age / 365)} ans) de ${Number(debt.balance || 0).toFixed(2)} TND`,
-          severity: 'medium',
-          recommendation: 'Évaluer la possibilité de recouvrement juridique ou provision'
-        });
-      });
-
-    // Alertes pour paiements partiels
-    debts
-      .filter(debt => debt.settlement > 0 && debt.settlement < debt.amount && debt.balance > 0)
-      .forEach(debt => {
-        const paymentRate = (debt.settlement / debt.amount) * 100;
-        if (paymentRate < 50) {
-          alerts.push({
-            id: `alert_${alertId++}`,
-            type: 'partial_payment',
-            clientName: debt.clientName,
-            message: `Paiement partiel de ${Number(paymentRate || 0).toFixed(1)}% (${Number(debt.settlement || 0).toFixed(2)} TND/${Number(debt.amount || 0).toFixed(2)} TND)`,
-            severity: 'medium',
-            recommendation: 'Contacter le client pour comprendre les raisons du paiement partiel'
-          });
-        }
-      });
-
-    return alerts.sort((a, b) => {
-      const severityOrder = { high: 3, medium: 2, low: 1 };
-      return severityOrder[b.severity] - severityOrder[a.severity];
-    });
+    } catch (e) {
+      console.error('Erreur génération alertes:', e);
+    }
+    return alerts;
   }
 
   static getRiskColor(riskLevel: string): string {
