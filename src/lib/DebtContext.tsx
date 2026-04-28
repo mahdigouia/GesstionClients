@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { ClientDebt, AnalysisResult } from '@/types/debt';
+import { ClientDebt, AnalysisResult, RecoveryAction } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
@@ -10,9 +10,11 @@ import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 interface DebtContextType {
   debts: ClientDebt[];
   analysis: AnalysisResult | null;
+  recoveryActions: RecoveryAction[];
   setDebts: (debts: ClientDebt[]) => void;
   setAnalysis: (analysis: AnalysisResult | null) => void;
   addDebts: (newDebts: ClientDebt[]) => void;
+  addRecoveryAction: (action: Omit<RecoveryAction, 'id' | 'date' | 'user'>) => void;
   updateDebtsFromFile: (filename: string, newDebts: ClientDebt[]) => { 
     updated: number, 
     new: number, 
@@ -31,6 +33,7 @@ const FIRESTORE_DOC = 'current_debts';
 export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebtsState] = useState<ClientDebt[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [recoveryActions, setRecoveryActions] = useState<RecoveryAction[]>([]);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string | null>(null);
   const [firestoreReady, setFirestoreReady] = useState(false);
   const { user } = useAuth();
@@ -46,6 +49,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           const data = snapshot.data();
           const firestoreDebts = data.debts || [];
           setDebtsState(firestoreDebts);
+          setRecoveryActions(data.recoveryActions || []);
           setLastUpdatedBy(data.updatedBy || null);
           
           // Recalculer l'analyse localement
@@ -92,22 +96,37 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   // Sauvegarder dans Firestore + localStorage
-  const saveToFirestore = async (newDebts: ClientDebt[]) => {
+  const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
+    localStorage.setItem('gc_actions', JSON.stringify(newActions));
 
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       await setDoc(docRef, {
         debts: newDebts,
+        recoveryActions: newActions,
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: newDebts.length,
       });
-      console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances dans Firestore par ${user?.email}`);
+      console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances et ${newActions.length} actions dans Firestore par ${user?.email}`);
     } catch (error) {
       console.warn('[DebtContext] Erreur sauvegarde Firestore:', error);
     }
+  };
+
+  const addRecoveryAction = (actionData: Omit<RecoveryAction, 'id' | 'date' | 'user'>) => {
+    const newAction: RecoveryAction = {
+      ...actionData,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      date: new Date().toISOString(),
+      user: user?.email || 'Utilisateur inconnu',
+    };
+    
+    const updatedActions = [newAction, ...recoveryActions];
+    setRecoveryActions(updatedActions);
+    saveToFirestore(debts, updatedActions);
   };
 
   const setDebts = (newDebts: ClientDebt[]) => {
@@ -196,7 +215,18 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <DebtContext.Provider value={{ debts, analysis, setDebts, setAnalysis, addDebts, updateDebtsFromFile, clearAll, lastUpdatedBy }}>
+    <DebtContext.Provider value={{ 
+      debts, 
+      analysis, 
+      recoveryActions,
+      setDebts, 
+      setAnalysis, 
+      addDebts, 
+      updateDebtsFromFile, 
+      addRecoveryAction,
+      clearAll, 
+      lastUpdatedBy 
+    }}>
       {children}
     </DebtContext.Provider>
   );

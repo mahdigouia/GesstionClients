@@ -1,3 +1,13 @@
+export interface RecoveryAction {
+  id: string;
+  clientName: string;
+  type: 'call' | 'email' | 'visit' | 'promise' | 'legal' | 'other';
+  date: string;
+  user: string;
+  comment: string;
+  promiseDate?: string;
+}
+
 export interface ClientDebt {
   id: string;
   clientCode: string;
