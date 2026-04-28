@@ -394,7 +394,7 @@ export default function Home() {
                       }}
                       onNavigateToDetail={() => setActiveTab('table')}
                     />
-                    <Dashboard analysis={analysis} />
+                    <Dashboard analysis={analysis} onClientClick={handleShowClientHistory} />
                   </TabsContent>
 
                   <TabsContent value="aging" className="space-y-6">
@@ -486,7 +486,11 @@ export default function Home() {
                         
                         <div className="grid grid-cols-1 gap-3">
                           {analysis.clientBreakdown?.map((client: any, index: number) => (
-                            <div key={index} className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01]">
+                            <div 
+                              key={index} 
+                              className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01] cursor-pointer"
+                              onClick={() => handleShowClientHistory(client.clientName)}
+                            >
                               <div className={`
                                 absolute left-0 top-0 bottom-0 w-1
                                 ${client.totalBalance > 1000 ? 'bg-gradient-to-b from-red-500 to-rose-600' :

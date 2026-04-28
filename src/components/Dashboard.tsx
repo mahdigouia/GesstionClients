@@ -39,9 +39,10 @@ import { useState } from 'react';
 interface DashboardProps {
   analysis: AnalysisResult;
   onViewDetail?: () => void;
+  onClientClick?: (clientName: string) => void;
 }
 
-export function Dashboard({ analysis, onViewDetail }: DashboardProps) {
+export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardProps) {
   const [selectedRisk, setSelectedRisk] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -202,9 +203,13 @@ export function Dashboard({ analysis, onViewDetail }: DashboardProps) {
         <CardContent>
           <div className="space-y-4">
             {analysis.topRiskClients.slice(0, 5).map((client) => (
-              <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div 
+                key={client.id} 
+                className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group"
+                onClick={() => onClientClick?.(client.clientName)}
+              >
                 <div className="flex-1">
-                  <div className="font-medium">{client.clientName}</div>
+                  <div className="font-medium group-hover:text-blue-600 transition-colors">{client.clientName}</div>
                   <div className="text-sm text-gray-500">
                     Facture {client.documentNumber} • {client.age} jours
                   </div>
