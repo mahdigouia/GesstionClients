@@ -38,7 +38,6 @@ export const AnalysisService = {
       const totalBalance = processedDebts.reduce((sum, debt) => sum + debt.balance, 0);
       
       const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
-      const globalUnpaidRate = totalDebts > 0 ? (totalBalance / totalDebts) * 100 : 0;
 
       const nonContentieuxDebts = processedDebts.filter(d => !d.isContentieux);
       const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + d.amount, 0);
@@ -106,7 +105,6 @@ export const AnalysisService = {
         recoveryRate,
         recoveryRateNoContentieux,
         unpaidRateNoContentieux,
-        globalUnpaidRate,
         clientBreakdown,
         agingBreakdown,
         amountRanges: [],
