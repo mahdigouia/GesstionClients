@@ -76,6 +76,29 @@ export function Dashboard({ analysis, onViewDetail }: DashboardProps) {
           </CardContent>
         </Card>
 
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-100 leading-tight">
+              Taux d'Impayés Global <br />
+              <span className="text-[10px] font-normal opacity-80">(Formule: Σ Solde / Σ Montant)</span>
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-200" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {Number(analysis.globalUnpaidRate || 0).toFixed(1)}%
+            </div>
+            <div className="mt-3">
+              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-white rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(0, 100 - Number(analysis.globalUnpaidRate || 0))}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
 
         <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

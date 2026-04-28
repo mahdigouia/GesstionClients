@@ -34,6 +34,7 @@ export interface AnalysisResult {
   recoveryRate: number;
   recoveryRateNoContentieux: number;
   unpaidRateNoContentieux: number;
+  globalUnpaidRate: number;
   clientBreakdown: {
     clientName: string;
     totalAmount: number;
