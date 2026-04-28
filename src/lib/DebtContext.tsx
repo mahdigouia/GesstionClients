@@ -196,7 +196,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <DebtContext.Provider value={{ debts, analysis, setDebts, setAnalysis, addDebts, clearAll, lastUpdatedBy }}>
+    <DebtContext.Provider value={{ debts, analysis, setDebts, setAnalysis, addDebts, updateDebtsFromFile, clearAll, lastUpdatedBy }}>
       {children}
     </DebtContext.Provider>
   );
