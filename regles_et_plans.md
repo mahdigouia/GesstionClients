@@ -59,16 +59,24 @@ Pour traiter les relevés de comptes locaux, l'Extracteur OCR suit des règles s
 
 Pour garantir la fiabilité des rapports, les formules suivantes sont appliquées dans l'application :
 
-### 1. Taux de Recouvrement Global (Sidebar)
-Il mesure la performance historique totale de l'entreprise sur l'ensemble de ses créances.
-*   **Formule** : `(Somme des Règlements / Somme des Montants Initiaux) * 100`
-*   **Affichage** : Barre "Performance" dans la barre latérale gauche.
+### 1. Widgets du Tableau de Bord (Cards)
 
-### 2. Taux d'Impayés Courants (Dashboard)
-Cet indicateur se concentre sur la santé de l'activité actuelle en excluant les dossiers juridiques anciens.
-*   **Formule** : `(Solde Restant Hors Contentieux / Montant Initial Hors Contentieux) * 100`
-*   **Affichage** : Carte verte centrale "Taux Impayés (Sans contentieux)".
-*   **Note** : Permet de voir si vos clients actuels paient bien, sans être "pollué" par les vieux dossiers de plus d'un an.
+*   **Total Créances** : Somme de tous les montants initiaux extraits des documents.
+    *   *Formule* : `Σ Montant`
+*   **En attente (Solde)** : Somme de tous les soldes restants à payer extraits.
+    *   *Formule* : `Σ Solde`
+*   **Taux d'Impayés Global (Carte Verte)** : Part de l'argent dû par rapport au montant total facturé.
+    *   *Formule* : `(Σ Solde / Σ Montant) * 100`
+
+### 2. Indicateurs de Performance (Sidebar Gauche)
+
+*   **Recouvrement Global** : Mesure l'efficacité historique du recouvrement sur la base des règlements déjà effectués.
+    *   *Formule* : `(Σ Règlements / Σ Montant) * 100`
+*   **Taux Courant (Sans contentieux)** : Mesure la performance sur l'activité récente en excluant les factures de plus de 365 jours.
+    *   *Formule* : `(Σ Règlements_hors_contentieux / Σ Montant_hors_contentieux) * 100`
+
+### 3. Note sur la Cohérence des Chiffres
+Si `Taux d'Impayé + Taux de Recouvrement` n'est pas égal à 100%, cela signifie que pour certaines lignes du document PDF, le `Montant Initial` n'est pas simplement égal à `Règlement + Solde` (par exemple en cas d'avoirs, de remises, ou de dettes déjà provisionnées dans le document source). L'application respecte les chiffres bruts tels qu'ils sont écrits dans le document.
 
 ## 7. Règle d'Unicité des Sources
 
