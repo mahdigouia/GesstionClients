@@ -6,7 +6,7 @@ export class AnalysisService {
     // S'assurer que chaque ligne a son statut contentieux à jour selon l'âge (> 365 jours)
     const processedDebts = debts.map(d => ({
       ...d,
-      isContentieux: d.age > 365
+      isContentieux: Number(d.age) > 365
     }));
 
     const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
@@ -16,6 +16,9 @@ export class AnalysisService {
     
     // Taux de recouvrement = (Somme des Règlements / Somme des Montants Initiaux)
     const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
+
+    // Taux d'impayé GLOBAL (Formule: Σ(Montant-Règlement) / Σ Montant)
+    const globalUnpaidRate = totalDebts > 0 ? ((totalDebts - totalPaid) / totalDebts) * 100 : 0;
 
     // Taux impayés hors contentieux
     const nonContentieuxDebts = processedDebts.filter(d => !d.isContentieux);
@@ -178,6 +181,7 @@ export class AnalysisService {
       recoveryRate,
       recoveryRateNoContentieux,
       unpaidRateNoContentieux,
+      globalUnpaidRate,
       clientBreakdown,
       agingBreakdown,
       amountRanges: amountRangesResult,
