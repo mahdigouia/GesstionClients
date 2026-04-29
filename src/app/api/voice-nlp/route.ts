@@ -45,6 +45,9 @@ Types d'intentions (intent) possibles :
 - "UNKNOWN" (si tu ne comprends absolument pas la demande)
 `;
 
+    // Fusionner le prompt système et le texte pour éviter les erreurs de schéma REST (systemInstruction)
+    const combinedText = systemPrompt + "\n\nTexte de l'utilisateur : " + text;
+
     // Utilisation native de fetch pour éviter d'ajouter de nouvelles dépendances npm
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -54,8 +57,10 @@ Types d'intentions (intent) possibles :
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: text }] }],
-          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ 
+            role: "user",
+            parts: [{ text: combinedText }] 
+          }],
           generationConfig: {
             temperature: 0.1, // Très bas pour être déterministe et précis
             responseMimeType: "application/json", // Force Gemini à répondre en JSON
