@@ -264,6 +264,25 @@ function findBestCommercialMatch(query: string, debts: ClientDebt[]): { name: st
   return bestMatch;
 }
 
+// Parse date string (handles DD/MM/YYYY and other formats)
+function parseDate(dateStr: string): Date {
+  if (!dateStr) return new Date();
+  if (typeof dateStr !== 'string') return new Date(dateStr);
+  
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10);
+      const year = parseInt(parts[2], 10);
+      return new Date(year, month - 1, day);
+    }
+  }
+  
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
 // Format currency
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('fr-FR', {
@@ -310,7 +329,7 @@ function buildResponse(intent: string, data: any): string {
       const { clientName, total, chartData } = data;
       if (!chartData || chartData.length === 0) {
         return clientName 
-          ? `Je n'ai pas assez de données pour tracer l'historique des retenues de ${clientName}.`
+          ? `Le client ${clientName} n'a aucune retenue à la source enregistrée.`
           : "Je n'ai pas assez de données pour tracer l'historique global des retenues.";
       }
       return clientName
@@ -322,7 +341,7 @@ function buildResponse(intent: string, data: any): string {
       const { clientName, invoices, total } = data;
       if (invoices.length === 0) {
         return clientName 
-          ? `Je n'ai trouvé aucune retenue à la source pour ${clientName}.`
+          ? `Le client ${clientName} n'a aucune retenue à la source.`
           : "Je n'ai trouvé aucune retenue à la source dans la base de données.";
       }
       return clientName
@@ -578,6 +597,8 @@ export const voiceNLP = {
         const docNumber = entity || '';
         const invoice = debts.find(d => 
           d.documentNumber.toLowerCase() === docNumber.toLowerCase()
+        ) || debts.find(d => 
+          d.documentNumber.toLowerCase().includes(docNumber.toLowerCase())
         );
         
         response = {
@@ -664,7 +685,7 @@ export const voiceNLP = {
         // Group by month
         const monthlyData: { [key: string]: number } = {};
         retainedInvoices.forEach(inv => {
-          const date = new Date(inv.documentDate);
+          const date = parseDate(inv.documentDate);
           const monthKey = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
           monthlyData[monthKey] = (monthlyData[monthKey] || 0) + inv.balance;
         });
