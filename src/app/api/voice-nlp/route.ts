@@ -38,7 +38,7 @@ Réponds UNIQUEMENT avec un objet JSON valide suivant exactement cette structure
 }
 
 Types d'intentions (intent) possibles :
-- "GET_UNPAID_INVOICES_BY_CLIENT" (Ex: "factures de X", "chnouwa ysalou X", "أعطيني الفاتورات إلي مش خالصة متع X")
+- "GET_UNPAID_INVOICES_BY_CLIENT" (Ex: "factures de X", "chnouwa ysalou X", "9adech 3andou men fatoura", "أعطيني الفاتورات إلي مش خالصة متع X")
 - "GET_TOTAL_DEBTS" (Ex: "total des créances", "9adech ysalou lkol", "قداش يسالوني الكل")
 - "GET_CRITICAL_ALERTS" (Ex: "alertes critiques", "شفمة مشكلة توة")
 - "GET_CLIENT_BALANCE" (Ex: "solde de X", "قداش يسال X")

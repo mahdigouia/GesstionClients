@@ -535,15 +535,15 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
                         )}
                         {message.data && (
                           <div className="mt-3 space-y-2">
-                            {message.data.chartData && (
-                              <ChartRenderer data={message.data.chartData} />
+                            {message.data.data?.chartData && (
+                              <ChartRenderer data={message.data.data.chartData} />
                             )}
                             
-                            {onShowResults && message.data.invoices && message.data.invoices.length > 0 && (
+                            {onShowResults && message.data.data?.invoices && message.data.data.invoices.length > 0 && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => onShowResults(message.data?.invoices || [], message.data?.clientName || 'Résultats')}
+                                onClick={() => onShowResults(message.data.data.invoices || [], message.data.data.clientName || 'Résultats')}
                                 className="h-6 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
                               >
                                 <ArrowRight className="h-3 w-3 mr-1" />
