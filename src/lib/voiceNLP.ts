@@ -195,7 +195,7 @@ function calculateSimilarity(str1: string, str2: string): number {
 // Find best matching client name
 function findBestClientMatch(query: string, debts: ClientDebt[]): { name: string; code: string; score: number } | null {
   let bestMatch = null;
-  let bestScore = 0.6; // Minimum threshold
+  let bestScore = 0.5; // Slightly lower threshold for smarter matching
   
   const uniqueClients = new Map<string, { name: string; code: string }>();
   debts.forEach(d => {
@@ -203,16 +203,32 @@ function findBestClientMatch(query: string, debts: ClientDebt[]): { name: string
       uniqueClients.set(d.clientCode, { name: d.clientName, code: d.clientCode });
     }
   });
+
+  const queryLower = query.toLowerCase().trim();
   
   uniqueClients.forEach(client => {
-    // Check against client name
-    const nameScore = calculateSimilarity(query, client.name);
-    // Check against client code
-    const codeScore = calculateSimilarity(query, client.code);
-    // Check if query is contained in name
-    const containsScore = client.name.toLowerCase().includes(query.toLowerCase()) ? 0.8 : 0;
+    const nameLower = client.name.toLowerCase();
     
-    const maxScore = Math.max(nameScore, codeScore, containsScore);
+    // 1. Exact match (Score: 1.0)
+    if (nameLower === queryLower) {
+      bestScore = 1.1; // Force win
+      bestMatch = { name: client.name, code: client.code, score: 1.1 };
+      return;
+    }
+
+    // 2. Similarity match (Levenstein)
+    const nameScore = calculateSimilarity(queryLower, nameLower);
+    
+    // 3. Word start match (Score: 0.9) - matches "Meddeb" in "Societe Meddeb"
+    // On vérifie si la requête est le début d'un des mots du nom du client
+    const words = nameLower.split(/[\s,.'"]+/);
+    const startsWithWord = words.some(word => word.startsWith(queryLower) || queryLower.startsWith(word));
+    const wordScore = startsWithWord ? 0.9 : 0;
+    
+    // 4. Contains match (Score: 0.7) - simple inclusion anywhere
+    const containsScore = nameLower.includes(queryLower) ? 0.7 : 0;
+    
+    const maxScore = Math.max(nameScore, wordScore, containsScore);
     
     if (maxScore > bestScore) {
       bestScore = maxScore;
