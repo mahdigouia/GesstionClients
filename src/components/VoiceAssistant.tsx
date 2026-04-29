@@ -141,12 +141,22 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     // Add user message
     addMessage('user', command);
     
+    // Pre-process history to give context to the LLM
+    const history = messages.slice(-5).map(m => ({
+      role: m.type === 'user' ? 'user' : 'assistant',
+      content: m.text
+    }));
+
     try {
       // 1. Try to use the LLM API
       const apiResponse = await fetch('/api/voice-nlp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: command, clientNames })
+        body: JSON.stringify({ 
+          text: command, 
+          clientNames,
+          history 
+        })
       });
 
       const data = await apiResponse.json();
