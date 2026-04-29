@@ -53,7 +53,7 @@ Types d'intentions (intent) possibles :
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama3-70b-8192", // Modèle ultra-rapide et puissant
+        model: "llama-3.3-70b-versatile", // Nouveau modèle officiel de Groq
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: text }
