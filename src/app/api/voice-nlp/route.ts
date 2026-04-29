@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 export async function POST(req: Request) {
   try {
@@ -10,9 +10,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Texte manquant" }, { status: 400 });
     }
 
-    if (!GEMINI_API_KEY) {
+    if (!GROQ_API_KEY) {
       // Indique au client qu'il faut utiliser le fallback (expressions régulières)
-      return NextResponse.json({ error: "Clé API Gemini non configurée", useFallback: true }, { status: 503 });
+      return NextResponse.json({ error: "Clé API Groq non configurée", useFallback: true }, { status: 503 });
     }
 
     const systemPrompt = `Tu es un assistant vocal intelligent pour un logiciel CRM de recouvrement de créances en Tunisie.
@@ -45,51 +45,38 @@ Types d'intentions (intent) possibles :
 - "UNKNOWN" (si tu ne comprends absolument pas la demande)
 `;
 
-    // Fusionner le prompt système et le texte pour éviter les erreurs de schéma REST (systemInstruction)
-    const combinedText = systemPrompt + "\n\nTexte de l'utilisateur : " + text;
-
-    // Utilisation native de fetch pour éviter d'ajouter de nouvelles dépendances npm
-    // Utilisation de gemini-1.5-flash-8b car il est plus léger et subit moins d'erreurs 503 sur le niveau gratuit
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [{ 
-            role: "user",
-            parts: [{ text: combinedText }] 
-          }],
-          generationConfig: {
-            temperature: 0.1, // Très bas pour être déterministe et précis
-            responseMimeType: "application/json", // Force Gemini à répondre en JSON
-          },
-        }),
-      }
-    );
+    // Utilisation native de fetch vers l'API Groq (OpenAI compatible)
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama3-70b-8192", // Modèle ultra-rapide et puissant
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" } // Force Groq à répondre en pur JSON
+      }),
+    });
 
     if (!response.ok) {
-      console.error("Erreur API Gemini HTTP:", await response.text());
-      return NextResponse.json({ error: "Erreur Gemini", useFallback: true }, { status: 500 });
+      console.error("Erreur API Groq HTTP:", await response.text());
+      return NextResponse.json({ error: "Erreur Groq", useFallback: true }, { status: 500 });
     }
 
     const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidateText = data.choices?.[0]?.message?.content;
 
     if (!candidateText) {
-      return NextResponse.json({ error: "Réponse vide de Gemini", useFallback: true }, { status: 500 });
+      return NextResponse.json({ error: "Réponse vide de Groq", useFallback: true }, { status: 500 });
     }
 
-    // Nettoyage robuste : extraire uniquement l'objet JSON avec une expression régulière
-    const jsonMatch = candidateText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("Impossible de trouver du JSON dans la réponse:", candidateText);
-      return NextResponse.json({ error: "Format invalide de Gemini", useFallback: true }, { status: 500 });
-    }
-
-    const jsonResult = JSON.parse(jsonMatch[0]);
+    // Le format JSON est garanti par Groq via response_format: { type: "json_object" }
+    const jsonResult = JSON.parse(candidateText);
     return NextResponse.json(jsonResult);
     
   } catch (error) {
