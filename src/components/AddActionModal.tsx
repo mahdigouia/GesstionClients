@@ -113,6 +113,28 @@ export function AddActionModal({ isOpen, onClose, onSubmit, clientName }: AddAct
             <Label htmlFor="comment" className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Commentaire / Notes
             </Label>
+            
+            {/* Quick Comments */}
+            <div className="flex flex-wrap gap-2 mb-2">
+              {[
+                "Promesse de règlement",
+                "Client absent",
+                "Rappel prévu",
+                "Demande de relevé",
+                "Litige signalé",
+                "Paiement envoyé"
+              ].map((msg) => (
+                <button
+                  key={msg}
+                  type="button"
+                  onClick={() => setComment(msg)}
+                  className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-blue-100 hover:text-blue-700 rounded-full border border-slate-200 transition-colors"
+                >
+                  {msg}
+                </button>
+              ))}
+            </div>
+
             <Textarea
               id="comment"
               placeholder="Détaillez l'échange avec le client..."

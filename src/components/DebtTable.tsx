@@ -12,7 +12,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Download, X, History, Calendar } from 'lucide-react';
+import { Download, X, History, Calendar, PhoneCall } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { ClientSearchFilters } from './ClientSearchFilters';
@@ -22,6 +22,7 @@ interface DebtTableProps {
   debts: ClientDebt[];
   onExport?: (debts: ClientDebt[]) => void;
   onClientClick?: (clientName: string) => void;
+  onQuickAction?: (clientName: string) => void;
 }
 
 export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
@@ -179,14 +180,28 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
                 <TableRow 
                   key={debt.id} 
                   className="hover:bg-blue-50/50 cursor-pointer transition-colors group"
-                  onClick={() => onClientClick?.(debt.clientName)}
                 >
                   <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-900 group-hover:text-blue-700 transition-colors">
-                          {debt.clientName || '-'}
-                        </span>
+                    <div className="flex items-center gap-2">
+                      {/* Quick Action Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full hover:bg-blue-100 hover:text-blue-700 text-slate-400 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onQuickAction?.(debt.clientName);
+                        }}
+                        title="Enregistrer une action"
+                      >
+                        <PhoneCall className="h-4 w-4" />
+                      </Button>
+
+                      <div className="flex flex-col flex-1" onClick={() => onClientClick?.(debt.clientName)}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-900 group-hover:text-blue-700 transition-colors">
+                            {debt.clientName || '-'}
+                          </span>
                         {debt.isRecentlyUpdated && (
                           <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[8px] h-3 px-1">
                             Mis à jour

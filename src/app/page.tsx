@@ -7,6 +7,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { DebtTable } from '@/components/DebtTable';
 import { QuickFilters } from '@/components/QuickFilters';
 import { VoiceAssistant } from '@/components/VoiceAssistant';
+import { AddActionModal } from '@/components/AddActionModal';
 import { OCRService } from '@/lib/ocr';
 import { AnalysisService } from '@/lib/analysis';
 import { ExportService } from '@/lib/export';
@@ -22,6 +23,7 @@ import {
   Bell,
   Search,
   Download,
+  PhoneCall,
   Settings,
   Save,
   X,
@@ -35,6 +37,7 @@ import { FilteredResultsModal } from '@/components/FilteredResultsModal';
 import { NotificationPopover } from '@/components/NotificationPopover';
 import { ClientHistoryModal } from '@/components/ClientHistoryModal';
 import { useToast } from '@/hooks/use-toast';
+import { ContactDirectory } from '@/components/ContactDirectory';
 
 export default function Home() {
   const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis } = useDebtContext();
@@ -53,6 +56,9 @@ export default function Home() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
   const [clientHistoryDebts, setClientHistoryDebts] = useState<ClientDebt[]>([]);
+  
+  const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const [quickActionClient, setQuickActionClient] = useState('');
 
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
 
@@ -318,40 +324,31 @@ export default function Home() {
                   </CardContent>
                 </Card>
               )}
-
-              {/* Tabs Content - Modern glassmorphism design */}
+{/* Tabs Content - Modern glassmorphism design */}
               {debts.length > 0 && analysis && (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                   {/* Modern Tabs with glassmorphism */}
-                  <div className="p-2 bg-white/50 backdrop-blur-xl rounded-2xl shadow-lg border border-white/60">
-                    <TabsList className="flex w-full bg-transparent p-1 gap-1 overflow-x-auto">
-                      <TabsTrigger 
-                        value="dashboard" 
-                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-blue-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        <span className="font-semibold">Vue d'ensemble</span>
+                  <div className="flex justify-center mb-8">
+                    <TabsList className="bg-white/50 backdrop-blur-md p-1 rounded-2xl shadow-inner border border-slate-200/50">
+                      <TabsTrigger value="dashboard" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
+                        <TrendingUp className="h-4 w-4 mr-2" />
+                        Vue d'ensemble
                       </TabsTrigger>
-                      <TabsTrigger 
-                        value="aging" 
-                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-emerald-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                        <span className="font-semibold">Analyse</span>
+                      <TabsTrigger value="aging" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Analyse
                       </TabsTrigger>
-                      <TabsTrigger 
-                        value="clients" 
-                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:to-violet-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
-                      >
-                        <Users className="h-4 w-4" />
-                        <span className="font-semibold">Clients</span>
+                      <TabsTrigger value="clients" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
+                        <Users className="h-4 w-4 mr-2" />
+                        Clients
                       </TabsTrigger>
-                      <TabsTrigger 
-                        value="table" 
-                        className="flex-1 min-w-[120px] flex items-center justify-center gap-2 rounded-xl data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-600 data-[state=active]:to-amber-700 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-300 py-2.5 md:py-3 text-xs md:text-sm"
-                      >
-                        <FileText className="h-4 w-4" />
-                        <span className="font-semibold">Détail</span>
+                      <TabsTrigger value="contacts" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
+                        <PhoneCall className="h-4 w-4 mr-2" />
+                        Contacts
+                      </TabsTrigger>
+                      <TabsTrigger value="table" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Détail
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -548,12 +545,20 @@ export default function Home() {
                       </CardContent>
                     </Card>
                   </TabsContent>
+                  
+                  <TabsContent value="contacts" className="space-y-6">
+                    <ContactDirectory />
+                  </TabsContent>
 
                   <TabsContent value="table" className="space-y-6">
                     <DebtTable 
                       debts={filteredDebts.length > 0 ? filteredDebts : debts} 
                       onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
                       onClientClick={handleShowClientHistory}
+                      onQuickAction={(clientName) => {
+                        setQuickActionClient(clientName);
+                        setIsQuickActionOpen(true);
+                      }}
                     />
                   </TabsContent>
                 </Tabs>
@@ -590,6 +595,14 @@ export default function Home() {
         onClose={() => setIsHistoryModalOpen(false)}
         clientName={selectedClientName}
         clientDebts={clientHistoryDebts}
+      />
+
+      {/* Quick Action Modal */}
+      <AddActionModal 
+        isOpen={isQuickActionOpen}
+        onClose={() => setIsQuickActionOpen(false)}
+        onSubmit={addRecoveryAction}
+        clientName={quickActionClient}
       />
     </div>
   );
