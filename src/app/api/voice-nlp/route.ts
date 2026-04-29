@@ -49,8 +49,9 @@ Types d'intentions (intent) possibles :
     const combinedText = systemPrompt + "\n\nTexte de l'utilisateur : " + text;
 
     // Utilisation native de fetch pour éviter d'ajouter de nouvelles dépendances npm
+    // Utilisation de gemini-1.5-flash-8b car il est plus léger et subit moins d'erreurs 503 sur le niveau gratuit
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -81,10 +82,14 @@ Types d'intentions (intent) possibles :
       return NextResponse.json({ error: "Réponse vide de Gemini", useFallback: true }, { status: 500 });
     }
 
-    // Nettoyage du markdown potentiel (```json ... ```)
-    const cleanedText = candidateText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    // Nettoyage robuste : extraire uniquement l'objet JSON avec une expression régulière
+    const jsonMatch = candidateText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("Impossible de trouver du JSON dans la réponse:", candidateText);
+      return NextResponse.json({ error: "Format invalide de Gemini", useFallback: true }, { status: 500 });
+    }
 
-    const jsonResult = JSON.parse(cleanedText);
+    const jsonResult = JSON.parse(jsonMatch[0]);
     return NextResponse.json(jsonResult);
     
   } catch (error) {
