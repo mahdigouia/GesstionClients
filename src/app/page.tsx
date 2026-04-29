@@ -40,7 +40,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ContactDirectory } from '@/components/ContactDirectory';
 
 export default function Home() {
-  const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis } = useDebtContext();
+  const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis, addRecoveryAction } = useDebtContext();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
