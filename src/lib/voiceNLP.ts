@@ -585,6 +585,44 @@ export const voiceNLP = {
         };
         break;
       }
+      case 'GET_CLIENT_PHONE': {
+        const clientName = entity || '';
+        const clientMatch = findBestClientMatch(clientName, debts);
+        
+        if (!clientMatch) {
+          response = {
+            message: `Je n'ai pas trouvé de client correspondant à "${clientName}".`,
+            intent,
+            data: { clientName, invoices: [], total: 0 }
+          };
+          break;
+        }
+
+        // Find phone number in the client's debts
+        const clientDebts = debts.filter(d => d.clientCode === clientMatch.code);
+        let phone = '';
+        for (const d of clientDebts) {
+          if (d.clientPhone) {
+            phone = d.clientPhone;
+            break;
+          }
+        }
+
+        if (phone) {
+          response = {
+            message: `Le numéro de téléphone de ${clientMatch.name} est le ${phone}.`,
+            intent,
+            data: { clientName: clientMatch.name, phone }
+          };
+        } else {
+          response = {
+            message: `Désolé, je n'ai pas le numéro de téléphone de ${clientMatch.name}.`,
+            intent,
+            data: { clientName: clientMatch.name }
+          };
+        }
+        break;
+      }
       
       default:
         response = {

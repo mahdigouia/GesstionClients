@@ -69,6 +69,7 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
   const [isMuted, setIsMuted] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
+  const [recognitionLang, setRecognitionLang] = useState<'fr-FR' | 'ar-TN'>('fr-FR');
   
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -93,7 +94,7 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = true;
-    recognition.lang = 'fr-FR';
+    recognition.lang = recognitionLang;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
@@ -153,7 +154,7 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     };
 
     return recognition;
-  }, []);
+  }, [recognitionLang, voiceState, handleVoiceCommand]);
 
   // Get unique client names for the LLM
   const clientNames = Array.from(new Set(debts.map(d => d.clientName)));
@@ -372,6 +373,18 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRecognitionLang(recognitionLang === 'fr-FR' ? 'ar-TN' : 'fr-FR')}
+                  className="h-8 px-2 text-xs font-medium gap-1"
+                >
+                  {recognitionLang === 'fr-FR' ? (
+                    <><span>🇫🇷</span> FR</>
+                  ) : (
+                    <><span>🇹🇳</span> TN</>
+                  )}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
