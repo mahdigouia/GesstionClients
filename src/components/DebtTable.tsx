@@ -183,7 +183,6 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
                 >
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      {/* Quick Action Button */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -197,22 +196,32 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
                         <PhoneCall className="h-4 w-4" />
                       </Button>
 
-                      <div className="flex flex-col flex-1" onClick={() => onClientClick?.(debt.clientName)}>
+                      <div 
+                        className="flex flex-col flex-1" 
+                        onClick={() => onClientClick?.(debt.clientName)}
+                      >
                         <div className="flex items-center gap-2">
                           <span className="text-gray-900 group-hover:text-blue-700 transition-colors">
                             {debt.clientName || '-'}
                           </span>
-                        {debt.isRecentlyUpdated && (
-                          <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[8px] h-3 px-1">
-                            Mis à jour
-                          </Badge>
+                          {debt.isRecentlyUpdated && (
+                            <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[8px] h-3 px-1">
+                              Mis à jour
+                            </Badge>
+                          )}
+                        </div>
+                        {debt.lastImportDate && (
+                          <span className="text-[9px] text-gray-400 font-normal">
+                            Importé le {new Date(debt.lastImportDate).toLocaleString('fr-FR', { 
+                              day: '2-digit', 
+                              month: '2-digit', 
+                              year: '2-digit', 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </span>
                         )}
                       </div>
-                      {debt.lastImportDate && (
-                        <span className="text-[9px] text-gray-400 font-normal">
-                          Importé le {new Date(debt.lastImportDate).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-gray-600">
