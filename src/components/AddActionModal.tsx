@@ -32,7 +32,7 @@ interface AddActionModalProps {
 export function AddActionModal({ isOpen, onClose, onSubmit, clientName }: AddActionModalProps) {
   const [type, setType] = useState<RecoveryAction['type']>('call');
   const [comment, setComment] = useState('');
-  const [promiseDate, setPromiseDate] = useState('');
+  const [promiseDate, setPromiseDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +47,7 @@ export function AddActionModal({ isOpen, onClose, onSubmit, clientName }: AddAct
 
     // Reset form
     setComment('');
-    setPromiseDate('');
+    setPromiseDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
 

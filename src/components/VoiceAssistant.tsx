@@ -19,6 +19,56 @@ import {
 } from 'lucide-react';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 import { voiceNLP, VoiceResponse } from '@/lib/voiceNLP';
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip,
+  AreaChart,
+  Area
+} from 'recharts';
+
+const ChartRenderer = ({ data }: { data: { name: string; value: number }[] }) => {
+  return (
+    <div className="w-full h-48 mt-4 bg-white/50 rounded-xl p-2 border border-blue-100 shadow-sm">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+          <XAxis 
+            dataKey="name" 
+            axisLine={false} 
+            tickLine={false} 
+            tick={{ fontSize: 10, fill: '#64748b' }}
+          />
+          <YAxis 
+            hide={true}
+          />
+          <RechartsTooltip 
+            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            labelStyle={{ fontWeight: 'bold', fontSize: '12px' }}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="value" 
+            stroke="#3b82f6" 
+            strokeWidth={2}
+            fillOpacity={1} 
+            fill="url(#colorValue)" 
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
 
 // TypeScript declarations for Web Speech API
 interface SpeechRecognitionEvent extends Event {
@@ -308,13 +358,19 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     conversationStartTime.current = new Date();
   };
 
-  // Suggested questions
-  const suggestedQuestions = [
+  // Suggested questions based on language
+  const suggestedQuestions = recognitionLang === 'fr-FR' ? [
     'Total des créances',
     'Alertes critiques',
-    'Contentieux',
+    'Retenues à la source',
     'Créances en retard',
     'Clients à risque'
+  ] : [
+    '9adech ysalouni lkol',
+    'أعطيني الفاتورات إلي مش خالصة',
+    'chnouma l-retenues elli mazalou',
+    'chfama alertes tawwa',
+    'aatini numero mta3 client'
   ];
 
   const handleSuggestedQuestion = (question: string) => {
@@ -465,13 +521,19 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
                                 <><Copy className="h-3 w-3 mr-1" /> Copier</>
                               )}
                             </Button>
+                          </div>
+                        )}
+                        {message.data && (
+                          <div className="mt-3 space-y-2">
+                            {message.data.chartData && (
+                              <ChartRenderer data={message.data.chartData} />
+                            )}
                             
-                            {/* View Results Button */}
-                            {onShowResults && message.data?.data?.invoices && message.data.data.invoices.length > 0 && (
+                            {onShowResults && message.data.invoices && message.data.invoices.length > 0 && (
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => onShowResults(message.data?.data?.invoices || [], message.data?.data?.clientName || 'Résultats')}
+                                onClick={() => onShowResults(message.data?.invoices || [], message.data?.clientName || 'Résultats')}
                                 className="h-6 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
                               >
                                 <ArrowRight className="h-3 w-3 mr-1" />

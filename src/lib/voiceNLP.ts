@@ -25,6 +25,7 @@ export interface VoiceResponse {
     avgAge?: number;
     alerts?: any[];
     clients?: ClientDebt[];
+    chartData?: { name: string; value: number }[];
     [key: string]: any;
   };
   intent: string;
@@ -305,10 +306,54 @@ function buildResponse(intent: string, data: any): string {
       return `J'ai identifié ${data.alerts.length} alerte${data.alerts.length > 1 ? 's' : ''} critique${data.alerts.length > 1 ? 's' : ''}:\n${lines.join('\n')}`;
     }
     
+    case 'GET_RETAINED_HISTORY': {
+      const { clientName, total, chartData } = data;
+      if (!chartData || chartData.length === 0) {
+        return clientName 
+          ? `Je n'ai pas assez de données pour tracer l'historique des retenues de ${clientName}.`
+          : "Je n'ai pas assez de données pour tracer l'historique global des retenues.";
+      }
+      return clientName
+        ? `Voici l'évolution des retenues pour ${clientName}. Le cumul total est de ${formatCurrency(total)}.`
+        : `Voici l'évolution globale des retenues dans le temps. Le cumul total est de ${formatCurrency(total)}.`;
+    }
+
+    case 'GET_RETAINED_INVOICES': {
+      const { clientName, invoices, total } = data;
+      if (invoices.length === 0) {
+        return clientName 
+          ? `Je n'ai trouvé aucune retenue à la source pour ${clientName}.`
+          : "Je n'ai trouvé aucune retenue à la source dans la base de données.";
+      }
+      return clientName
+        ? `${clientName} a ${invoices.length} retenue${invoices.length > 1 ? 's' : ''} pour un total de ${formatCurrency(total)}.`
+        : `Il y a ${invoices.length} retenue${invoices.length > 1 ? 's' : ''} au total pour un montant de ${formatCurrency(total)}.`;
+    }
+
     case 'GET_CLIENT_BALANCE': {
       return `${data.clientName} doit actuellement ${formatCurrency(data.total)} réparti sur ${data.count} facture${data.count > 1 ? 's' : ''}.`;
     }
     
+    case 'GET_CREDIT_NOTES': {
+      const { clientName, invoices, total } = data;
+      if (invoices.length === 0) {
+        return clientName 
+          ? `Je n'ai trouvé aucune facture d'avoir pour ${clientName}.`
+          : "Je n'ai trouvé aucune facture d'avoir dans la base de données.";
+      }
+      return clientName
+        ? `${clientName} a ${invoices.length} facture${invoices.length > 1 ? 's' : ''} d'avoir pour un montant de ${formatCurrency(Math.abs(total))}.`
+        : `Il y a ${invoices.length} facture${invoices.length > 1 ? 's' : ''} d'avoir au total pour ${formatCurrency(Math.abs(total))}.`;
+    }
+
+    case 'GET_INVOICE_AGE': {
+      const { invoice, documentNumber } = data;
+      if (!invoice) {
+        return `Désolé, je ne trouve pas la facture numéro ${documentNumber}.`;
+      }
+      return `La facture ${invoice.documentNumber} de ${invoice.clientName} a été émise il y a ${invoice.age} jours (le ${invoice.documentDate}). Son solde est de ${formatCurrency(invoice.balance)}.`;
+    }
+
     case 'GET_INVOICES_BY_COMMERCIAL': {
       if (data.invoices.length === 0) {
         return `Je n'ai trouvé aucun document pour le commercial ${data.commercialName}.`;
@@ -601,6 +646,130 @@ export const voiceNLP = {
         };
         break;
       }
+      case 'GET_RETAINED_HISTORY': {
+        const clientName = entity || '';
+        let retainedInvoices: ClientDebt[] = [];
+        let finalClientName = '';
+
+        if (clientName) {
+          const clientMatch = findBestClientMatch(clientName, debts);
+          if (clientMatch) {
+            retainedInvoices = debts.filter(d => d.clientCode === clientMatch.code && d.paymentStatus === 'retained');
+            finalClientName = clientMatch.name;
+          }
+        } else {
+          retainedInvoices = debts.filter(d => d.paymentStatus === 'retained');
+        }
+
+        // Group by month
+        const monthlyData: { [key: string]: number } = {};
+        retainedInvoices.forEach(inv => {
+          const date = new Date(inv.documentDate);
+          const monthKey = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+          monthlyData[monthKey] = (monthlyData[monthKey] || 0) + inv.balance;
+        });
+
+        const chartData = Object.keys(monthlyData)
+          .sort((a, b) => {
+            const [mA, yA] = a.split('/').map(Number);
+            const [mB, yB] = b.split('/').map(Number);
+            return yA !== yB ? yA - yB : mA - mB;
+          })
+          .map(month => ({
+            name: month,
+            value: monthlyData[month]
+          }));
+
+        response = {
+          message: '',
+          intent,
+          data: { 
+            chartData,
+            clientName: finalClientName,
+            total: chartData.reduce((sum, d) => sum + d.value, 0)
+          }
+        };
+        break;
+      }
+
+      case 'GET_RETAINED_INVOICES': {
+        const clientName = entity || '';
+        let retainedInvoices: ClientDebt[] = [];
+        let finalClientName = '';
+
+        if (clientName) {
+          const clientMatch = findBestClientMatch(clientName, debts);
+          if (clientMatch) {
+            retainedInvoices = debts.filter(d => d.clientCode === clientMatch.code && d.paymentStatus === 'retained');
+            finalClientName = clientMatch.name;
+          }
+        } else {
+          retainedInvoices = debts.filter(d => d.paymentStatus === 'retained');
+        }
+
+        const totalRetained = retainedInvoices.reduce((sum, inv) => sum + inv.balance, 0);
+        
+        response = {
+          message: '',
+          intent,
+          data: { 
+            invoices: retainedInvoices, 
+            total: totalRetained, 
+            count: retainedInvoices.length,
+            clientName: finalClientName
+          }
+        };
+        break;
+      }
+      
+      case 'GET_CREDIT_NOTES': {
+        const clientName = entity || '';
+        let creditNotes: ClientDebt[] = [];
+        let finalClientName = '';
+
+        if (clientName) {
+          const clientMatch = findBestClientMatch(clientName, debts);
+          if (clientMatch) {
+            creditNotes = debts.filter(d => d.clientCode === clientMatch.code && (d.documentType === 'credit_note' || d.amount < 0));
+            finalClientName = clientMatch.name;
+          }
+        } else {
+          creditNotes = debts.filter(d => d.documentType === 'credit_note' || d.amount < 0);
+        }
+
+        const totalCredit = creditNotes.reduce((sum, inv) => sum + inv.amount, 0);
+        
+        response = {
+          message: '',
+          intent,
+          data: { 
+            invoices: creditNotes, 
+            total: totalCredit, 
+            count: creditNotes.length,
+            clientName: finalClientName
+          }
+        };
+        break;
+      }
+
+      case 'GET_INVOICE_AGE': {
+        // Here we need the documentNumber entity. 
+        // Note: Llama returns entities in the post body, but our executeIntent only takes intent and one entity.
+        // I'll assume entity passed here is the document number if intent is GET_INVOICE_AGE.
+        const docNum = entity || '';
+        const invoice = debts.find(d => d.documentNumber.toLowerCase().includes(docNum.toLowerCase()));
+        
+        response = {
+          message: '',
+          intent,
+          data: { 
+            invoice,
+            documentNumber: docNum
+          }
+        };
+        break;
+      }
+      
       case 'GET_CLIENT_PHONE': {
         const clientName = entity || '';
         const clientMatch = findBestClientMatch(clientName, debts);

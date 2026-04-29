@@ -37,12 +37,16 @@ Réponds UNIQUEMENT avec un objet JSON valide suivant exactement cette structure
 }
 
 Types d'intentions (intent) possibles :
-- "GET_UNPAID_INVOICES_BY_CLIENT" (Ex: "factures de X", "chnouwa ysalou X", "chfama 3and X", "factures l'amen", "aatini fatourat eli moch khalsin mta3 X")
-- "GET_TOTAL_DEBTS" (Ex: "total des créances", "9adech ysalou lkol fi lkol", "somme totale")
-- "GET_CRITICAL_ALERTS" (Ex: "alertes critiques", "chkoune fih mochkla", "les dossiers rouges")
-- "GET_CLIENT_BALANCE" (Ex: "solde de X", "9adech ysal X", "balance de X")
+- "GET_UNPAID_INVOICES_BY_CLIENT" (Ex: "factures de X", "chnouwa ysalou X", "chfama 3and X", "factures l'amen", "أعطيني الفاتورات إلي مش خالصة متع X")
+- "GET_TOTAL_DEBTS" (Ex: "total des créances", "9adech ysalou lkol fi lkol", "somme totale", "قداش يسالوني الكل")
+- "GET_CRITICAL_ALERTS" (Ex: "alertes critiques", "chkoune fih mochkla", "les dossiers rouges", "شفمة مشكلة توة")
+- "GET_CLIENT_BALANCE" (Ex: "solde de X", "9adech ysal X", "balance de X", "قداش يسال X")
 - "GET_OVERDUE_INVOICES" (Ex: "factures en retard", "elli retardé lkol", "les retards")
-- "GET_CLIENT_PHONE" (Ex: "numéro de téléphone de X", "donne moi le numéro de X", "téléphone mta3 X", "numéro X", "aatini numero mta3 X")
+- "GET_RETAINED_INVOICES" (Ex: "les retenues", "retenues à la source de X", "chnouma l-retenues", "قداش رتنوات")
+- "GET_RETAINED_HISTORY" (Ex: "historique des retenues de X", "évolution des retenues", "courbe des retenues", "المنحنى متاع الرتنوات")
+- "GET_CREDIT_NOTES" (Ex: "les avoirs", "factures avoir de X", "chfama avoirs", "الأبوار")
+- "GET_INVOICE_AGE" (Ex: "âge de la facture X", "facture X 9adech 3morha", "عمر الفاتورة X")
+- "GET_CLIENT_PHONE" (Ex: "numéro de téléphone de X", "donne moi le numéro de X", "téléphone mta3 X", "numéro X", "aatini numero mta3 X", "أعطيني نيمرو X")
 - "UNKNOWN" (si tu ne comprends absolument pas la demande)
 `;
 
