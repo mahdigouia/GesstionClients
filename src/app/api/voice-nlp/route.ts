@@ -81,7 +81,10 @@ Types d'intentions (intent) possibles :
       return NextResponse.json({ error: "Réponse vide de Gemini", useFallback: true }, { status: 500 });
     }
 
-    const jsonResult = JSON.parse(candidateText);
+    // Nettoyage du markdown potentiel (```json ... ```)
+    const cleanedText = candidateText.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+    const jsonResult = JSON.parse(cleanedText);
     return NextResponse.json(jsonResult);
     
   } catch (error) {
