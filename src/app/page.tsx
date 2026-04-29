@@ -327,30 +327,32 @@ export default function Home() {
 {/* Tabs Content - Modern glassmorphism design */}
               {debts.length > 0 && analysis && (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  {/* Modern Tabs with glassmorphism */}
-                  <div className="flex justify-center mb-8">
-                    <TabsList className="bg-white/50 backdrop-blur-md p-1 rounded-2xl shadow-inner border border-slate-200/50">
-                      <TabsTrigger value="dashboard" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
-                        <TrendingUp className="h-4 w-4 mr-2" />
-                        Vue d'ensemble
-                      </TabsTrigger>
-                      <TabsTrigger value="aging" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        Analyse
-                      </TabsTrigger>
-                      <TabsTrigger value="clients" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
-                        <Users className="h-4 w-4 mr-2" />
-                        Clients
-                      </TabsTrigger>
-                      <TabsTrigger value="contacts" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
-                        <PhoneCall className="h-4 w-4 mr-2" />
-                        Contacts
-                      </TabsTrigger>
-                      <TabsTrigger value="table" className="rounded-xl font-bold px-6 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-lg transition-all">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Détail
-                      </TabsTrigger>
-                    </TabsList>
+                  {/* Modern Tabs with glassmorphism - Optimized for Mobile */}
+                  <div className="sticky top-0 z-30 -mx-4 md:mx-0 mb-8 px-4 py-2 bg-slate-50/80 backdrop-blur-md md:bg-transparent md:backdrop-blur-none">
+                    <div className="flex justify-start md:justify-center overflow-x-auto scrollbar-hide">
+                      <TabsList className="bg-white/70 backdrop-blur-md p-1 rounded-2xl shadow-sm border border-slate-200/50 flex-nowrap inline-flex min-w-max md:min-w-0">
+                        <TabsTrigger value="dashboard" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Vue d'ensemble</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="aging" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4" />
+                          <span>Analyse</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="clients" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          <span>Clients</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="contacts" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
+                          <PhoneCall className="h-4 w-4" />
+                          <span>Contacts</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="table" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          <span>Détail</span>
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
                   </div>
 
                   <TabsContent value="dashboard" className="space-y-6">
