@@ -81,6 +81,61 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Get unique client names for the LLM
+  const clientNames = Array.from(new Set(debts.map(d => d.clientName)));
+
+  // Handle voice command
+  const handleVoiceCommand = useCallback(async (command: string) => {
+    setVoiceState('processing');
+    
+    // Add user message
+    addMessage('user', command);
+    
+    try {
+      // 1. Try to use the LLM API
+      const apiResponse = await fetch('/api/voice-nlp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: command, clientNames })
+      });
+
+      const data = await apiResponse.json();
+
+      let response: VoiceResponse;
+
+      if (apiResponse.ok && !data.useFallback) {
+        // LLM Success
+        const intent = data.intent || 'UNKNOWN';
+        const clientEntity = data.entities?.client;
+        response = voiceNLP.executeIntent(intent, clientEntity, debts, analysis);
+      } else {
+        // API Error or Key missing -> Fallback to Regex
+        console.warn('Fallback to local NLP:', data.error);
+        response = voiceNLP.processCommand(command, debts, analysis);
+      }
+
+      // Add assistant message with delay for natural feel
+      setTimeout(() => {
+        addMessage('assistant', response.message, response);
+        
+        // Speak response if not muted
+        if (!isMuted) {
+          speak(response.message);
+        }
+        
+        setVoiceState('idle');
+      }, 500);
+
+    } catch (error) {
+      console.error('Error calling voice NLP API:', error);
+      // Hard fallback
+      const response = voiceNLP.processCommand(command, debts, analysis);
+      addMessage('assistant', response.message, response);
+      if (!isMuted) speak(response.message);
+      setVoiceState('idle');
+    }
+  }, [debts, analysis, isMuted, clientNames]);
+
   // Initialize speech recognition
   const initSpeechRecognition = useCallback(() => {
     if (typeof window === 'undefined') return null;
@@ -155,61 +210,6 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
 
     return recognition;
   }, [recognitionLang, voiceState, handleVoiceCommand]);
-
-  // Get unique client names for the LLM
-  const clientNames = Array.from(new Set(debts.map(d => d.clientName)));
-
-  // Handle voice command
-  const handleVoiceCommand = useCallback(async (command: string) => {
-    setVoiceState('processing');
-    
-    // Add user message
-    addMessage('user', command);
-    
-    try {
-      // 1. Try to use the LLM API
-      const apiResponse = await fetch('/api/voice-nlp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: command, clientNames })
-      });
-
-      const data = await apiResponse.json();
-
-      let response: VoiceResponse;
-
-      if (apiResponse.ok && !data.useFallback) {
-        // LLM Success
-        const intent = data.intent || 'UNKNOWN';
-        const clientEntity = data.entities?.client;
-        response = voiceNLP.executeIntent(intent, clientEntity, debts, analysis);
-      } else {
-        // API Error or Key missing -> Fallback to Regex
-        console.warn('Fallback to local NLP:', data.error);
-        response = voiceNLP.processCommand(command, debts, analysis);
-      }
-
-      // Add assistant message with delay for natural feel
-      setTimeout(() => {
-        addMessage('assistant', response.message, response);
-        
-        // Speak response if not muted
-        if (!isMuted) {
-          speak(response.message);
-        }
-        
-        setVoiceState('idle');
-      }, 500);
-
-    } catch (error) {
-      console.error('Error calling voice NLP API:', error);
-      // Hard fallback
-      const response = voiceNLP.processCommand(command, debts, analysis);
-      addMessage('assistant', response.message, response);
-      if (!isMuted) speak(response.message);
-      setVoiceState('idle');
-    }
-  }, [debts, analysis, isMuted, clientNames]);
 
   // Handle text input submission
   const handleTextSubmit = () => {
