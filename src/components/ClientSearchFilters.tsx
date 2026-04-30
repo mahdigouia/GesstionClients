@@ -138,6 +138,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
         filters.riskLevels.includes(debt.riskLevel);
 
       // Retained filter: règle selon regles_et_plans.md (FT uniquement, ratio solde/montant entre 0.5% et 1.5%)
+      // Indépendant de la valeur du règlement (peut être 0 ou > 0)
       const isRetained = (debt: ClientDebt) => {
         const upper = (debt.documentNumber || '').toUpperCase();
         if (!upper.startsWith('FT')) return false;
@@ -148,13 +149,13 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       };
       const matchesRetained = !filters.retainedOnly || isRetained(debt);
 
-      // Partial payment filter: règle selon regles_et_plans.md (FT uniquement, ratio entre 1.5% et 99%, règlement > 0)
+      // Partial payment filter: règle selon regles_et_plans.md (FT uniquement, ratio entre 1.5% et 99%)
+      // Indépendant de la valeur du règlement (peut être 0 ou > 0)
       const isPartial = (debt: ClientDebt) => {
         const upper = (debt.documentNumber || '').toUpperCase();
         if (!upper.startsWith('FT')) return false;
         if (debt.balance <= 0) return false;
         if (debt.amount <= 0) return false;
-        if ((debt.settlement || 0) <= 0) return false; // Doit avoir un règlement
         const ratio = (debt.balance / debt.amount) * 100;
         return ratio > 1.5 && ratio < 99;
       };
@@ -523,7 +524,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                   if (!upper.startsWith('FT')) return false;
                   if (d.balance <= 0) return false;
                   if (d.amount <= 0) return false;
-                  if ((d.settlement || 0) <= 0) return false;
                   const ratio = (d.balance / d.amount) * 100;
                   return ratio > 1.5 && ratio < 99;
                 }).length})
