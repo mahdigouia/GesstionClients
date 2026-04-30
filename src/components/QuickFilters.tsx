@@ -29,10 +29,10 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
 
   const isRetained = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();
-    if (!upper.startsWith('FT')) return false;
+    if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
     if (debt.balance <= 0) return false;
-    if ((debt.settlement || 0) <= 0) return false;
-    const ratio = debt.amount > 0 ? (debt.balance / debt.amount) * 100 : 0;
+    if (debt.amount <= 0) return false;
+    const ratio = (debt.balance / debt.amount) * 100;
     return ratio >= 0.5 && ratio <= 1.5;
   };
 
