@@ -141,7 +141,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       // Indépendant de la valeur du règlement (peut être 0 ou > 0)
       const isRetained = (debt: ClientDebt) => {
         const upper = (debt.documentNumber || '').toUpperCase();
-        if (!upper.startsWith('FT')) return false;
+        if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
         if (debt.balance <= 0) return false;
         if (debt.amount <= 0) return false;
         const ratio = (debt.balance / debt.amount) * 100;
@@ -149,11 +149,11 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       };
       const matchesRetained = !filters.retainedOnly || isRetained(debt);
 
-      // Partial payment filter: règle selon regles_et_plans.md (FT uniquement, ratio entre 1.5% et 99%)
+      // Partial payment filter: règle selon regles_et_plans.md (FT/FS, ratio entre 1.5% et 99%)
       // Indépendant de la valeur du règlement (peut être 0 ou > 0)
       const isPartial = (debt: ClientDebt) => {
         const upper = (debt.documentNumber || '').toUpperCase();
-        if (!upper.startsWith('FT')) return false;
+        if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
         if (debt.balance <= 0) return false;
         if (debt.amount <= 0) return false;
         const ratio = (debt.balance / debt.amount) * 100;
@@ -503,7 +503,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
               >
                 🛡️ Retenue 0.5%-1.5% ({debts.filter(d => {
                   const upper = (d.documentNumber || '').toUpperCase();
-                  if (!upper.startsWith('FT')) return false;
+                  if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
                   if (d.balance <= 0) return false;
                   if (d.amount <= 0) return false;
                   const ratio = (d.balance / d.amount) * 100;
@@ -521,7 +521,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
               >
                 💳 Paiement partiel 1.5%-99% ({debts.filter(d => {
                   const upper = (d.documentNumber || '').toUpperCase();
-                  if (!upper.startsWith('FT')) return false;
+                  if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
                   if (d.balance <= 0) return false;
                   if (d.amount <= 0) return false;
                   const ratio = (d.balance / d.amount) * 100;

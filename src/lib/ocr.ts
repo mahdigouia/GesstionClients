@@ -607,8 +607,8 @@ export class OCRService {
       };
     }
 
-    // ── FT: Factures de vente ─────────────────────────────────────────────────
-    if (upper.startsWith('FT')) {
+    // ── FT/FS: Factures de vente et de service ─────────────────────────────────
+    if (upper.startsWith('FT') || upper.startsWith('FS')) {
       // Soldé
       if (balance <= 0) {
         return { documentType: 'invoice', paymentStatus: 'paid', isContentieux: false };

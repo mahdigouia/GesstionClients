@@ -30,10 +30,10 @@ Pour les factures standard (**FT**), l'application analyse le ratio entre le *So
 
 L'interface utilisateur propose des filtres dédiés pour identifier rapidement les factures selon leur statut de paiement :
 
-*   **🛡️ Filtre "Retenue 0.5%-1.5%"** : Affiche uniquement les factures FT dont le ratio Solde/Montant est compris entre 0.5% et 1.5%. Ces factures représentent des retenues de garantie, timbres, ou erreurs d'arrondi. Ce filtre fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
-*   **💳 Filtre "Paiement partiel 1.5%-99%"** : Affiche uniquement les factures FT avec un ratio Solde/Montant entre 1.5% et 99%. Ce filtre identifie les factures partiellement payées ou en cours de règlement. Il fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
+*   **🛡️ Filtre "Retenue 0.5%-1.5%"** : Affiche uniquement les factures **FT** et **FS** dont le ratio Solde/Montant est compris entre 0.5% et 1.5%. Ces factures représentent des retenues de garantie, timbres, ou erreurs d'arrondi. Ce filtre fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
+*   **💳 Filtre "Paiement partiel 1.5%-99%"** : Affiche uniquement les factures **FT** et **FS** avec un ratio Solde/Montant entre 1.5% et 99%. Ce filtre identifie les factures partiellement payées ou en cours de règlement. Il fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
 
-**Important** : Ces deux filtres s'appliquent uniquement aux factures de type **FT** (Facture de Vente), car seules celles-ci peuvent avoir des statuts de paiement intermédiaires. Les avoirs (AV/AVT/AVS/FRS/FRT) sont toujours considérés comme "Payés".
+**Important** : Ces deux filtres s'appliquent uniquement aux factures de type **FT** (Facture de Vente) et **FS** (Facture de Service), car seules celles-ci peuvent avoir des statuts de paiement intermédiaires. Les avoirs (AV/AVT/AVS/FRS/FRT) sont toujours considérés comme "Payés".
 
 ## 3. Règle des "Contentieux"
 
@@ -42,7 +42,7 @@ La qualification de **Contentieux** (`isContentieux = true`) n'est pas appliqué
 *   **Condition Générale** : Tout document dont le solde est supérieur à 0 et l'ancienneté (Âge) dépasse strictement **365 jours**.
 *   **Par Type de Pièce** :
     *   **IC** (Impayé Client) : Devient contentieux si l'âge > 365 jours ET solde > 0.
-    *   **FT** (Facture de Vente) : Devient contentieux si l'âge > 365 jours ET solde > 0.
+    *   **FT** (Facture de Vente) et **FS** (Facture de Service) : Devient contentieux si l'âge > 365 jours ET solde > 0.
     *   **AV / AVT / AVS / FRS / FRT** : Jamais en contentieux.
 
 *Exemple pratique :* 
