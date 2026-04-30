@@ -363,12 +363,15 @@ export class OCRService {
 
     // 4. Extraction des montants (ceux qui ont une virgule)
     const amountTokens: string[] = [];
+    const usedTokenIndices = new Set<number>(); // Track tokens used in amounts
     for (let i = 0; i < tokens.length; i++) {
         if (tokens[i].includes(',')) {
             let fullAmount = tokens[i];
-            // Si le mot précédent est un petit chiffre (millier), on fusionne
+            usedTokenIndices.add(i);
+            // Si le mot précédent est un petit chiffre (millier) ou négatif, on fusionne
             if (i > 0 && /^-?\d{1,3}$/.test(tokens[i-1])) {
                 fullAmount = tokens[i-1] + fullAmount;
+                usedTokenIndices.add(i-1);
             }
             amountTokens.push(fullAmount);
         }
@@ -387,8 +390,14 @@ export class OCRService {
         r = Math.max(0, m - s);
     }
 
-    // 6. Extraction de l'âge (le premier nombre sans virgule qui reste)
-    const ageToken = tokens.find(t => /^\d+$/.test(t) && t.length < 5 && !amountTokens.join('').includes(t));
+    // 6. Extraction de l'âge (le premier nombre sans virgule qui n'a pas été utilisé)
+    // L'âge vient toujours AVANT les montants dans le format standard
+    const ageToken = tokens.find((t, idx) => 
+        /^\d+$/.test(t) && 
+        t.length < 5 && 
+        !usedTokenIndices.has(idx) &&
+        idx < (tokens.findIndex((x, i) => i > 0 && x.includes(',')) || tokens.length) // Doit être avant le premier montant
+    );
     const age = ageToken ? parseInt(ageToken) : 0;
     const paymentDays = 0;
 

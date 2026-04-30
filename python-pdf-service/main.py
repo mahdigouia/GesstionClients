@@ -321,11 +321,13 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         
         # Chercher aussi les entiers simples (sans espace) SANS virgule après
         # Ex: "336" matche, mais "1,264" ne matche pas
-        for match in re.finditer(r'\b(\d{1,4})\b(?!\s*,)', work_line):
+        # IMPORTANT: Ne pas matcher un chiffre précédé d'un moins (ex: -1 367,895)
+        for match in re.finditer(r'(?<![-\d])\b(\d{1,4})\b(?!\s*,)', work_line):
             val = int(match.group(1))
             # Vérifier qu'on n'a pas déjà trouvé ce nombre avec espace
             already_found = any(c[0] == val for c in candidates)
-            if not already_found and val > 0:
+            # Âge = 0 est valide, mais on filtre les faux positifs (nombres faisant partie de montants)
+            if not already_found and val >= 0 and match.start() < work_line.find(','):
                 candidates.append((val, match.start()))
                 print(f"[PDF Extract] Candidate (simple): {val} at pos {match.start()}")
         
