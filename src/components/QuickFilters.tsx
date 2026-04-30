@@ -75,8 +75,8 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
     },
     { 
       id: 'retained', 
-      label: 'Retenue', 
-      count: debts.filter(d => d.paymentStatus === 'retained').length,
+      label: 'Retenue (0.5%-1.5%)', 
+      count: debts.filter(d => isRetained(d)).length,
       icon: Shield,
       color: 'bg-purple-500',
       bgColor: 'bg-purple-50',
@@ -84,9 +84,18 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
     }
   ];
 
+  const isRetained = (debt: ClientDebt) => {
+    const upper = (debt.documentNumber || '').toUpperCase();
+    if (!upper.startsWith('FT')) return false;
+    if (debt.balance <= 0) return false;
+    if ((debt.settlement || 0) <= 0) return false;
+    const ratio = debt.amount > 0 ? (debt.balance / debt.amount) * 100 : 0;
+    return ratio >= 0.5 && ratio <= 1.5;
+  };
+
   const applyFilter = (filterId: string, data: ClientDebt[]): ClientDebt[] => {
     if (filterId === 'all') return data;
-    if (filterId === 'retained') return data.filter(d => d.paymentStatus === 'retained');
+    if (filterId === 'retained') return data.filter(d => isRetained(d));
     return data.filter(d => d.riskLevel === filterId);
   };
 
@@ -229,7 +238,7 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
               {debts
                 .filter(d => {
                   if (activeFilter === 'all') return true;
-                  if (activeFilter === 'retained') return d.paymentStatus === 'retained';
+                  if (activeFilter === 'retained') return isRetained(d);
                   return d.riskLevel === activeFilter;
                 })
                 .filter(d => {

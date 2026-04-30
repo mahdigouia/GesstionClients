@@ -129,7 +129,7 @@ function createClientDebt(
  * Classification du document selon les règles métier:
  *
  * IC → Facture impayée ancienne
- * AVT/FRS/FRT → Avoir sur Vente / Facture Retour Sfax / Facture Retour Tunis (montant négatif)
+ * AVT/AVS/FRS/FRT → Avoir sur Vente / Avoir Service / Facture Retour Sfax / Facture Retour Tunis (montant négatif)
  * AV → Avoir / Note de crédit
  * FT → Facture de vente (retenue: 0.5% à 1.5%)
  */
@@ -156,8 +156,8 @@ function classifyDocument(
     };
   }
 
-  // AVT/FRS/FRT: Avoir sur Vente / Facture Retour Sfax / Facture Retour Tunis (montant négatif)
-  if (upper.startsWith('AVT') || upper.startsWith('FRS') || upper.startsWith('FRT')) {
+  // AVT/AVS/FRS/FRT: Avoir sur Vente / Avoir Service / Facture Retour Sfax / Facture Retour Tunis (montant négatif)
+  if (upper.startsWith('AVT') || upper.startsWith('AVS') || upper.startsWith('FRS') || upper.startsWith('FRT')) {
     return {
       documentType: 'credit_note',
       paymentStatus: 'paid',

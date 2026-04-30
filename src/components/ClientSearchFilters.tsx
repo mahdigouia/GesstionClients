@@ -29,6 +29,7 @@ interface FilterState {
   documentNumber: string;
   commercial: string;
   sourceFile: string;
+  docType: string;
   minAmount: string;
   maxAmount: string;
   minAge: string;
@@ -53,6 +54,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     documentNumber: '',
     commercial: '',
     sourceFile: '',
+    docType: '',
     minAmount: '',
     maxAmount: '',
     minAge: '',
@@ -79,6 +81,16 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       if (d.sourceFile) uniqueFiles.add(d.sourceFile);
     });
     return Array.from(uniqueFiles).sort();
+  }, [debts]);
+
+  // Extract unique document type prefixes for dropdown
+  const docTypes = useMemo(() => {
+    const uniqueTypes = new Set<string>();
+    debts.forEach(d => {
+      const prefix = (d.documentNumber || '').match(/^[A-Z]+/i);
+      if (prefix) uniqueTypes.add(prefix[0].toUpperCase());
+    });
+    return Array.from(uniqueTypes).sort();
   }, [debts]);
 
   // Apply filters
@@ -108,6 +120,9 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesSourceFile = !filters.sourceFile || 
         debt.sourceFile === filters.sourceFile;
 
+      const matchesDocType = !filters.docType || 
+        (debt.documentNumber || '').toUpperCase().startsWith(filters.docType);
+
       // Amount filters
       const matchesMinAmount = !filters.minAmount || debt.balance >= parseFloat(filters.minAmount);
       const matchesMaxAmount = !filters.maxAmount || debt.balance <= parseFloat(filters.maxAmount);
@@ -120,11 +135,19 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesRisk = filters.riskLevels.length === 0 || 
         filters.riskLevels.includes(debt.riskLevel);
 
-      // Retained filter
-      const matchesRetained = !filters.retainedOnly || debt.paymentStatus === 'retained';
+      // Retained filter: règle explicite selon regles_et_plans.md (FT uniquement, ratio solde/montant entre 0.5% et 1.5%)
+      const isRetained = (debt: ClientDebt) => {
+        const upper = (debt.documentNumber || '').toUpperCase();
+        if (!upper.startsWith('FT')) return false;
+        if (debt.balance <= 0) return false;
+        if ((debt.settlement || 0) <= 0) return false;
+        const ratio = debt.amount > 0 ? (debt.balance / debt.amount) * 100 : 0;
+        return ratio >= 0.5 && ratio <= 1.5;
+      };
+      const matchesRetained = !filters.retainedOnly || isRetained(debt);
 
       return matchesSearch && matchesCode && matchesPhone && matchesDoc && 
-             matchesCommercial && matchesSourceFile && matchesMinAmount && matchesMaxAmount &&
+             matchesCommercial && matchesSourceFile && matchesDocType && matchesMinAmount && matchesMaxAmount &&
              matchesMinAge && matchesMaxAge && matchesRisk && matchesRetained;
     });
 
@@ -197,6 +220,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       documentNumber: '',
       commercial: '',
       sourceFile: '',
+      docType: '',
       minAmount: '',
       maxAmount: '',
       minAge: '',
@@ -215,6 +239,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.documentNumber,
     filters.commercial,
     filters.sourceFile,
+    filters.docType,
     filters.minAmount,
     filters.maxAmount,
     filters.minAge,
@@ -338,6 +363,21 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                   ))}
                 </select>
               </div>
+
+              {/* Document Type */}
+              <div className="relative">
+                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select
+                  value={filters.docType}
+                  onChange={(e) => updateFilter('docType', e.target.value)}
+                  className="w-full h-10 pl-10 pr-3 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="">Tous les types</option>
+                  {docTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -445,7 +485,14 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                 }`}
                 onClick={() => updateFilter('retainedOnly', !filters.retainedOnly)}
               >
-                🛡️ Retenue ({debts.filter(d => d.paymentStatus === 'retained').length})
+                🛡️ Retenue 0.5%-1.5% ({debts.filter(d => {
+                  const upper = (d.documentNumber || '').toUpperCase();
+                  if (!upper.startsWith('FT')) return false;
+                  if (d.balance <= 0) return false;
+                  if ((d.settlement || 0) <= 0) return false;
+                  const ratio = d.amount > 0 ? (d.balance / d.amount) * 100 : 0;
+                  return ratio >= 0.5 && ratio <= 1.5;
+                }).length})
               </Badge>
             </div>
           </div>

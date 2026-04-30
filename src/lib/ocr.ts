@@ -548,7 +548,7 @@ export class OCRService {
    *
    * AV + chiffres → Facture avoir (note de crédit)
    *
-   * AVT/FRS/FRT → Avoir sur Vente / Facture Retour Sfax / Facture Retour Tunis
+   * AVT/AVS/FRS/FRT → Avoir sur Vente / Avoir Service / Facture Retour Sfax / Facture Retour Tunis
    *   → Montant négatif, jamais contentieux
    *
    * FT + chiffres → Facture de vente, 3 scénarios:
@@ -580,8 +580,8 @@ export class OCRService {
       };
     }
 
-    // ── AVT/FRS/FRT: Avoir sur Vente / Facture Retour Sfax / Facture Retour Tunis (montant négatif) ──
-    if (upper.startsWith('AVT') || upper.startsWith('FRS') || upper.startsWith('FRT')) {
+    // ── AVT/AVS/FRS/FRT: Avoir sur Vente / Avoir Service / Facture Retour Sfax / Facture Retour Tunis (montant négatif) ──
+    if (upper.startsWith('AVT') || upper.startsWith('AVS') || upper.startsWith('FRS') || upper.startsWith('FRT')) {
       return {
         documentType: 'credit_note',
         paymentStatus: 'paid',
