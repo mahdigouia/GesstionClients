@@ -27,6 +27,15 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
 
+  const isRetained = (debt: ClientDebt) => {
+    const upper = (debt.documentNumber || '').toUpperCase();
+    if (!upper.startsWith('FT')) return false;
+    if (debt.balance <= 0) return false;
+    if ((debt.settlement || 0) <= 0) return false;
+    const ratio = debt.amount > 0 ? (debt.balance / debt.amount) * 100 : 0;
+    return ratio >= 0.5 && ratio <= 1.5;
+  };
+
   const quickStats = [
     { 
       id: 'all', 
@@ -83,15 +92,6 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
       textColor: 'text-purple-700'
     }
   ];
-
-  const isRetained = (debt: ClientDebt) => {
-    const upper = (debt.documentNumber || '').toUpperCase();
-    if (!upper.startsWith('FT')) return false;
-    if (debt.balance <= 0) return false;
-    if ((debt.settlement || 0) <= 0) return false;
-    const ratio = debt.amount > 0 ? (debt.balance / debt.amount) * 100 : 0;
-    return ratio >= 0.5 && ratio <= 1.5;
-  };
 
   const applyFilter = (filterId: string, data: ClientDebt[]): ClientDebt[] => {
     if (filterId === 'all') return data;
