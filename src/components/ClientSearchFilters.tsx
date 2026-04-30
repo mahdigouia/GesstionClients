@@ -28,6 +28,7 @@ interface FilterState {
   phone: string;
   documentNumber: string;
   commercial: string;
+  sourceFile: string;
   minAmount: string;
   maxAmount: string;
   minAge: string;
@@ -51,6 +52,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     phone: '',
     documentNumber: '',
     commercial: '',
+    sourceFile: '',
     minAmount: '',
     maxAmount: '',
     minAge: '',
@@ -68,6 +70,15 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       if (d.commercialName) uniqueCommerciaux.add(d.commercialName);
     });
     return Array.from(uniqueCommerciaux).sort();
+  }, [debts]);
+
+  // Extract unique source files for dropdown
+  const sourceFiles = useMemo(() => {
+    const uniqueFiles = new Set<string>();
+    debts.forEach(d => {
+      if (d.sourceFile) uniqueFiles.add(d.sourceFile);
+    });
+    return Array.from(uniqueFiles).sort();
   }, [debts]);
 
   // Apply filters
@@ -94,6 +105,9 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesCommercial = !filters.commercial || 
         debt.commercialName === filters.commercial;
 
+      const matchesSourceFile = !filters.sourceFile || 
+        debt.sourceFile === filters.sourceFile;
+
       // Amount filters
       const matchesMinAmount = !filters.minAmount || debt.balance >= parseFloat(filters.minAmount);
       const matchesMaxAmount = !filters.maxAmount || debt.balance <= parseFloat(filters.maxAmount);
@@ -110,12 +124,32 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesRetained = !filters.retainedOnly || debt.paymentStatus === 'retained';
 
       return matchesSearch && matchesCode && matchesPhone && matchesDoc && 
-             matchesCommercial && matchesMinAmount && matchesMaxAmount &&
+             matchesCommercial && matchesSourceFile && matchesMinAmount && matchesMaxAmount &&
              matchesMinAge && matchesMaxAge && matchesRisk && matchesRetained;
     });
 
-    // Sort
+    // Sort with search relevance priority
     result.sort((a, b) => {
+      // If search term is active, prioritize exact field matches
+      if (filters.searchTerm) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        const getPriority = (debt: ClientDebt) => {
+          if (debt.commercialName?.toLowerCase() === searchLower) return 0;
+          if (debt.clientName?.toLowerCase() === searchLower) return 1;
+          if (debt.clientCode?.toLowerCase() === searchLower) return 2;
+          if (debt.documentNumber?.toLowerCase() === searchLower) return 3;
+          if (debt.sourceFile?.toLowerCase() === searchLower) return 4;
+          if (debt.commercialName?.toLowerCase().startsWith(searchLower)) return 10;
+          if (debt.clientName?.toLowerCase().startsWith(searchLower)) return 11;
+          if (debt.clientCode?.toLowerCase().startsWith(searchLower)) return 12;
+          if (debt.documentNumber?.toLowerCase().startsWith(searchLower)) return 13;
+          if (debt.sourceFile?.toLowerCase().startsWith(searchLower)) return 14;
+          return 100;
+        };
+        const priorityDiff = getPriority(a) - getPriority(b);
+        if (priorityDiff !== 0) return priorityDiff;
+      }
+
       let comparison = 0;
       switch (filters.sortBy) {
         case 'name':
@@ -162,6 +196,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       phone: '',
       documentNumber: '',
       commercial: '',
+      sourceFile: '',
       minAmount: '',
       maxAmount: '',
       minAge: '',
@@ -179,6 +214,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.phone,
     filters.documentNumber,
     filters.commercial,
+    filters.sourceFile,
     filters.minAmount,
     filters.maxAmount,
     filters.minAge,
@@ -284,6 +320,21 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                   <option value="">Tous les commerciaux</option>
                   {commercials.map(com => (
                     <option key={com} value={com}>{com}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Source File */}
+              <div className="relative">
+                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select
+                  value={filters.sourceFile}
+                  onChange={(e) => updateFilter('sourceFile', e.target.value)}
+                  className="w-full h-10 pl-10 pr-3 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="">Tous les documents</option>
+                  {sourceFiles.map(file => (
+                    <option key={file} value={file}>{file}</option>
                   ))}
                 </select>
               </div>

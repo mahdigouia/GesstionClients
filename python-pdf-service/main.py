@@ -198,8 +198,8 @@ def parse_data_row(
         due_date = dates[0] if len(dates) > 0 else ""
         doc_date = dates[-1] if len(dates) > 1 else due_date
         
-        # Extraire le numéro de pièce (FT######, IC######, AV######)
-        doc_match = re.search(r'(FT\d{6}|IC\d{6}|AVT\d{5,8}|AV\d{5,8})', row_text, re.IGNORECASE)
+        # Extraire le numéro de pièce (FT######, IC######, AV######, FRS###, FRT###)
+        doc_match = re.search(r'(FT\d{6}|IC\d{6}|AVT\d{5,8}|AV\d{5,8}|FRS\d+|FRT\d+)', row_text, re.IGNORECASE)
         doc_number = doc_match.group(1).upper() if doc_match else "DOC"
         
         # Extraire l'âge (nombre avant "jours" ou après les dates)

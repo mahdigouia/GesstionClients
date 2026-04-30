@@ -11,6 +11,8 @@ L'application identifie le type de document grâce au préfixe du Numéro de Pi�
 | **IC** | Facture Impayée | Factures de type "Impayé Client". Ces factures sont soumises à la règle stricte des contentieux (voir section 3). |
 | **AV** | Avoir (Note de crédit) | Document créditeur. Automatiquement considéré avec un statut de paiement `Payé` (solde neutre). N'est jamais classifié en contentieux. |
 | **AVT** | Avoir sur Vente | Document créditeur lié à un retour ou annulation de vente. **Le montant est négatif** et doit être comptabilisé en moins dans le solde du client. Statut `Payé`, jamais en contentieux. |
+| **FRS** | Facture de Retour Sfax | Facture avoir (note de crédit) liée à un retour Sfax. **Le montant est négatif** et doit être extrait en négatif. Statut `Payé`, jamais en contentieux. |
+| **FRT** | Facture de Retour Tunis | Facture avoir (note de crédit) liée à un retour Tunis. **Le montant est négatif** et doit être extrait en négatif. Statut `Payé`, jamais en contentieux. |
 | **FT** | Facture de Vente | Facture standard. Son statut de paiement est finement analysé selon le pourcentage du règlement par rapport au montant initial (voir section 2). |
 | **Autre** | Document Générique | Par défaut, tout autre document avec un solde > 0 est considéré comme `Non payé`. |
 
@@ -20,8 +22,8 @@ Pour les factures standard (**FT**), l'application analyse le ratio entre le *So
 
 1.  **Soldé (`paid`)** : Solde ≤ 0.
 2.  **Impayé total (`unpaid`)** : Règlement = 0.
-3.  **Retenu non réglé (`retained`)** : Le ratio (Solde / Montant) est compris entre **0.1% et 2%**. Cela indique souvent une petite retenue de garantie, un timbre, ou une erreur d'arrondi plutôt qu'un réel impayé problématique.
-4.  **Paiement partiel (`partial`)** : Le ratio (Solde / Montant) est strictement supérieur à 2% et inférieur à 99%. Le client a effectué un versement significatif mais n'a pas tout réglé.
+3.  **Retenu non réglé (`retained`)** : Le ratio (Solde / Montant) est compris entre **0.5% et 1.5%**. Cela indique souvent une petite retenue de garantie, un timbre, ou une erreur d'arrondi plutôt qu'un réel impayé problématique.
+4.  **Paiement partiel (`partial`)** : Le ratio (Solde / Montant) est strictement supérieur à 1.5% et inférieur à 99%. Le client a effectué un versement significatif mais n'a pas tout réglé.
 
 ## 3. Règle des "Contentieux"
 
@@ -31,7 +33,7 @@ La qualification de **Contentieux** (`isContentieux = true`) n'est pas appliqué
 *   **Par Type de Pièce** :
     *   **IC** (Impayé Client) : Devient contentieux si l'âge > 365 jours ET solde > 0.
     *   **FT** (Facture de Vente) : Devient contentieux si l'âge > 365 jours ET solde > 0.
-    *   **AV / AVT** : Jamais en contentieux.
+    *   **AV / AVT / FRS / FRT** : Jamais en contentieux.
 
 *Exemple pratique :* 
 - La facture `IC000262` âgée de 2436 jours avec un solde de 1264,277 TND **est** un contentieux.
@@ -51,7 +53,7 @@ Chaque ligne de créance reçoit un niveau de risque, indépendant du type de pi
 Pour traiter les relevés de comptes locaux, l'Extracteur OCR suit des règles spécifiques aux devises tunisiennes :
 *   **Séparateur de milliers** : L'espace (ex: `12 771,360` ou `1 264,277`). L'application doit recoller ces chiffres avant de calculer pour éviter que "1" soit confondu avec un numéro et "264,277" avec le montant.
 *   **Décimales** : L'application s'attend à une virgule suivie d'exactement 3 chiffres décimaux pour isoler les montants (`,\d{3}`).
-*   **Montants négatifs** : Les documents `AVT` peuvent avoir un montant négatif (ex: `-28,808`). Le signe `-` doit être préservé lors du parsing.
+*   **Montants négatifs** : Les documents `AVT`, `FRS` et `FRT` peuvent avoir un montant négatif (ex: `-28,808`). Le signe `-` doit être préservé lors du parsing. Ces factures avoirs sont comptabilisées en négatif dans le solde du client.
 *   **Noms de clients avec chiffres** : Un nom de client peut contenir des chiffres (ex: `VIVARIUM 2 COMMERCE`). Le parser ne doit pas confondre ces chiffres avec un code client ou un nouveau bloc.
 *   **Cohérence Mathématique** : L'algorithme valide que `Montant - Règlement ≈ Solde` (avec une tolérance de 1 TND) pour être certain de ne pas capturer de mauvais chiffres sur des documents mal scannés.
 

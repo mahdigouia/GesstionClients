@@ -548,10 +548,13 @@ export class OCRService {
    *
    * AV + chiffres → Facture avoir (note de crédit)
    *
+   * AVT/FRS/FRT → Avoir sur Vente / Facture Retour Sfax / Facture Retour Tunis
+   *   → Montant négatif, jamais contentieux
+   *
    * FT + chiffres → Facture de vente, 3 scénarios:
    *   1. Impayé total (règlement = 0)
-   *   2. Retenu non réglé (0.1% ≤ solde/montant ≤ 2%)
-   *   3. Paiement partiel (2% < solde/montant < 99%)
+   *   2. Retenu non réglé (0.5% ≤ solde/montant ≤ 1.5%)
+   *   3. Paiement partiel (1.5% < solde/montant < 99%)
    *   4. Soldé (solde = 0)
    */
   private static classifyDocument(
@@ -577,8 +580,8 @@ export class OCRService {
       };
     }
 
-    // ── AVT: Avoir sur Vente (montant négatif) ────────────────────────────────
-    if (upper.startsWith('AVT')) {
+    // ── AVT/FRS/FRT: Avoir sur Vente / Facture Retour Sfax / Facture Retour Tunis (montant négatif) ──
+    if (upper.startsWith('AVT') || upper.startsWith('FRS') || upper.startsWith('FRT')) {
       return {
         documentType: 'credit_note',
         paymentStatus: 'paid',
@@ -613,8 +616,8 @@ export class OCRService {
       // Calculer le ratio solde / montant
       const ratio = amount > 0 ? (balance / amount) * 100 : 0;
 
-      // Retenu non réglé (petite retenue: 0.1% à 2%)
-      if (ratio >= 0.1 && ratio <= 2) {
+      // Retenu non réglé (petite retenue: 0.5% à 1.5%)
+      if (ratio >= 0.5 && ratio <= 1.5) {
         return { documentType: 'invoice', paymentStatus: 'retained', isContentieux };
       }
 
