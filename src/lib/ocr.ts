@@ -351,7 +351,7 @@ export class OCRService {
     // --- TOKENIZER DE PRÉCISION ---
     
     // 1. On isole le numéro de pièce et on l'enlève de la ligne pour éviter les collisions
-    const docMatch = line.match(/(FT\d{6}|IC\d{6}|AVT\d{5,8}|AV\d{5,8})/i);
+    const docMatch = line.match(/(FT\d{6}|IC\d{6}|AVT\d{5,8}|AVS\d{5,8}|AV\d{5,8}|FRS\d+|FRT\d+)/i);
     const docNumber = docMatch ? docMatch[1].toUpperCase() : "DOC";
     let workingLine = line.replace(docNumber, " [PIECE] ");
 

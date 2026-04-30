@@ -287,7 +287,7 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         doc_date = f"{dates[1][2]}-{dates[1][1]}-{dates[1][0]}" if len(dates) > 1 else due_date
         
         # Chercher le numéro de pièce (FT######, IC######, AVT/AVS######, AV######, etc.)
-        doc_match = re.search(r'(AVT\d{5,8}|AVS\d{5,8}|[A-Z]{2}\d{6})', line)
+        doc_match = re.search(r'(AVT\d{5,8}|AVS\d{5,8}|FRS\d+|FRT\d+|[A-Z]{2}\d{6})', line)
         document_number = doc_match.group(1) if doc_match else ""
         
         # Supprimer les dates et le numéro de pièce pour analyser le reste
