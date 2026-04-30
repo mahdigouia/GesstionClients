@@ -26,6 +26,15 @@ Pour les factures standard (**FT**), l'application analyse le ratio entre le *So
 3.  **Retenu non réglé (`retained`)** : Le ratio (Solde / Montant) est compris entre **0.5% et 1.5%**. Cela indique souvent une petite retenue de garantie, un timbre, ou une erreur d'arrondi plutôt qu'un réel impayé problématique.
 4.  **Paiement partiel (`partial`)** : Le ratio (Solde / Montant) est strictement supérieur à 1.5% et inférieur à 99%. Le client a effectué un versement significatif mais n'a pas tout réglé.
 
+### Filtres de Statut de Paiement (UI)
+
+L'interface utilisateur propose des filtres dédiés pour identifier rapidement les factures selon leur statut de paiement :
+
+*   **🛡️ Filtre "Retenue 0.5%-1.5%"** : Affiche uniquement les factures FT dont le ratio Solde/Montant est compris entre 0.5% et 1.5%. Ces factures représentent des retenues de garantie, timbres, ou erreurs d'arrondi. Ce filtre **ne requiert pas** de règlement préalable (la retenue peut exister même sans paiement).
+*   **💳 Filtre "Paiement partiel 1.5%-99%"** : Affiche uniquement les factures FT avec un ratio Solde/Montant entre 1.5% et 99% **ET** ayant un règlement > 0. Ce filtre identifie les factures partiellement payées où le client a effectué un versement significatif.
+
+**Important** : Ces deux filtres s'appliquent uniquement aux factures de type **FT** (Facture de Vente), car seules celles-ci peuvent avoir des statuts de paiement intermédiaires. Les avoirs (AV/AVT/AVS/FRS/FRT) sont toujours considérés comme "Payés".
+
 ## 3. Règle des "Contentieux"
 
 La qualification de **Contentieux** (`isContentieux = true`) n'est pas appliquée à tous les documents. Elle obéit à des conditions strictes concernant le type de document ou l'ancienneté :

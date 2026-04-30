@@ -36,6 +36,7 @@ interface FilterState {
   maxAge: string;
   riskLevels: string[];
   retainedOnly: boolean;
+  partialOnly: boolean;
   sortBy: 'name' | 'amount' | 'age' | 'balance';
   sortOrder: 'asc' | 'desc';
 }
@@ -61,6 +62,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     maxAge: '',
     riskLevels: [],
     retainedOnly: false,
+    partialOnly: false,
     sortBy: 'name',
     sortOrder: 'asc'
   });
@@ -135,20 +137,32 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesRisk = filters.riskLevels.length === 0 || 
         filters.riskLevels.includes(debt.riskLevel);
 
-      // Retained filter: règle explicite selon regles_et_plans.md (FT uniquement, ratio solde/montant entre 0.5% et 1.5%)
+      // Retained filter: règle selon regles_et_plans.md (FT uniquement, ratio solde/montant entre 0.5% et 1.5%)
       const isRetained = (debt: ClientDebt) => {
         const upper = (debt.documentNumber || '').toUpperCase();
         if (!upper.startsWith('FT')) return false;
         if (debt.balance <= 0) return false;
-        if ((debt.settlement || 0) <= 0) return false;
-        const ratio = debt.amount > 0 ? (debt.balance / debt.amount) * 100 : 0;
+        if (debt.amount <= 0) return false;
+        const ratio = (debt.balance / debt.amount) * 100;
         return ratio >= 0.5 && ratio <= 1.5;
       };
       const matchesRetained = !filters.retainedOnly || isRetained(debt);
 
+      // Partial payment filter: règle selon regles_et_plans.md (FT uniquement, ratio entre 1.5% et 99%, règlement > 0)
+      const isPartial = (debt: ClientDebt) => {
+        const upper = (debt.documentNumber || '').toUpperCase();
+        if (!upper.startsWith('FT')) return false;
+        if (debt.balance <= 0) return false;
+        if (debt.amount <= 0) return false;
+        if ((debt.settlement || 0) <= 0) return false; // Doit avoir un règlement
+        const ratio = (debt.balance / debt.amount) * 100;
+        return ratio > 1.5 && ratio < 99;
+      };
+      const matchesPartial = !filters.partialOnly || isPartial(debt);
+
       return matchesSearch && matchesCode && matchesPhone && matchesDoc && 
              matchesCommercial && matchesSourceFile && matchesDocType && matchesMinAmount && matchesMaxAmount &&
-             matchesMinAge && matchesMaxAge && matchesRisk && matchesRetained;
+             matchesMinAge && matchesMaxAge && matchesRisk && matchesRetained && matchesPartial;
     });
 
     // Sort with search relevance priority
@@ -227,6 +241,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       maxAge: '',
       riskLevels: [],
       retainedOnly: false,
+      partialOnly: false,
       sortBy: 'name',
       sortOrder: 'asc'
     });
@@ -244,7 +259,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.maxAmount,
     filters.minAge,
     filters.maxAge
-  ].filter(Boolean).length + filters.riskLevels.length + (filters.retainedOnly ? 1 : 0);
+  ].filter(Boolean).length + filters.riskLevels.length + (filters.retainedOnly ? 1 : 0) + (filters.partialOnly ? 1 : 0);
 
   const quickFilters = [
     { label: 'Tous', count: debts.length, risk: null },
@@ -473,7 +488,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
               ))}
             </div>
 
-            {/* Retenue Filter */}
+            {/* Payment Status Filters */}
             <div className="flex flex-wrap gap-2 items-center">
               <span className="text-sm text-gray-500">Statut paiement:</span>
               <Badge
@@ -489,9 +504,28 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                   const upper = (d.documentNumber || '').toUpperCase();
                   if (!upper.startsWith('FT')) return false;
                   if (d.balance <= 0) return false;
-                  if ((d.settlement || 0) <= 0) return false;
-                  const ratio = d.amount > 0 ? (d.balance / d.amount) * 100 : 0;
+                  if (d.amount <= 0) return false;
+                  const ratio = (d.balance / d.amount) * 100;
                   return ratio >= 0.5 && ratio <= 1.5;
+                }).length})
+              </Badge>
+              <Badge
+                variant={filters.partialOnly ? 'default' : 'outline'}
+                className={`cursor-pointer ${
+                  filters.partialOnly
+                    ? 'bg-orange-600 text-white hover:bg-orange-700'
+                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                }`}
+                onClick={() => updateFilter('partialOnly', !filters.partialOnly)}
+              >
+                💳 Paiement partiel 1.5%-99% ({debts.filter(d => {
+                  const upper = (d.documentNumber || '').toUpperCase();
+                  if (!upper.startsWith('FT')) return false;
+                  if (d.balance <= 0) return false;
+                  if (d.amount <= 0) return false;
+                  if ((d.settlement || 0) <= 0) return false;
+                  const ratio = (d.balance / d.amount) * 100;
+                  return ratio > 1.5 && ratio < 99;
                 }).length})
               </Badge>
             </div>
