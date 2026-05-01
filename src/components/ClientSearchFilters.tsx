@@ -35,8 +35,9 @@ interface FilterState {
   minAge: string;
   maxAge: string;
   riskLevels: string[];
-  retainedOnly: boolean;
-  partialOnly: boolean;
+  retainedFilter: 'off' | 'include' | 'exclude';
+  partialFilter: 'off' | 'include' | 'exclude';
+  contentieuxFilter: 'off' | 'include' | 'exclude';
   sortBy: 'name' | 'amount' | 'age' | 'balance';
   sortOrder: 'asc' | 'desc';
 }
@@ -61,8 +62,9 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     minAge: '',
     maxAge: '',
     riskLevels: [],
-    retainedOnly: false,
-    partialOnly: false,
+    retainedFilter: 'off',
+    partialFilter: 'off',
+    contentieuxFilter: 'off',
     sortBy: 'name',
     sortOrder: 'asc'
   });
@@ -137,7 +139,16 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesRisk = filters.riskLevels.length === 0 || 
         filters.riskLevels.includes(debt.riskLevel);
 
-      // Retained filter: règle selon regles_et_plans.md (FT uniquement, ratio solde/montant entre 0.5% et 1.5%)
+      // Contentieux filter: 3 states (off / include / exclude)
+      const isContentieux = (debt: ClientDebt) => debt.isContentieux === true;
+      const matchesContentieux =
+        filters.contentieuxFilter === 'off'
+          ? true
+          : filters.contentieuxFilter === 'include'
+          ? isContentieux(debt)
+          : !isContentieux(debt);
+
+      // Retained filter: règle selon regles_et_plans.md (FT/FS, ratio solde/montant entre 0.5% et 1.5%)
       // Indépendant de la valeur du règlement (peut être 0 ou > 0)
       const isRetained = (debt: ClientDebt) => {
         const upper = (debt.documentNumber || '').toUpperCase();
@@ -147,7 +158,12 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
         const ratio = (debt.balance / debt.amount) * 100;
         return ratio >= 0.5 && ratio <= 1.5;
       };
-      const matchesRetained = !filters.retainedOnly || isRetained(debt);
+      const matchesRetained =
+        filters.retainedFilter === 'off'
+          ? true
+          : filters.retainedFilter === 'include'
+          ? isRetained(debt)
+          : !isRetained(debt);
 
       // Partial payment filter: règle selon regles_et_plans.md (FT/FS, ratio entre 1.5% et 99%)
       // Indépendant de la valeur du règlement (peut être 0 ou > 0)
@@ -159,11 +175,16 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
         const ratio = (debt.balance / debt.amount) * 100;
         return ratio > 1.5 && ratio < 99;
       };
-      const matchesPartial = !filters.partialOnly || isPartial(debt);
+      const matchesPartial =
+        filters.partialFilter === 'off'
+          ? true
+          : filters.partialFilter === 'include'
+          ? isPartial(debt)
+          : !isPartial(debt);
 
-      return matchesSearch && matchesCode && matchesPhone && matchesDoc && 
+      return matchesSearch && matchesCode && matchesPhone && matchesDoc &&
              matchesCommercial && matchesSourceFile && matchesDocType && matchesMinAmount && matchesMaxAmount &&
-             matchesMinAge && matchesMaxAge && matchesRisk && matchesRetained && matchesPartial;
+             matchesMinAge && matchesMaxAge && matchesRisk && matchesContentieux && matchesRetained && matchesPartial;
     });
 
     // Sort with search relevance priority
@@ -227,6 +248,14 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     }));
   };
 
+  const cycleTristate = (field: 'retainedFilter' | 'partialFilter' | 'contentieuxFilter') => {
+    setFilters(prev => {
+      const current = prev[field];
+      const next = current === 'off' ? 'include' : current === 'include' ? 'exclude' : 'off';
+      return { ...prev, [field]: next };
+    });
+  };
+
   const clearAllFilters = () => {
     setFilters({
       searchTerm: '',
@@ -241,8 +270,9 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       minAge: '',
       maxAge: '',
       riskLevels: [],
-      retainedOnly: false,
-      partialOnly: false,
+      retainedFilter: 'off',
+      partialFilter: 'off',
+      contentieuxFilter: 'off',
       sortBy: 'name',
       sortOrder: 'asc'
     });
@@ -260,7 +290,10 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.maxAmount,
     filters.minAge,
     filters.maxAge
-  ].filter(Boolean).length + filters.riskLevels.length + (filters.retainedOnly ? 1 : 0) + (filters.partialOnly ? 1 : 0);
+  ].filter(Boolean).length + filters.riskLevels.length +
+    (filters.retainedFilter !== 'off' ? 1 : 0) +
+    (filters.partialFilter !== 'off' ? 1 : 0) +
+    (filters.contentieuxFilter !== 'off' ? 1 : 0);
 
   const quickFilters = [
     { label: 'Tous', count: debts.length, risk: null },
@@ -489,19 +522,34 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
               ))}
             </div>
 
-            {/* Payment Status Filters */}
+            {/* Contentieux + Payment Status Filters */}
             <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-sm text-gray-500">Statut paiement:</span>
+              <span className="text-sm text-gray-500">Filtres:</span>
               <Badge
-                variant={filters.retainedOnly ? 'default' : 'outline'}
+                variant="outline"
                 className={`cursor-pointer ${
-                  filters.retainedOnly
-                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                  filters.contentieuxFilter === 'include'
+                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                    : filters.contentieuxFilter === 'exclude'
+                    ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                }`}
+                onClick={() => cycleTristate('contentieuxFilter')}
+              >
+                ⚖️ Contentieux {filters.contentieuxFilter === 'include' ? '✓' : filters.contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => d.isContentieux).length})
+              </Badge>
+              <Badge
+                variant="outline"
+                className={`cursor-pointer ${
+                  filters.retainedFilter === 'include'
+                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                    : filters.retainedFilter === 'exclude'
+                    ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
                     : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
                 }`}
-                onClick={() => updateFilter('retainedOnly', !filters.retainedOnly)}
+                onClick={() => cycleTristate('retainedFilter')}
               >
-                🛡️ Retenue 0.5%-1.5% ({debts.filter(d => {
+                🛡️ Retenue {filters.retainedFilter === 'include' ? '✓' : filters.retainedFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
                   const upper = (d.documentNumber || '').toUpperCase();
                   if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
                   if (d.balance <= 0) return false;
@@ -511,15 +559,17 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                 }).length})
               </Badge>
               <Badge
-                variant={filters.partialOnly ? 'default' : 'outline'}
+                variant="outline"
                 className={`cursor-pointer ${
-                  filters.partialOnly
-                    ? 'bg-orange-600 text-white hover:bg-orange-700'
+                  filters.partialFilter === 'include'
+                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                    : filters.partialFilter === 'exclude'
+                    ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
                     : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
                 }`}
-                onClick={() => updateFilter('partialOnly', !filters.partialOnly)}
+                onClick={() => cycleTristate('partialFilter')}
               >
-                💳 Paiement partiel 1.5%-99% ({debts.filter(d => {
+                💳 Partiel {filters.partialFilter === 'include' ? '✓' : filters.partialFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
                   const upper = (d.documentNumber || '').toUpperCase();
                   if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
                   if (d.balance <= 0) return false;

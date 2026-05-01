@@ -11,7 +11,8 @@ import {
   ChevronRight,
   FileText,
   Expand,
-  Shrink
+  Shrink,
+  X
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,18 +40,71 @@ export default function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
 
-  // Group debts by client name
+  // Tristate filters
+  const [contentieuxFilter, setContentieuxFilter] = useState<'off' | 'include' | 'exclude'>('off');
+  const [retainedFilter, setRetainedFilter] = useState<'off' | 'include' | 'exclude'>('off');
+  const [partialFilter, setPartialFilter] = useState<'off' | 'include' | 'exclude'>('off');
+
+  const isContentieux = (debt: ClientDebt) => debt.isContentieux === true;
+
+  const isRetained = (debt: ClientDebt) => {
+    const upper = (debt.documentNumber || '').toUpperCase();
+    if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+    if (debt.balance <= 0) return false;
+    if (debt.amount <= 0) return false;
+    const ratio = (debt.balance / debt.amount) * 100;
+    return ratio >= 0.5 && ratio <= 1.5;
+  };
+
+  const isPartial = (debt: ClientDebt) => {
+    const upper = (debt.documentNumber || '').toUpperCase();
+    if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+    if (debt.balance <= 0) return false;
+    if (debt.amount <= 0) return false;
+    const ratio = (debt.balance / debt.amount) * 100;
+    return ratio > 1.5 && ratio < 99;
+  };
+
+  // Apply tristate filters
+  const filteredDebts = useMemo(() => {
+    return debts.filter((debt: ClientDebt) => {
+      const matchesContentieux =
+        contentieuxFilter === 'off'
+          ? true
+          : contentieuxFilter === 'include'
+          ? isContentieux(debt)
+          : !isContentieux(debt);
+
+      const matchesRetained =
+        retainedFilter === 'off'
+          ? true
+          : retainedFilter === 'include'
+          ? isRetained(debt)
+          : !isRetained(debt);
+
+      const matchesPartial =
+        partialFilter === 'off'
+          ? true
+          : partialFilter === 'include'
+          ? isPartial(debt)
+          : !isPartial(debt);
+
+      return matchesContentieux && matchesRetained && matchesPartial;
+    });
+  }, [debts, contentieuxFilter, retainedFilter, partialFilter]);
+
+  // Group filtered debts by client name
   const clientsMap = useMemo(() => {
     const map = new Map<string, ClientDebt[]>();
-    for (const debt of debts) {
+    for (const debt of filteredDebts) {
       const name = debt.clientName || 'Client inconnu';
       if (!map.has(name)) map.set(name, []);
       map.get(name)!.push(debt);
     }
     return map;
-  }, [debts]);
+  }, [filteredDebts]);
 
-  // Filtered client names
+  // Filtered client names by search
   const filteredClientNames = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return Array.from(clientsMap.keys()).sort();
@@ -128,6 +182,63 @@ export default function ClientsPage() {
                   {allExpanded ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
                   {allExpanded ? 'Tout replier' : 'Tout déplier'}
                 </Button>
+              </div>
+
+              {/* Tristate filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <Badge
+                  variant="outline"
+                  className={`cursor-pointer ${
+                    contentieuxFilter === 'include'
+                      ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                      : contentieuxFilter === 'exclude'
+                      ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
+                  onClick={() => setContentieuxFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
+                >
+                  ⚖️ Contentieux {contentieuxFilter === 'include' ? '✓' : contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(isContentieux).length})
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={`cursor-pointer ${
+                    retainedFilter === 'include'
+                      ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                      : retainedFilter === 'exclude'
+                      ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                  }`}
+                  onClick={() => setRetainedFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
+                >
+                  🛡️ Retenue {retainedFilter === 'include' ? '✓' : retainedFilter === 'exclude' ? '✗' : ''} ({debts.filter(isRetained).length})
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={`cursor-pointer ${
+                    partialFilter === 'include'
+                      ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                      : partialFilter === 'exclude'
+                      ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                      : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                  }`}
+                  onClick={() => setPartialFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
+                >
+                  💳 Partiel {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''} ({debts.filter(isPartial).length})
+                </Badge>
+                {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-gray-700 gap-1"
+                    onClick={() => {
+                      setContentieuxFilter('off');
+                      setRetainedFilter('off');
+                      setPartialFilter('off');
+                    }}
+                  >
+                    <X className="h-3 w-3" /> Réinitialiser
+                  </Button>
+                )}
               </div>
 
               {/* Clients list */}
