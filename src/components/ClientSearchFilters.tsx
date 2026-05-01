@@ -28,7 +28,7 @@ interface FilterState {
   phone: string;
   documentNumber: string;
   commercial: string;
-  sourceFile: string;
+  docType: string;
   minAmount: string;
   maxAmount: string;
   minAge: string;
@@ -54,7 +54,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     phone: '',
     documentNumber: '',
     commercial: '',
-    sourceFile: '',
     docType: '',
     minAmount: '',
     maxAmount: '',
@@ -77,13 +76,14 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     return Array.from(uniqueCommerciaux).sort();
   }, [debts]);
 
-  // Extract unique source files for dropdown
-  const sourceFiles = useMemo(() => {
-    const uniqueFiles = new Set<string>();
+  // Extract unique document type prefixes for dropdown
+  const docTypes = useMemo(() => {
+    const uniqueTypes = new Set<string>();
     debts.forEach(d => {
-      if (d.sourceFile) uniqueFiles.add(d.sourceFile);
+      const prefix = (d.documentNumber || '').match(/^[A-Z]+/i);
+      if (prefix) uniqueTypes.add(prefix[0].toUpperCase());
     });
-    return Array.from(uniqueFiles).sort();
+    return Array.from(uniqueTypes).sort();
   }, [debts]);
 
   // Apply filters
@@ -110,8 +110,8 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesCommercial = !filters.commercial || 
         debt.commercialName === filters.commercial;
 
-      const matchesSourceFile = !filters.sourceFile || 
-        debt.sourceFile === filters.sourceFile;
+      const matchesDocType = !filters.docType || 
+        (debt.documentNumber || '').toUpperCase().startsWith(filters.docType);
 
       // Amount filters
       const matchesMinAmount = !filters.minAmount || debt.balance >= parseFloat(filters.minAmount);
@@ -169,7 +169,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
           : !isPartial(debt);
 
       return matchesSearch && matchesCode && matchesPhone && matchesDoc &&
-             matchesCommercial && matchesSourceFile && matchesMinAmount && matchesMaxAmount &&
+             matchesCommercial && matchesDocType && matchesMinAmount && matchesMaxAmount &&
              matchesMinAge && matchesMaxAge && matchesRisk && matchesContentieux && matchesRetained && matchesPartial;
     });
 
@@ -249,7 +249,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       phone: '',
       documentNumber: '',
       commercial: '',
-      sourceFile: '',
+      docType: '',
       minAmount: '',
       maxAmount: '',
       minAge: '',
@@ -269,7 +269,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.phone,
     filters.documentNumber,
     filters.commercial,
-    filters.sourceFile,
+    filters.docType,
     filters.minAmount,
     filters.maxAmount,
     filters.minAge,
@@ -382,17 +382,17 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                 </select>
               </div>
 
-              {/* Source File */}
+              {/* Document Type */}
               <div className="relative">
                 <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <select
-                  value={filters.sourceFile}
-                  onChange={(e) => updateFilter('sourceFile', e.target.value)}
+                  value={filters.docType}
+                  onChange={(e) => updateFilter('docType', e.target.value)}
                   className="w-full h-10 pl-10 pr-3 rounded-md border border-input bg-background text-sm"
                 >
-                  <option value="">Tous les documents</option>
-                  {sourceFiles.map(file => (
-                    <option key={file} value={file}>{file}</option>
+                  <option value="">Tous les types</option>
+                  {docTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>
