@@ -241,8 +241,8 @@ export class OCRService {
 
       // 2. Détection Client (Ignorer Ariana 2036 et Masmoudi)
       // Nouvelle regex plus permissive: code 4 chiffres + nom jusqu'à "Tél" ou fin de ligne
-      // Gère: "0424 LA MANGEARIA", "0646 ECO-PRIX", "0751 EL ANOUAR EXPRESS", "0831 NAIFAR ISKANDAR (FEMA)"
-      const clientMatch = line.match(/^(\d{4})\s+([A-Z][A-Z0-9\s\-'_().]*?)(?=\s+T[eé]l|\s{3,}|\d{2,}|$)/i);
+      // Gère: "0424 LA MANGEARIA", "0646 ECO-PRIX", "0751 EL ANOUAR EXPRESS", "0831 NAIFAR ISKANDAR (FEMA)", "3603 JAOUA SKANDER \"PROPREX\""
+      const clientMatch = line.match(/^(\d{4})\s+([A-Z][A-Z0-9\s\-'"_().]*?)(?=\s+T[eé]l|\s{3,}|\d{2,}|$)/i);
       if (clientMatch && clientMatch[1] !== '2036' && !line.includes('MASMOUDI') && !line.includes('SARL')) {
         currentClient = {
           code: clientMatch[1],
