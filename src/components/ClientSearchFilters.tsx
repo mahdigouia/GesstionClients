@@ -29,7 +29,6 @@ interface FilterState {
   documentNumber: string;
   commercial: string;
   sourceFile: string;
-  docType: string;
   minAmount: string;
   maxAmount: string;
   minAge: string;
@@ -87,16 +86,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     return Array.from(uniqueFiles).sort();
   }, [debts]);
 
-  // Extract unique document type prefixes for dropdown
-  const docTypes = useMemo(() => {
-    const uniqueTypes = new Set<string>();
-    debts.forEach(d => {
-      const prefix = (d.documentNumber || '').match(/^[A-Z]+/i);
-      if (prefix) uniqueTypes.add(prefix[0].toUpperCase());
-    });
-    return Array.from(uniqueTypes).sort();
-  }, [debts]);
-
   // Apply filters
   const filteredDebts = useMemo(() => {
     let result = debts.filter(debt => {
@@ -123,9 +112,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
 
       const matchesSourceFile = !filters.sourceFile || 
         debt.sourceFile === filters.sourceFile;
-
-      const matchesDocType = !filters.docType || 
-        (debt.documentNumber || '').toUpperCase().startsWith(filters.docType);
 
       // Amount filters
       const matchesMinAmount = !filters.minAmount || debt.balance >= parseFloat(filters.minAmount);
@@ -183,7 +169,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
           : !isPartial(debt);
 
       return matchesSearch && matchesCode && matchesPhone && matchesDoc &&
-             matchesCommercial && matchesSourceFile && matchesDocType && matchesMinAmount && matchesMaxAmount &&
+             matchesCommercial && matchesSourceFile && matchesMinAmount && matchesMaxAmount &&
              matchesMinAge && matchesMaxAge && matchesRisk && matchesContentieux && matchesRetained && matchesPartial;
     });
 
@@ -264,7 +250,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       documentNumber: '',
       commercial: '',
       sourceFile: '',
-      docType: '',
       minAmount: '',
       maxAmount: '',
       minAge: '',
@@ -285,7 +270,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     filters.documentNumber,
     filters.commercial,
     filters.sourceFile,
-    filters.docType,
     filters.minAmount,
     filters.maxAmount,
     filters.minAge,
@@ -413,20 +397,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                 </select>
               </div>
 
-              {/* Document Type */}
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <select
-                  value={filters.docType}
-                  onChange={(e) => updateFilter('docType', e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 rounded-md border border-input bg-background text-sm"
-                >
-                  <option value="">Tous les types</option>
-                  {docTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
