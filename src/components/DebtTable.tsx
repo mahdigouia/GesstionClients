@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,13 +29,17 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
   const [advancedFilteredDebts, setAdvancedFilteredDebts] = useState<ClientDebt[]>(debts);
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [clientSearchValue, setClientSearchValue] = useState<string>('');
+  const prevDebtsLengthRef = useRef(debts.length);
 
-  // Update when parent debts change
+  // Update when parent debts change (only on real data changes, not reference changes)
   useEffect(() => {
-    setAdvancedFilteredDebts(debts);
-    setSelectedClient('');
-    setClientSearchValue('');
-  }, [debts]);
+    if (debts.length !== prevDebtsLengthRef.current) {
+      setAdvancedFilteredDebts(debts);
+      setSelectedClient('');
+      setClientSearchValue('');
+      prevDebtsLengthRef.current = debts.length;
+    }
+  }, [debts.length]);
 
   // Final filtered debts = advanced filters + client selection
   const filteredDebts = useMemo(() => {
