@@ -153,8 +153,31 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const addDebts = (newDebts: ClientDebt[]) => {
-    const updatedDebts = [...debts, ...newDebts];
-    setDebts(updatedDebts);
+    setDebtsState(prevDebts => {
+      const debtMap = new Map<string, ClientDebt>();
+      
+      // 1. Ajouter les dettes existantes
+      prevDebts.forEach(d => debtMap.set(d.id, d));
+      
+      // 2. Ajouter les nouvelles
+      newDebts.forEach(d => debtMap.set(d.id, d));
+      
+      const updatedDebts = Array.from(debtMap.values());
+      
+      // Sauvegarder la version finale fusionnée
+      saveToFirestore(updatedDebts);
+      
+      // Analyse locale
+      if (updatedDebts.length > 0) {
+        const newAnalysis = AnalysisService.analyzeDebts(updatedDebts);
+        setAnalysis(newAnalysis);
+        if (newAnalysis.processedDebts) {
+          return newAnalysis.processedDebts;
+        }
+      }
+      
+      return updatedDebts;
+    });
   };
 
   const updateDebtsFromFile = (filename: string, newDebts: ClientDebt[]) => {

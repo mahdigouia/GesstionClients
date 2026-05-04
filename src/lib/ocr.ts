@@ -426,9 +426,9 @@ export class OCRService {
 
     const classification = this.classifyDocument(docNumber, ageDays, amount, settlement, balance);
 
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const id = `${client.code}_${docNumber}`.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     return {
-      id: `debt_${sanitizedFileName}_${id}`,
+      id: `debt_${id}`,
       clientCode: client.code,
       clientName: client.name,
       clientPhone: client.phone,

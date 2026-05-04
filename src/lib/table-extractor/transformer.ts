@@ -95,11 +95,11 @@ function createClientDebt(
       return dateStr;
     };
 
-    // Créer un ID unique basé sur le nom du fichier et l'index
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    // Créer un ID unique basé sur le client et le numéro de pièce pour permettre la fusion/déduplication
+    const id = `${data.client_code}_${data.document_number}`.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     
     return {
-      id: `debt_${sanitizedFileName}_${id}`,
+      id: `debt_${id}`,
       clientCode: data.client_code,
       clientName: data.client_name,
       clientPhone: data.client_phone,
