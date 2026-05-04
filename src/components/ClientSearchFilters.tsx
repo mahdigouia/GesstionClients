@@ -125,8 +125,8 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
       const matchesRisk = filters.riskLevels.length === 0 || 
         filters.riskLevels.includes(debt.riskLevel);
 
-      // Contentieux filter: 3 states (off / include / exclude)
-      const isContentieux = (debt: ClientDebt) => !!debt.isContentieux;
+      // Contentieux filter: règle stricte (âge > 365 jours ET solde > 0)
+      const isContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
       const matchesContentieux =
         filters.contentieuxFilter === 'off'
           ? true
@@ -135,13 +135,12 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
           : !isContentieux(debt);
 
       // Retained filter: règle selon regles_et_plans.md (FT/FS, ratio solde/montant entre 0.5% et 1.5%)
-      // Indépendant de la valeur du règlement (peut être 0 ou > 0)
-      const isRetained = (debt: ClientDebt) => {
-        const upper = (debt.documentNumber || '').toUpperCase();
+      const isRetained = (d: ClientDebt) => {
+        const upper = (d.documentNumber || '').toUpperCase();
         if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-        if (debt.balance <= 0) return false;
-        if (debt.amount <= 0) return false;
-        const ratio = (debt.balance / debt.amount) * 100;
+        if (Number(d.balance || 0) <= 0) return false;
+        if (Number(d.amount || 0) <= 0) return false;
+        const ratio = (Number(d.balance) / Number(d.amount)) * 100;
         return ratio >= 0.5 && ratio <= 1.5;
       };
       const matchesRetained =
@@ -152,13 +151,12 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
           : !isRetained(debt);
 
       // Partial payment filter: règle selon regles_et_plans.md (FT/FS, ratio entre 1.5% et 99%)
-      // Indépendant de la valeur du règlement (peut être 0 ou > 0)
-      const isPartial = (debt: ClientDebt) => {
-        const upper = (debt.documentNumber || '').toUpperCase();
+      const isPartial = (d: ClientDebt) => {
+        const upper = (d.documentNumber || '').toUpperCase();
         if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-        if (debt.balance <= 0) return false;
-        if (debt.amount <= 0) return false;
-        const ratio = (debt.balance / debt.amount) * 100;
+        if (Number(d.balance || 0) <= 0) return false;
+        if (Number(d.amount || 0) <= 0) return false;
+        const ratio = (Number(d.balance) / Number(d.amount)) * 100;
         return ratio > 1.5 && ratio < 99;
       };
       const matchesPartial =
@@ -306,6 +304,63 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
               </Badge>
             </Button>
           ))}
+        </div>
+
+        {/* Tristate Filters - Toujours visibles pour accessibilité directe */}
+        <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-gray-100">
+          <Badge
+            variant="outline"
+            className={`cursor-pointer transition-all ${
+              filters.contentieuxFilter === 'include'
+                ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                : filters.contentieuxFilter === 'exclude'
+                ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            }`}
+            onClick={() => cycleTristate('contentieuxFilter')}
+          >
+            ⚖️ Contentieux {filters.contentieuxFilter === 'include' ? '✓' : filters.contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0).length})
+          </Badge>
+          <Badge
+            variant="outline"
+            className={`cursor-pointer transition-all ${
+              filters.retainedFilter === 'include'
+                ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                : filters.retainedFilter === 'exclude'
+                ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+            }`}
+            onClick={() => cycleTristate('retainedFilter')}
+          >
+            🛡️ Retenue {filters.retainedFilter === 'include' ? '✓' : filters.retainedFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
+              const upper = (d.documentNumber || '').toUpperCase();
+              if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+              if (Number(d.balance || 0) <= 0) return false;
+              if (Number(d.amount || 0) <= 0) return false;
+              const ratio = (Number(d.balance) / Number(d.amount)) * 100;
+              return ratio >= 0.5 && ratio <= 1.5;
+            }).length})
+          </Badge>
+          <Badge
+            variant="outline"
+            className={`cursor-pointer transition-all ${
+              filters.partialFilter === 'include'
+                ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                : filters.partialFilter === 'exclude'
+                ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
+                : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+            }`}
+            onClick={() => cycleTristate('partialFilter')}
+          >
+            💳 Partiel {filters.partialFilter === 'include' ? '✓' : filters.partialFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
+              const upper = (d.documentNumber || '').toUpperCase();
+              if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+              if (Number(d.balance || 0) <= 0) return false;
+              if (Number(d.amount || 0) <= 0) return false;
+              const ratio = (Number(d.balance) / Number(d.amount)) * 100;
+              return ratio > 1.5 && ratio < 99;
+            }).length})
+          </Badge>
         </div>
 
         {/* Filtres avancés toggle uniquement - sans recherche principale */}
@@ -490,64 +545,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                    risk === 'overdue' ? 'En retard' : 'Critique'}
                 </Badge>
               ))}
-            </div>
-
-            {/* Contentieux + Payment Status Filters */}
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-sm text-gray-500">Filtres:</span>
-              <Badge
-                variant="outline"
-                className={`cursor-pointer ${
-                  filters.contentieuxFilter === 'include'
-                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
-                    : filters.contentieuxFilter === 'exclude'
-                    ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                }`}
-                onClick={() => cycleTristate('contentieuxFilter')}
-              >
-                ⚖️ Contentieux {filters.contentieuxFilter === 'include' ? '✓' : filters.contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => !!d.isContentieux).length})
-              </Badge>
-              <Badge
-                variant="outline"
-                className={`cursor-pointer ${
-                  filters.retainedFilter === 'include'
-                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
-                    : filters.retainedFilter === 'exclude'
-                    ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                    : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                }`}
-                onClick={() => cycleTristate('retainedFilter')}
-              >
-                🛡️ Retenue {filters.retainedFilter === 'include' ? '✓' : filters.retainedFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
-                  const upper = (d.documentNumber || '').toUpperCase();
-                  if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-                  if (d.balance <= 0) return false;
-                  if (d.amount <= 0) return false;
-                  const ratio = (d.balance / d.amount) * 100;
-                  return ratio >= 0.5 && ratio <= 1.5;
-                }).length})
-              </Badge>
-              <Badge
-                variant="outline"
-                className={`cursor-pointer ${
-                  filters.partialFilter === 'include'
-                    ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
-                    : filters.partialFilter === 'exclude'
-                    ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                }`}
-                onClick={() => cycleTristate('partialFilter')}
-              >
-                💳 Partiel {filters.partialFilter === 'include' ? '✓' : filters.partialFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
-                  const upper = (d.documentNumber || '').toUpperCase();
-                  if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-                  if (d.balance <= 0) return false;
-                  if (d.amount <= 0) return false;
-                  const ratio = (d.balance / d.amount) * 100;
-                  return ratio > 1.5 && ratio < 99;
-                }).length})
-              </Badge>
+                </Badge>
             </div>
           </div>
         )}
