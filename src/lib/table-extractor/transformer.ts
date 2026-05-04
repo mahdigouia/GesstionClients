@@ -95,8 +95,11 @@ function createClientDebt(
       return dateStr;
     };
 
+    // Créer un ID unique basé sur le nom du fichier et l'index
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    
     return {
-      id: `debt_${id}`,
+      id: `debt_${sanitizedFileName}_${id}`,
       clientCode: data.client_code,
       clientName: data.client_name,
       clientPhone: data.client_phone,
