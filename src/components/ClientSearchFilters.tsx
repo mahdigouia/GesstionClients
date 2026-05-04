@@ -88,87 +88,81 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
 
   // Apply filters
   const filteredDebts = useMemo(() => {
+    // Helpers for specific business rules
+    const checkContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
+    
+    const checkRetained = (d: ClientDebt) => {
+      const upper = (d.documentNumber || '').toUpperCase();
+      if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+      const b = Number(d.balance || 0);
+      const a = Number(d.amount || 0);
+      if (b <= 0 || a <= 0) return false;
+      const ratio = (b / a) * 100;
+      return ratio >= 0.5 && ratio <= 1.5;
+    };
+
+    const checkPartial = (d: ClientDebt) => {
+      const upper = (d.documentNumber || '').toUpperCase();
+      if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+      const b = Number(d.balance || 0);
+      const a = Number(d.amount || 0);
+      if (b <= 0 || a <= 0) return false;
+      const ratio = (b / a) * 100;
+      return ratio > 1.5 && ratio < 99;
+    };
+
     let result = debts.filter(debt => {
       // Text search
       const searchLower = filters.searchTerm.toLowerCase();
-      const matchesSearch = !filters.searchTerm || 
-        (debt.clientName?.toLowerCase().includes(searchLower)) ||
-        (debt.clientCode?.toLowerCase().includes(searchLower)) ||
-        (debt.documentNumber?.toLowerCase().includes(searchLower)) ||
-        (debt.commercialName?.toLowerCase().includes(searchLower));
+      if (filters.searchTerm) {
+        const inName = (debt.clientName || '').toLowerCase().includes(searchLower);
+        const inCode = (debt.clientCode || '').toLowerCase().includes(searchLower);
+        const inDoc = (debt.documentNumber || '').toLowerCase().includes(searchLower);
+        const inComm = (debt.commercialName || '').toLowerCase().includes(searchLower);
+        if (!inName && !inCode && !inDoc && !inComm) return false;
+      }
 
-      // Specific filters
-      const matchesCode = !filters.clientCode || 
-        debt.clientCode?.toLowerCase().includes(filters.clientCode.toLowerCase());
+      // Specific field filters
+      if (filters.clientCode && !(debt.clientCode || '').toLowerCase().includes(filters.clientCode.toLowerCase())) return false;
+      if (filters.phone && !(debt.clientPhone || '').includes(filters.phone)) return false;
+      if (filters.documentNumber && !(debt.documentNumber || '').toLowerCase().includes(filters.documentNumber.toLowerCase())) return false;
+      if (filters.commercial && debt.commercialName !== filters.commercial) return false;
+      if (filters.docType && !(debt.documentNumber || '').toUpperCase().startsWith(filters.docType)) return false;
+
+      // Numeric filters
+      const balance = Number(debt.balance || 0);
+      const age = Number(debt.age || 0);
       
-      const matchesPhone = !filters.phone || 
-        debt.clientPhone?.includes(filters.phone);
-      
-      const matchesDoc = !filters.documentNumber || 
-        debt.documentNumber?.toLowerCase().includes(filters.documentNumber.toLowerCase());
-      
-      const matchesCommercial = !filters.commercial || 
-        debt.commercialName === filters.commercial;
+      if (filters.minAmount && balance < parseFloat(filters.minAmount)) return false;
+      if (filters.maxAmount && balance > parseFloat(filters.maxAmount)) return false;
+      if (filters.minAge && age < parseInt(filters.minAge)) return false;
+      if (filters.maxAge && age > parseInt(filters.maxAge)) return false;
 
-      const matchesDocType = !filters.docType || 
-        (debt.documentNumber || '').toUpperCase().startsWith(filters.docType);
+      // Risk level filter
+      if (filters.riskLevels.length > 0 && !filters.riskLevels.includes(debt.riskLevel)) return false;
 
-      // Amount filters
-      const matchesMinAmount = !filters.minAmount || debt.balance >= parseFloat(filters.minAmount);
-      const matchesMaxAmount = !filters.maxAmount || debt.balance <= parseFloat(filters.maxAmount);
+      // Tristate: Contentieux
+      if (filters.contentieuxFilter !== 'off') {
+        const isC = checkContentieux(debt);
+        if (filters.contentieuxFilter === 'include' && !isC) return false;
+        if (filters.contentieuxFilter === 'exclude' && isC) return false;
+      }
 
-      // Age filters
-      const matchesMinAge = !filters.minAge || debt.age >= parseInt(filters.minAge);
-      const matchesMaxAge = !filters.maxAge || debt.age <= parseInt(filters.maxAge);
+      // Tristate: Retained
+      if (filters.retainedFilter !== 'off') {
+        const isR = checkRetained(debt);
+        if (filters.retainedFilter === 'include' && !isR) return false;
+        if (filters.retainedFilter === 'exclude' && isR) return false;
+      }
 
-      // Risk filter
-      const matchesRisk = filters.riskLevels.length === 0 || 
-        filters.riskLevels.includes(debt.riskLevel);
+      // Tristate: Partial
+      if (filters.partialFilter !== 'off') {
+        const isP = checkPartial(debt);
+        if (filters.partialFilter === 'include' && !isP) return false;
+        if (filters.partialFilter === 'exclude' && isP) return false;
+      }
 
-      // Contentieux filter: règle stricte (âge > 365 jours ET solde > 0)
-      const isContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
-      const matchesContentieux =
-        filters.contentieuxFilter === 'off'
-          ? true
-          : filters.contentieuxFilter === 'include'
-          ? isContentieux(debt)
-          : !isContentieux(debt);
-
-      // Retained filter: règle selon regles_et_plans.md (FT/FS, ratio solde/montant entre 0.5% et 1.5%)
-      const isRetained = (d: ClientDebt) => {
-        const upper = (d.documentNumber || '').toUpperCase();
-        if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-        if (Number(d.balance || 0) <= 0) return false;
-        if (Number(d.amount || 0) <= 0) return false;
-        const ratio = (Number(d.balance) / Number(d.amount)) * 100;
-        return ratio >= 0.5 && ratio <= 1.5;
-      };
-      const matchesRetained =
-        filters.retainedFilter === 'off'
-          ? true
-          : filters.retainedFilter === 'include'
-          ? isRetained(debt)
-          : !isRetained(debt);
-
-      // Partial payment filter: règle selon regles_et_plans.md (FT/FS, ratio entre 1.5% et 99%)
-      const isPartial = (d: ClientDebt) => {
-        const upper = (d.documentNumber || '').toUpperCase();
-        if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-        if (Number(d.balance || 0) <= 0) return false;
-        if (Number(d.amount || 0) <= 0) return false;
-        const ratio = (Number(d.balance) / Number(d.amount)) * 100;
-        return ratio > 1.5 && ratio < 99;
-      };
-      const matchesPartial =
-        filters.partialFilter === 'off'
-          ? true
-          : filters.partialFilter === 'include'
-          ? isPartial(debt)
-          : !isPartial(debt);
-
-      return matchesSearch && matchesCode && matchesPhone && matchesDoc &&
-             matchesCommercial && matchesDocType && matchesMinAmount && matchesMaxAmount &&
-             matchesMinAge && matchesMaxAge && matchesRisk && matchesContentieux && matchesRetained && matchesPartial;
+      return true;
     });
 
     // Sort with search relevance priority
