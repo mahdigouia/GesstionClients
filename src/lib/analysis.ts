@@ -121,7 +121,8 @@ export const AnalysisService = {
         partiallyPaidPercentage: 0,
         unpaidPercentage: 0,
         projectedMonthlyCashflow: 0,
-        riskDistribution: { healthy: 0, monitoring: 0, overdue: 0, critical: 0 }
+        riskDistribution: { healthy: 0, monitoring: 0, overdue: 0, critical: 0 },
+        processedDebts
       };
     } catch (error) {
       console.error('Analyze error:', error);

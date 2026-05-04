@@ -83,6 +83,7 @@ export interface AnalysisResult {
     overdue: number;
     critical: number;
   };
+  processedDebts?: ClientDebt[];
 }
 
 export interface Alert {

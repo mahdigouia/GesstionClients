@@ -31,15 +31,12 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
   const [clientSearchValue, setClientSearchValue] = useState<string>('');
   const prevDebtsLengthRef = useRef(debts.length);
 
-  // Update when parent debts change (only on real data changes, not reference changes)
+  // Update when parent debts change
   useEffect(() => {
-    if (debts.length !== prevDebtsLengthRef.current) {
-      setAdvancedFilteredDebts(debts);
-      setSelectedClient('');
-      setClientSearchValue('');
-      prevDebtsLengthRef.current = debts.length;
-    }
-  }, [debts.length]);
+    setAdvancedFilteredDebts(debts);
+    setSelectedClient('');
+    setClientSearchValue('');
+  }, [debts]);
 
   // Final filtered debts = advanced filters + client selection
   const filteredDebts = useMemo(() => {

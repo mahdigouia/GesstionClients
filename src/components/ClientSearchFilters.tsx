@@ -126,7 +126,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
         filters.riskLevels.includes(debt.riskLevel);
 
       // Contentieux filter: 3 states (off / include / exclude)
-      const isContentieux = (debt: ClientDebt) => debt.isContentieux === true;
+      const isContentieux = (debt: ClientDebt) => !!debt.isContentieux;
       const matchesContentieux =
         filters.contentieuxFilter === 'off'
           ? true
@@ -506,7 +506,7 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                 }`}
                 onClick={() => cycleTristate('contentieuxFilter')}
               >
-                ⚖️ Contentieux {filters.contentieuxFilter === 'include' ? '✓' : filters.contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => d.isContentieux).length})
+                ⚖️ Contentieux {filters.contentieuxFilter === 'include' ? '✓' : filters.contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => !!d.isContentieux).length})
               </Badge>
               <Badge
                 variant="outline"

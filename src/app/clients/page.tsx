@@ -45,7 +45,7 @@ export default function ClientsPage() {
   const [retainedFilter, setRetainedFilter] = useState<'off' | 'include' | 'exclude'>('off');
   const [partialFilter, setPartialFilter] = useState<'off' | 'include' | 'exclude'>('off');
 
-  const isContentieux = (debt: ClientDebt) => debt.isContentieux === true;
+  const isContentieux = (debt: ClientDebt) => !!debt.isContentieux;
 
   const isRetained = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();

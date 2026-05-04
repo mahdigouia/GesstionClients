@@ -52,10 +52,13 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           setRecoveryActions(data.recoveryActions || []);
           setLastUpdatedBy(data.updatedBy || null);
           
-          // Recalculer l'analyse localement
           if (firestoreDebts.length > 0) {
             const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts);
             setAnalysis(newAnalysis);
+            // Si l'analyse a produit des créances traitées (avec isContentieux corrigé), les utiliser
+            if (newAnalysis.processedDebts) {
+              setDebtsState(newAnalysis.processedDebts);
+            }
           } else {
             setAnalysis(null);
           }
@@ -137,6 +140,14 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     if (newDebts.length > 0) {
       const newAnalysis = AnalysisService.analyzeDebts(newDebts);
       setAnalysis(newAnalysis);
+      
+      // Mettre à jour l'état local avec les créances enrichies (isContentieux, etc.)
+      if (newAnalysis.processedDebts) {
+        setDebtsState(newAnalysis.processedDebts);
+        // On ne sauvegarde pas forcément les processedDebts dans Firestore ici 
+        // pour garder les originaux si besoin, mais l'UI utilisera les versions traitées.
+      }
+      
       localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
     }
   };
