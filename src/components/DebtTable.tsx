@@ -49,15 +49,25 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [clientSearchValue, setClientSearchValue] = useState<string>('');
   
-  // Helpers for specific business rules
-  const checkContentieux = useCallback((d: ClientDebt) => 
-    Number(d.age || 0) > 365 && Number(d.balance || 0) > 0, []);
+  // Helpers for specific business rules - EXTREMELY DEFENSIVE
+  const parseNumeric = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const cleaned = String(val).replace(/[^-0-9.]/g, '');
+    return parseFloat(cleaned) || 0;
+  };
+
+  const checkContentieux = useCallback((d: ClientDebt) => {
+    const age = parseNumeric(d.age);
+    const balance = parseNumeric(d.balance);
+    return age > 365 && balance > 0;
+  }, []);
   
   const checkRetained = useCallback((d: ClientDebt) => {
     const upper = (d.documentNumber || '').toUpperCase();
     if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-    const b = Number(d.balance || 0);
-    const a = Number(d.amount || 0);
+    const b = parseNumeric(d.balance);
+    const a = parseNumeric(d.amount);
     if (b <= 0 || a <= 0) return false;
     const ratio = (b / a) * 100;
     return ratio >= 0.5 && ratio <= 1.5;
@@ -66,8 +76,8 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
   const checkPartial = useCallback((d: ClientDebt) => {
     const upper = (d.documentNumber || '').toUpperCase();
     if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-    const b = Number(d.balance || 0);
-    const a = Number(d.amount || 0);
+    const b = parseNumeric(d.balance);
+    const a = parseNumeric(d.amount);
     if (b <= 0 || a <= 0) return false;
     const ratio = (b / a) * 100;
     return ratio > 1.5 && ratio < 99;
@@ -76,41 +86,7 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
   // Main filtering logic - THE SINGLE SOURCE OF TRUTH
   const filteredDebts = useMemo(() => {
     let result = debts.filter(debt => {
-      // 1. Text Search (Global)
-      if (filters.searchTerm) {
-        const s = filters.searchTerm.toLowerCase();
-        const match = 
-          (debt.clientName || '').toLowerCase().includes(s) ||
-          (debt.clientCode || '').toLowerCase().includes(s) ||
-          (debt.documentNumber || '').toLowerCase().includes(s) ||
-          (debt.commercialName || '').toLowerCase().includes(s);
-        if (!match) return false;
-      }
-
-      // 2. Client Autocomplete Filter
-      if (selectedClient) {
-        if ((debt.clientName || '').toLowerCase() !== selectedClient.toLowerCase()) return false;
-      }
-
-      // 3. Field Specific Filters
-      if (filters.clientCode && !(debt.clientCode || '').toLowerCase().includes(filters.clientCode.toLowerCase())) return false;
-      if (filters.phone && !(debt.clientPhone || '').includes(filters.phone)) return false;
-      if (filters.documentNumber && !(debt.documentNumber || '').toLowerCase().includes(filters.documentNumber.toLowerCase())) return false;
-      if (filters.commercial && debt.commercialName !== filters.commercial) return false;
-      if (filters.docType && !(debt.documentNumber || '').toUpperCase().startsWith(filters.docType)) return false;
-
-      // 4. Numeric Filters
-      const balance = Number(debt.balance || 0);
-      const age = Number(debt.age || 0);
-      if (filters.minAmount && balance < parseFloat(filters.minAmount)) return false;
-      if (filters.maxAmount && balance > parseFloat(filters.maxAmount)) return false;
-      if (filters.minAge && age < parseInt(filters.minAge)) return false;
-      if (filters.maxAge && age > parseInt(filters.maxAge)) return false;
-
-      // 5. Risk Level
-      if (filters.riskLevels.length > 0 && !filters.riskLevels.includes(debt.riskLevel)) return false;
-
-      // 6. Tristate Filters - STRICT RULES
+      // 1. Tristate Filters - APPLY FIRST AS THEY ARE THE MOST STRICT
       if (filters.contentieuxFilter !== 'off') {
         const isC = checkContentieux(debt);
         if (filters.contentieuxFilter === 'include' && !isC) return false;
@@ -126,6 +102,40 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
         if (filters.partialFilter === 'include' && !isP) return false;
         if (filters.partialFilter === 'exclude' && isP) return false;
       }
+
+      // 2. Text Search (Global)
+      if (filters.searchTerm) {
+        const s = filters.searchTerm.toLowerCase();
+        const match = 
+          (debt.clientName || '').toLowerCase().includes(s) ||
+          (debt.clientCode || '').toLowerCase().includes(s) ||
+          (debt.documentNumber || '').toLowerCase().includes(s) ||
+          (debt.commercialName || '').toLowerCase().includes(s);
+        if (!match) return false;
+      }
+
+      // 3. Client Autocomplete Filter
+      if (selectedClient) {
+        if ((debt.clientName || '').toLowerCase() !== selectedClient.toLowerCase()) return false;
+      }
+
+      // 4. Field Specific Filters
+      if (filters.clientCode && !(debt.clientCode || '').toLowerCase().includes(filters.clientCode.toLowerCase())) return false;
+      if (filters.phone && !(debt.clientPhone || '').includes(filters.phone)) return false;
+      if (filters.documentNumber && !(debt.documentNumber || '').toLowerCase().includes(filters.documentNumber.toLowerCase())) return false;
+      if (filters.commercial && debt.commercialName !== filters.commercial) return false;
+      if (filters.docType && !(debt.documentNumber || '').toUpperCase().startsWith(filters.docType)) return false;
+
+      // 5. Numeric Filters
+      const balance = parseNumeric(debt.balance);
+      const age = parseNumeric(debt.age);
+      if (filters.minAmount && balance < parseFloat(filters.minAmount)) return false;
+      if (filters.maxAmount && balance > parseFloat(filters.maxAmount)) return false;
+      if (filters.minAge && age < parseInt(filters.minAge)) return false;
+      if (filters.maxAge && age > parseInt(filters.maxAge)) return false;
+
+      // 6. Risk Level
+      if (filters.riskLevels.length > 0 && !filters.riskLevels.includes(debt.riskLevel)) return false;
 
       return true;
     });
