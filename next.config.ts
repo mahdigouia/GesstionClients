@@ -1,5 +1,6 @@
 import type {NextConfig} from 'next';
 
+// Deployment trigger: 2026-05-04 15:01
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
