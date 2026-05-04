@@ -31,11 +31,16 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
   const [clientSearchValue, setClientSearchValue] = useState<string>('');
   const prevDebtsLengthRef = useRef(debts.length);
 
-  // Update when parent debts change
+  // Update when parent debts change (only reset if necessary or let ClientSearchFilters handle it)
   useEffect(() => {
-    setAdvancedFilteredDebts(debts);
-    setSelectedClient('');
-    setClientSearchValue('');
+    // If the entire debts array changed (e.g. new import), we might want to reset.
+    // But ClientSearchFilters already re-renders and calls onFilterChange when debts prop changes.
+    // So we don't need to manually setAdvancedFilteredDebts(debts) here as it competes with the filter.
+    if (prevDebtsLengthRef.current !== debts.length) {
+      setSelectedClient('');
+      setClientSearchValue('');
+      prevDebtsLengthRef.current = debts.length;
+    }
   }, [debts]);
 
   // Final filtered debts = advanced filters + client selection
