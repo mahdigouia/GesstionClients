@@ -545,7 +545,6 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
                    risk === 'overdue' ? 'En retard' : 'Critique'}
                 </Badge>
               ))}
-                </Badge>
             </div>
           </div>
         )}
