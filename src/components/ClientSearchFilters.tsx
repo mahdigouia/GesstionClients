@@ -151,7 +151,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
             onClick={() => cycleTristate('contentieuxFilter')}
           >
             {filters.contentieuxFilter === 'off' ? (
-              <>⚖️ Contentieux ({contentieuxCount})</>
+              <>⚖️ Contentieux</>
             ) : filters.contentieuxFilter === 'include' ? (
               <><CheckCircle2 className="h-4 w-4" /> Contentieux ({contentieuxCount})</>
             ) : (
@@ -169,7 +169,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
             onClick={() => cycleTristate('retainedFilter')}
           >
             {filters.retainedFilter === 'off' ? (
-              <>🛡️ Retenue ({retainedCount})</>
+              <>🛡️ Retenue</>
             ) : filters.retainedFilter === 'include' ? (
               <><CheckCircle2 className="h-4 w-4" /> Retenue ({retainedCount})</>
             ) : (
@@ -187,7 +187,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
             onClick={() => cycleTristate('partialFilter')}
           >
             {filters.partialFilter === 'off' ? (
-              <>💳 Partiel ({partialCount})</>
+              <>💳 Partiel</>
             ) : filters.partialFilter === 'include' ? (
               <><CheckCircle2 className="h-4 w-4" /> Partiel ({partialCount})</>
             ) : (
