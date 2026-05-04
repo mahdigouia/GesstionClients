@@ -6,7 +6,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { FileUpload } from '@/components/FileUpload';
 import { OCRService } from '@/lib/ocr';
 import { AnalysisService } from '@/lib/analysis';
-import { Upload, FileText, AlertTriangle, CheckCircle, X } from 'lucide-react';
+import { Upload, FileText, AlertTriangle, CheckCircle, X, XCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -17,7 +17,7 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
-
+  const [fileStatuses, setFileStatuses] = useState<{name: string, status: 'pending' | 'processing' | 'success' | 'error', count: number, error?: string}[]>([]);
   const handleFileProcess = async (files: File[]) => {
     setIsProcessing(true);
     setProgress(0);
@@ -25,59 +25,53 @@ export default function ImportPage() {
     setSuccessMessage(null);
     setWaitingMessage(null);
 
+    // Initialiser les statuts
+    setFileStatuses(files.map(f => ({ name: f.name, status: 'pending', count: 0 })));
+
     try {
-      // Étape 1: Vérifier que le service Python est disponible (avec attente)
+      // Étape 1: Vérifier le service
       setProgress(10);
       setWaitingMessage('Vérification du service...');
-      
-      const healthCheck = await OCRService.waitForPythonService(
-        (seconds, message) => {
-          setWaitingMessage(message);
-          // Progression de 10% à 50% pendant l'attente (max 90s)
-          const progressValue = Math.min(10 + (seconds * 40 / 90), 50);
-          setProgress(Math.round(progressValue));
-        },
-        90 // max 90 secondes
-      );
+      const healthCheck = await OCRService.waitForPythonService((s, m) => setWaitingMessage(m), 90);
       
       if (!healthCheck.available) {
-        throw new Error(`Le service n'est pas disponible après ${healthCheck.waitedSeconds} secondes. Veuillez réessayer plus tard.`);
+        throw new Error(`Le service est indisponible.`);
       }
       
       setWaitingMessage(null);
-      setProgress(50);
+      setProgress(30);
 
-      // Étape 2: Importer les fichiers
-      let allNewDebts: any[] = [];
-      const totalFiles = files.length;
-      
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileProgress = 50 + (40 * (i + 1) / totalFiles);
-        setProgress(Math.round(fileProgress));
+      // Étape 2: Traitement en parallèle
+      const results = await Promise.all(files.map(async (file, index) => {
+        setFileStatuses(prev => prev.map((s, i) => i === index ? { ...s, status: 'processing' } : s));
         
-        // Utiliser le service d'extraction Python (PAS de fallback OCR)
-        const result = await OCRService.extractDebtsFromPDF(file);
-        
-        if (!result.success || result.debts.length === 0) {
-          console.warn(`Aucune donnée trouvée dans: ${file.name}`);
-          if (result.error) {
-            console.error(`[Import] Erreur pour ${file.name}:`, result.error);
+        try {
+          const result = await OCRService.extractDebtsFromPDF(file);
+          
+          if (result.success && result.debts.length > 0) {
+            setFileStatuses(prev => prev.map((s, i) => i === index ? { ...s, status: 'success', count: result.debts.length } : s));
+            return result.debts;
+          } else {
+            setFileStatuses(prev => prev.map((s, i) => i === index ? { ...s, status: 'error', count: 0, error: result.error || 'Aucune donnée' } : s));
+            return [];
           }
-        } else {
-          console.log(`[Import] ${file.name}: ${result.debts.length} créances via ${result.method}`);
-          allNewDebts = [...allNewDebts, ...result.debts];
+        } catch (e) {
+          setFileStatuses(prev => prev.map((s, i) => i === index ? { ...s, status: 'error', count: 0, error: 'Erreur réseau' } : s));
+          return [];
         }
+      }));
+
+      const allNewDebts = results.flat();
+      setProgress(90);
+      
+      if (allNewDebts.length > 0) {
+        addDebts(allNewDebts);
+        setSuccessMessage(`${allNewDebts.length} créances importées depuis ${files.length} fichier(s)`);
+      } else {
+        setError('Aucune créance n\'a pu être extraite des fichiers sélectionnés.');
       }
       
-      if (allNewDebts.length === 0) {
-        throw new Error('Aucune donnée de créance trouvée dans les fichiers');
-      }
-
-      setProgress(90);
-      addDebts(allNewDebts);
       setProgress(100);
-      setSuccessMessage(`${allNewDebts.length} créances importées avec succès depuis ${totalFiles} fichier(s)`);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement';
@@ -127,7 +121,35 @@ export default function ImportPage() {
             </CardContent>
           </Card>
 
-          {/* Progression */}
+          {/* Statut détaillé des fichiers */}
+          {fileStatuses.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Détail du traitement</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {fileStatuses.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between p-2 rounded-md bg-gray-50 border text-xs">
+                    <div className="flex items-center gap-2">
+                      {file.status === 'processing' ? <Loader2 className="h-3 w-3 animate-spin text-blue-500" /> :
+                       file.status === 'success' ? <CheckCircle className="h-3 w-3 text-green-500" /> :
+                       file.status === 'error' ? <XCircle className="h-3 w-3 text-red-500" /> :
+                       <div className="h-3 w-3 rounded-full bg-gray-200" />}
+                      <span className="font-medium truncate max-w-[200px]">{file.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {file.status === 'success' && <span className="text-green-600 font-bold">{file.count} créances</span>}
+                      {file.status === 'error' && <span className="text-red-500 italic">{file.error}</span>}
+                      {file.status === 'processing' && <span className="text-blue-500">Extraction...</span>}
+                      {file.status === 'pending' && <span className="text-gray-400">En attente</span>}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Progression globale */}
           {isProcessing && (
             <Card className="border-blue-200 bg-blue-50">
               <CardContent className="p-6">
