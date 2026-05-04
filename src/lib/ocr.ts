@@ -294,7 +294,7 @@ export class OCRService {
         // Si aucun client détecté, utiliser un placeholder mais continuer à chercher
         const activeClient = currentClient || { code: '0000', name: 'CLIENT NON IDENTIFIÉ' };
         try {
-          const debtData = this.parseDataRow(line, activeClient, fileName, id++);
+          const debtData = this.parseDataRow(line, activeClient, fileName);
           if (debtData) debts.push(debtData);
         } catch (err) {
           // Ignorer les erreurs de parsing silencieusement
@@ -336,8 +336,7 @@ export class OCRService {
   private static parseDataRow(
     line: string,
     client: { code: string; name: string; phone?: string },
-    fileName: string,
-    id: number
+    fileName: string
   ): ClientDebt | null {
 
     // --- STRATÉGIE "ENTITIES 2.0" ---
@@ -401,7 +400,7 @@ export class OCRService {
     const age = ageToken ? parseInt(ageToken) : 0;
     const paymentDays = 0;
 
-    return this.constructDebtObject(id, client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
+    return this.constructDebtObject(client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
       montant: m,
       reglement: r,
       solde: s,
@@ -410,7 +409,6 @@ export class OCRService {
   }
 
   private static constructDebtObject(
-    id: number,
     client: { code: string; name: string; phone?: string },
     fileName: string,
     dueDate: string,
