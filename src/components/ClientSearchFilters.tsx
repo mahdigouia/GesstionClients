@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, ChangeEvent } from 'react';
+import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,28 +18,11 @@ import {
   Clock,
   Building2,
   SortAsc,
-  SortDesc
+  SortDesc,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
-
-interface FilterState {
-  searchTerm: string;
-  clientCode: string;
-  phone: string;
-  documentNumber: string;
-  commercial: string;
-  docType: string;
-  minAmount: string;
-  maxAmount: string;
-  minAge: string;
-  maxAge: string;
-  riskLevels: string[];
-  retainedFilter: 'off' | 'include' | 'exclude';
-  partialFilter: 'off' | 'include' | 'exclude';
-  contentieuxFilter: 'off' | 'include' | 'exclude';
-  sortBy: 'name' | 'amount' | 'age' | 'balance';
-  sortOrder: 'asc' | 'desc';
-}
 
 interface ClientSearchFiltersProps {
   debts: ClientDebt[];
@@ -107,109 +90,113 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
     });
   };
 
-  const activeFiltersCount = [
-    filters.searchTerm,
-    filters.clientCode,
-    filters.phone,
-    filters.documentNumber,
-    filters.commercial,
-    filters.docType,
-    filters.minAmount,
-    filters.maxAmount,
-    filters.minAge,
-    filters.maxAge
-  ].filter(Boolean).length + filters.riskLevels.length +
-    (filters.retainedFilter !== 'off' ? 1 : 0) +
-    (filters.partialFilter !== 'off' ? 1 : 0) +
-    (filters.contentieuxFilter !== 'off' ? 1 : 0);
+  // Pre-calculate counts for labels
+  const contentieuxCount = useMemo(() => 
+    debts.filter(d => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0).length
+  , [debts]);
 
-  const quickFilters = [
-    { label: 'Tous', count: debts.length, risk: null },
-    { label: 'Critiques', count: debts.filter(d => d.riskLevel === 'critical').length, risk: 'critical', color: 'bg-red-100 text-red-800' },
-    { label: 'En retard', count: debts.filter(d => d.riskLevel === 'overdue').length, risk: 'overdue', color: 'bg-orange-100 text-orange-800' },
-    { label: 'À surveiller', count: debts.filter(d => d.riskLevel === 'monitoring').length, risk: 'monitoring', color: 'bg-yellow-100 text-yellow-800' },
-    { label: 'Sains', count: debts.filter(d => d.riskLevel === 'healthy').length, risk: 'healthy', color: 'bg-green-100 text-green-800' }
-  ];
+  const retainedCount = useMemo(() => 
+    debts.filter(d => {
+      const upper = (d.documentNumber || '').toUpperCase();
+      if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+      const b = Number(d.balance || 0);
+      const a = Number(d.amount || 0);
+      if (b <= 0 || a <= 0) return false;
+      const ratio = (b / a) * 100;
+      return ratio >= 0.5 && ratio <= 1.5;
+    }).length
+  , [debts]);
+
+  const partialCount = useMemo(() => 
+    debts.filter(d => {
+      const upper = (d.documentNumber || '').toUpperCase();
+      if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+      const b = Number(d.balance || 0);
+      const a = Number(d.amount || 0);
+      if (b <= 0 || a <= 0) return false;
+      const ratio = (b / a) * 100;
+      return ratio > 1.5 && ratio < 99;
+    }).length
+  , [debts]);
+
+  const activeFiltersCount = [
+    filters.clientCode, filters.phone, filters.documentNumber, filters.commercial,
+    filters.docType, filters.minAmount, filters.maxAmount, filters.minAge, filters.maxAge,
+    filters.riskLevels.length > 0 ? 'yes' : ''
+  ].filter(Boolean).length;
 
   return (
-    <Card className="mb-6">
+    <Card className="mb-4 border-b border-gray-100 shadow-none bg-transparent">
       <CardContent className="p-4 space-y-4">
-        {/* Quick Stats & Filters - Garder uniquement les badges de risque */}
-        <div className="flex flex-wrap gap-2">
-          {quickFilters.map((filter) => (
-            <Button
-              key={filter.label}
-              variant={filter.risk && filters.riskLevels.includes(filter.risk) ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => filter.risk && toggleRiskLevel(filter.risk)}
-              className={`h-8 ${filter.risk && filters.riskLevels.includes(filter.risk) && filter.color ? filter.color : ''}`}
-            >
-              {filter.label}
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {filter.count}
-              </Badge>
-            </Button>
-          ))}
+        {/* Global Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Input
+            placeholder="Recherche globale (nom, code, pièce, commercial...)"
+            value={filters.searchTerm}
+            onChange={(e) => updateFilter('searchTerm', e.target.value)}
+            className="pl-10 h-12 text-lg shadow-sm"
+          />
         </div>
 
-        {/* Tristate Filters - Toujours visibles pour accessibilité directe */}
+        {/* Tristate Filters - Toujours visibles */}
         <div className="flex flex-wrap gap-2 items-center pt-2 border-t border-gray-100">
+          {/* Contentieux Filter */}
           <Badge
-            variant="outline"
-            className={`cursor-pointer transition-all ${
-              filters.contentieuxFilter === 'include'
-                ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
-                : filters.contentieuxFilter === 'exclude'
-                ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+            variant={filters.contentieuxFilter === 'off' ? 'secondary' : filters.contentieuxFilter === 'include' ? 'default' : 'destructive'}
+            className={`cursor-pointer h-8 gap-2 px-3 text-xs font-bold transition-all ${
+              filters.contentieuxFilter === 'include' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+              filters.contentieuxFilter === 'exclude' ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
             onClick={() => cycleTristate('contentieuxFilter')}
           >
-            ⚖️ Contentieux {filters.contentieuxFilter === 'include' ? '✓' : filters.contentieuxFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0).length})
+            {filters.contentieuxFilter === 'off' ? (
+              <>⚖️ Contentieux ({contentieuxCount})</>
+            ) : filters.contentieuxFilter === 'include' ? (
+              <><CheckCircle2 className="h-4 w-4" /> Contentieux ({contentieuxCount})</>
+            ) : (
+              <><XCircle className="h-4 w-4" /> Non Contentieux ({debts.length - contentieuxCount})</>
+            )}
           </Badge>
+
+          {/* Retained Filter */}
           <Badge
-            variant="outline"
-            className={`cursor-pointer transition-all ${
-              filters.retainedFilter === 'include'
-                ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
-                : filters.retainedFilter === 'exclude'
-                ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+            variant={filters.retainedFilter === 'off' ? 'secondary' : filters.retainedFilter === 'include' ? 'default' : 'destructive'}
+            className={`cursor-pointer h-8 gap-2 px-3 text-xs font-bold transition-all ${
+              filters.retainedFilter === 'include' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+              filters.retainedFilter === 'exclude' ? 'bg-red-500 hover:bg-red-600' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
             }`}
             onClick={() => cycleTristate('retainedFilter')}
           >
-            🛡️ Retenue {filters.retainedFilter === 'include' ? '✓' : filters.retainedFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
-              const upper = (d.documentNumber || '').toUpperCase();
-              if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-              if (Number(d.balance || 0) <= 0) return false;
-              if (Number(d.amount || 0) <= 0) return false;
-              const ratio = (Number(d.balance) / Number(d.amount)) * 100;
-              return ratio >= 0.5 && ratio <= 1.5;
-            }).length})
+            {filters.retainedFilter === 'off' ? (
+              <>🛡️ Retenue ({retainedCount})</>
+            ) : filters.retainedFilter === 'include' ? (
+              <><CheckCircle2 className="h-4 w-4" /> Retenue ({retainedCount})</>
+            ) : (
+              <><XCircle className="h-4 w-4" /> Hors Retenue ({debts.length - retainedCount})</>
+            )}
           </Badge>
+
+          {/* Partial Filter */}
           <Badge
-            variant="outline"
-            className={`cursor-pointer transition-all ${
-              filters.partialFilter === 'include'
-                ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
-                : filters.partialFilter === 'exclude'
-                ? 'bg-red-600 text-white hover:bg-red-700 border-red-600'
-                : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+            variant={filters.partialFilter === 'off' ? 'secondary' : filters.partialFilter === 'include' ? 'default' : 'destructive'}
+            className={`cursor-pointer h-8 gap-2 px-3 text-xs font-bold transition-all ${
+              filters.partialFilter === 'include' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+              filters.partialFilter === 'exclude' ? 'bg-red-500 hover:bg-red-600' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
             }`}
             onClick={() => cycleTristate('partialFilter')}
           >
-            💳 Partiel {filters.partialFilter === 'include' ? '✓' : filters.partialFilter === 'exclude' ? '✗' : ''} ({debts.filter(d => {
-              const upper = (d.documentNumber || '').toUpperCase();
-              if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-              if (Number(d.balance || 0) <= 0) return false;
-              if (Number(d.amount || 0) <= 0) return false;
-              const ratio = (Number(d.balance) / Number(d.amount)) * 100;
-              return ratio > 1.5 && ratio < 99;
-            }).length})
+            {filters.partialFilter === 'off' ? (
+              <>💳 Partiel ({partialCount})</>
+            ) : filters.partialFilter === 'include' ? (
+              <><CheckCircle2 className="h-4 w-4" /> Partiel ({partialCount})</>
+            ) : (
+              <><XCircle className="h-4 w-4" /> Hors Partiel ({debts.length - partialCount})</>
+            )}
           </Badge>
         </div>
 
-        {/* Filtres avancés toggle uniquement - sans recherche principale */}
+        {/* Advanced Toggle */}
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -223,19 +210,18 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
             )}
             {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
-          {activeFiltersCount > 0 && (
+          {(activeFiltersCount > 0 || filters.searchTerm) && (
             <Button variant="ghost" onClick={clearAllFilters} className="gap-2">
               <X className="h-4 w-4" />
-              Effacer
+              Effacer tout
             </Button>
           )}
         </div>
 
-        {/* Advanced Filters */}
+        {/* Advanced Filters Panel */}
         {showAdvanced && (
           <div className="border-t pt-4 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Client Code */}
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -245,8 +231,6 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   className="pl-10"
                 />
               </div>
-
-              {/* Phone */}
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -256,8 +240,6 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   className="pl-10"
                 />
               </div>
-
-              {/* Document Number */}
               <div className="relative">
                 <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -267,46 +249,36 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   className="pl-10"
                 />
               </div>
-
-              {/* Commercial */}
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <select
+                  className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm appearance-none"
                   value={filters.commercial}
                   onChange={(e) => updateFilter('commercial', e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 rounded-md border border-input bg-background text-sm"
                 >
                   <option value="">Tous les commerciaux</option>
-                  {commercials.map(com => (
-                    <option key={com} value={com}>{com}</option>
-                  ))}
+                  {commercials.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-
-              {/* Document Type */}
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <select
-                  value={filters.docType}
-                  onChange={(e) => updateFilter('docType', e.target.value)}
-                  className="w-full h-10 pl-10 pr-3 rounded-md border border-input bg-background text-sm"
-                >
-                  <option value="">Tous les types</option>
-                  {docTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Amount Range */}
+              <div className="relative">
+                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <select
+                  className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm appearance-none"
+                  value={filters.docType}
+                  onChange={(e) => updateFilter('docType', e.target.value)}
+                >
+                  <option value="">Tous les types</option>
+                  {docTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Solde min"
+                    placeholder="Min"
                     type="number"
                     value={filters.minAmount}
                     onChange={(e) => updateFilter('minAmount', e.target.value)}
@@ -316,7 +288,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                 <div className="relative flex-1">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Solde max"
+                    placeholder="Max"
                     type="number"
                     value={filters.maxAmount}
                     onChange={(e) => updateFilter('maxAmount', e.target.value)}
@@ -324,13 +296,11 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   />
                 </div>
               </div>
-
-              {/* Age Range */}
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Âge min (jours)"
+                    placeholder="Âge min"
                     type="number"
                     value={filters.minAge}
                     onChange={(e) => updateFilter('minAge', e.target.value)}
@@ -340,7 +310,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                 <div className="relative flex-1">
                   <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Âge max (jours)"
+                    placeholder="Âge max"
                     type="number"
                     value={filters.maxAge}
                     onChange={(e) => updateFilter('maxAge', e.target.value)}
@@ -348,8 +318,6 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   />
                 </div>
               </div>
-
-              {/* Sort */}
               <div className="flex gap-2">
                 <select
                   value={filters.sortBy}
@@ -371,41 +339,21 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
               </div>
             </div>
 
-            {/* Risk Level Badges */}
             <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-sm text-gray-500">Niveaux de risque:</span>
+              <span className="text-sm text-gray-500">Risque:</span>
               {['healthy', 'monitoring', 'overdue', 'critical'].map((risk) => (
                 <Badge
                   key={risk}
                   variant={filters.riskLevels.includes(risk) ? 'default' : 'outline'}
-                  className={`cursor-pointer ${
-                    risk === 'healthy' ? 'bg-green-100 text-green-800 hover:bg-green-200' :
-                    risk === 'monitoring' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' :
-                    risk === 'overdue' ? 'bg-orange-100 text-orange-800 hover:bg-orange-200' :
-                    'bg-red-100 text-red-800 hover:bg-red-200'
-                  }`}
+                  className="cursor-pointer"
                   onClick={() => toggleRiskLevel(risk)}
                 >
-                  {risk === 'healthy' ? 'Sain' :
-                   risk === 'monitoring' ? 'Surveillance' :
-                   risk === 'overdue' ? 'En retard' : 'Critique'}
+                  {risk === 'healthy' ? 'Sain' : risk === 'monitoring' ? 'Surv.' : risk === 'overdue' ? 'Retard' : 'Critique'}
                 </Badge>
               ))}
             </div>
           </div>
         )}
-
-        {/* Results count */}
-        <div className="flex justify-between items-center text-sm text-gray-500 border-t pt-2">
-          <span>
-            {/* Note: In controlled mode, we use the debts count passed from parent if needed, 
-                but usually DebtTable shows its own count. Keeping it simple here. */}
-            Filtres actifs
-          </span>
-          <span>
-            Détail des créances
-          </span>
-        </div>
       </CardContent>
     </Card>
   );
