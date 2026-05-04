@@ -43,29 +43,12 @@ interface FilterState {
 
 interface ClientSearchFiltersProps {
   debts: ClientDebt[];
-  onFilterChange: (filteredDebts: ClientDebt[]) => void;
+  filters: any;
+  onFiltersChange: (filters: any) => void;
 }
 
-export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFiltersProps) {
+export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientSearchFiltersProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [filters, setFilters] = useState<FilterState>({
-    searchTerm: '',
-    clientCode: '',
-    phone: '',
-    documentNumber: '',
-    commercial: '',
-    docType: '',
-    minAmount: '',
-    maxAmount: '',
-    minAge: '',
-    maxAge: '',
-    riskLevels: [],
-    retainedFilter: 'off',
-    partialFilter: 'off',
-    contentieuxFilter: 'off',
-    sortBy: 'name',
-    sortOrder: 'asc'
-  });
 
   // Extract unique commercials for dropdown
   const commercials = useMemo(() => {
@@ -86,156 +69,25 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
     return Array.from(uniqueTypes).sort();
   }, [debts]);
 
-  // Apply filters
-  const filteredDebts = useMemo(() => {
-    // Helpers for specific business rules
-    const checkContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
-    
-    const checkRetained = (d: ClientDebt) => {
-      const upper = (d.documentNumber || '').toUpperCase();
-      if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-      const b = Number(d.balance || 0);
-      const a = Number(d.amount || 0);
-      if (b <= 0 || a <= 0) return false;
-      const ratio = (b / a) * 100;
-      return ratio >= 0.5 && ratio <= 1.5;
-    };
-
-    const checkPartial = (d: ClientDebt) => {
-      const upper = (d.documentNumber || '').toUpperCase();
-      if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-      const b = Number(d.balance || 0);
-      const a = Number(d.amount || 0);
-      if (b <= 0 || a <= 0) return false;
-      const ratio = (b / a) * 100;
-      return ratio > 1.5 && ratio < 99;
-    };
-
-    let result = debts.filter(debt => {
-      // Text search
-      const searchLower = filters.searchTerm.toLowerCase();
-      if (filters.searchTerm) {
-        const inName = (debt.clientName || '').toLowerCase().includes(searchLower);
-        const inCode = (debt.clientCode || '').toLowerCase().includes(searchLower);
-        const inDoc = (debt.documentNumber || '').toLowerCase().includes(searchLower);
-        const inComm = (debt.commercialName || '').toLowerCase().includes(searchLower);
-        if (!inName && !inCode && !inDoc && !inComm) return false;
-      }
-
-      // Specific field filters
-      if (filters.clientCode && !(debt.clientCode || '').toLowerCase().includes(filters.clientCode.toLowerCase())) return false;
-      if (filters.phone && !(debt.clientPhone || '').includes(filters.phone)) return false;
-      if (filters.documentNumber && !(debt.documentNumber || '').toLowerCase().includes(filters.documentNumber.toLowerCase())) return false;
-      if (filters.commercial && debt.commercialName !== filters.commercial) return false;
-      if (filters.docType && !(debt.documentNumber || '').toUpperCase().startsWith(filters.docType)) return false;
-
-      // Numeric filters
-      const balance = Number(debt.balance || 0);
-      const age = Number(debt.age || 0);
-      
-      if (filters.minAmount && balance < parseFloat(filters.minAmount)) return false;
-      if (filters.maxAmount && balance > parseFloat(filters.maxAmount)) return false;
-      if (filters.minAge && age < parseInt(filters.minAge)) return false;
-      if (filters.maxAge && age > parseInt(filters.maxAge)) return false;
-
-      // Risk level filter
-      if (filters.riskLevels.length > 0 && !filters.riskLevels.includes(debt.riskLevel)) return false;
-
-      // Tristate: Contentieux
-      if (filters.contentieuxFilter !== 'off') {
-        const isC = checkContentieux(debt);
-        if (filters.contentieuxFilter === 'include' && !isC) return false;
-        if (filters.contentieuxFilter === 'exclude' && isC) return false;
-      }
-
-      // Tristate: Retained
-      if (filters.retainedFilter !== 'off') {
-        const isR = checkRetained(debt);
-        if (filters.retainedFilter === 'include' && !isR) return false;
-        if (filters.retainedFilter === 'exclude' && isR) return false;
-      }
-
-      // Tristate: Partial
-      if (filters.partialFilter !== 'off') {
-        const isP = checkPartial(debt);
-        if (filters.partialFilter === 'include' && !isP) return false;
-        if (filters.partialFilter === 'exclude' && isP) return false;
-      }
-
-      return true;
-    });
-
-    // Sort with search relevance priority
-    result.sort((a, b) => {
-      // If search term is active, prioritize exact field matches
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase();
-        const getPriority = (debt: ClientDebt) => {
-          if (debt.commercialName?.toLowerCase() === searchLower) return 0;
-          if (debt.clientName?.toLowerCase() === searchLower) return 1;
-          if (debt.clientCode?.toLowerCase() === searchLower) return 2;
-          if (debt.documentNumber?.toLowerCase() === searchLower) return 3;
-          if (debt.sourceFile?.toLowerCase() === searchLower) return 4;
-          if (debt.commercialName?.toLowerCase().startsWith(searchLower)) return 10;
-          if (debt.clientName?.toLowerCase().startsWith(searchLower)) return 11;
-          if (debt.clientCode?.toLowerCase().startsWith(searchLower)) return 12;
-          if (debt.documentNumber?.toLowerCase().startsWith(searchLower)) return 13;
-          if (debt.sourceFile?.toLowerCase().startsWith(searchLower)) return 14;
-          return 100;
-        };
-        const priorityDiff = getPriority(a) - getPriority(b);
-        if (priorityDiff !== 0) return priorityDiff;
-      }
-
-      let comparison = 0;
-      switch (filters.sortBy) {
-        case 'name':
-          comparison = (a.clientName || '').localeCompare(b.clientName || '');
-          break;
-        case 'amount':
-          comparison = a.amount - b.amount;
-          break;
-        case 'age':
-          comparison = a.age - b.age;
-          break;
-        case 'balance':
-          comparison = a.balance - b.balance;
-          break;
-      }
-      return filters.sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-    return result;
-  }, [debts, filters]);
-
-  // Notify parent of filter changes
-  useEffect(() => {
-    onFilterChange(filteredDebts);
-  }, [filteredDebts, onFilterChange]);
-
-  const updateFilter = <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
-    setFilters((prev: FilterState) => ({ ...prev, [key]: value }));
+  const updateFilter = (key: string, value: any) => {
+    onFiltersChange({ ...filters, [key]: value });
   };
 
   const toggleRiskLevel = (risk: string) => {
-    setFilters((prev: FilterState) => ({
-      ...prev,
-      riskLevels: prev.riskLevels.includes(risk)
-        ? prev.riskLevels.filter((r: string) => r !== risk)
-        : [...prev.riskLevels, risk]
-    }));
+    const nextRiskLevels = filters.riskLevels.includes(risk)
+      ? filters.riskLevels.filter((r: string) => r !== risk)
+      : [...filters.riskLevels, risk];
+    onFiltersChange({ ...filters, riskLevels: nextRiskLevels });
   };
 
   const cycleTristate = (field: 'retainedFilter' | 'partialFilter' | 'contentieuxFilter') => {
-    setFilters(prev => {
-      const current = prev[field];
-      const next = current === 'off' ? 'include' : current === 'include' ? 'exclude' : 'off';
-      return { ...prev, [field]: next };
-    });
+    const current = filters[field];
+    const next = current === 'off' ? 'include' : current === 'include' ? 'exclude' : 'off';
+    onFiltersChange({ ...filters, [field]: next });
   };
 
   const clearAllFilters = () => {
-    setFilters({
+    onFiltersChange({
       searchTerm: '',
       clientCode: '',
       phone: '',
@@ -546,10 +398,12 @@ export function ClientSearchFilters({ debts, onFilterChange }: ClientSearchFilte
         {/* Results count */}
         <div className="flex justify-between items-center text-sm text-gray-500 border-t pt-2">
           <span>
-            <strong>{filteredDebts.length}</strong> créance{filteredDebts.length !== 1 ? 's' : ''} trouvée{filteredDebts.length !== 1 ? 's' : ''}
+            {/* Note: In controlled mode, we use the debts count passed from parent if needed, 
+                but usually DebtTable shows its own count. Keeping it simple here. */}
+            Filtres actifs
           </span>
           <span>
-            Solde total: <strong className="text-red-600">{filteredDebts.reduce((sum, d) => sum + d.balance, 0).toFixed(2)} TND</strong>
+            Détail des créances
           </span>
         </div>
       </CardContent>

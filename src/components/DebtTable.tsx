@@ -25,31 +25,125 @@ interface DebtTableProps {
   onQuickAction?: (clientName: string) => void;
 }
 
-export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
-  const [advancedFilteredDebts, setAdvancedFilteredDebts] = useState<ClientDebt[]>(debts);
+export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: DebtTableProps) {
+  // State for all filters moved here for single source of truth
+  const [filters, setFilters] = useState({
+    searchTerm: '',
+    clientCode: '',
+    phone: '',
+    documentNumber: '',
+    commercial: '',
+    docType: '',
+    minAmount: '',
+    maxAmount: '',
+    minAge: '',
+    maxAge: '',
+    riskLevels: [] as string[],
+    sortBy: 'age',
+    sortOrder: 'desc' as 'asc' | 'desc',
+    contentieuxFilter: 'off' as 'off' | 'include' | 'exclude',
+    retainedFilter: 'off' as 'off' | 'include' | 'exclude',
+    partialFilter: 'off' as 'off' | 'include' | 'exclude',
+  });
+
   const [selectedClient, setSelectedClient] = useState<string>('');
   const [clientSearchValue, setClientSearchValue] = useState<string>('');
-  const prevDebtsLengthRef = useRef(debts.length);
+  
+  // Helpers for specific business rules
+  const checkContentieux = useCallback((d: ClientDebt) => 
+    Number(d.age || 0) > 365 && Number(d.balance || 0) > 0, []);
+  
+  const checkRetained = useCallback((d: ClientDebt) => {
+    const upper = (d.documentNumber || '').toUpperCase();
+    if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+    const b = Number(d.balance || 0);
+    const a = Number(d.amount || 0);
+    if (b <= 0 || a <= 0) return false;
+    const ratio = (b / a) * 100;
+    return ratio >= 0.5 && ratio <= 1.5;
+  }, []);
 
-  // Update when parent debts change (only reset if necessary or let ClientSearchFilters handle it)
-  useEffect(() => {
-    // If the entire debts array changed (e.g. new import), we might want to reset.
-    // But ClientSearchFilters already re-renders and calls onFilterChange when debts prop changes.
-    // So we don't need to manually setAdvancedFilteredDebts(debts) here as it competes with the filter.
-    if (prevDebtsLengthRef.current !== debts.length) {
-      setSelectedClient('');
-      setClientSearchValue('');
-      prevDebtsLengthRef.current = debts.length;
-    }
-  }, [debts]);
+  const checkPartial = useCallback((d: ClientDebt) => {
+    const upper = (d.documentNumber || '').toUpperCase();
+    if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
+    const b = Number(d.balance || 0);
+    const a = Number(d.amount || 0);
+    if (b <= 0 || a <= 0) return false;
+    const ratio = (b / a) * 100;
+    return ratio > 1.5 && ratio < 99;
+  }, []);
 
-  // Final filtered debts = advanced filters + client selection
+  // Main filtering logic - THE SINGLE SOURCE OF TRUTH
   const filteredDebts = useMemo(() => {
-    if (!selectedClient) return advancedFilteredDebts;
-    return advancedFilteredDebts.filter(d => 
-      (d.clientName || '').toLowerCase() === selectedClient.toLowerCase()
-    );
-  }, [advancedFilteredDebts, selectedClient]);
+    let result = debts.filter(debt => {
+      // 1. Text Search (Global)
+      if (filters.searchTerm) {
+        const s = filters.searchTerm.toLowerCase();
+        const match = 
+          (debt.clientName || '').toLowerCase().includes(s) ||
+          (debt.clientCode || '').toLowerCase().includes(s) ||
+          (debt.documentNumber || '').toLowerCase().includes(s) ||
+          (debt.commercialName || '').toLowerCase().includes(s);
+        if (!match) return false;
+      }
+
+      // 2. Client Autocomplete Filter
+      if (selectedClient) {
+        if ((debt.clientName || '').toLowerCase() !== selectedClient.toLowerCase()) return false;
+      }
+
+      // 3. Field Specific Filters
+      if (filters.clientCode && !(debt.clientCode || '').toLowerCase().includes(filters.clientCode.toLowerCase())) return false;
+      if (filters.phone && !(debt.clientPhone || '').includes(filters.phone)) return false;
+      if (filters.documentNumber && !(debt.documentNumber || '').toLowerCase().includes(filters.documentNumber.toLowerCase())) return false;
+      if (filters.commercial && debt.commercialName !== filters.commercial) return false;
+      if (filters.docType && !(debt.documentNumber || '').toUpperCase().startsWith(filters.docType)) return false;
+
+      // 4. Numeric Filters
+      const balance = Number(debt.balance || 0);
+      const age = Number(debt.age || 0);
+      if (filters.minAmount && balance < parseFloat(filters.minAmount)) return false;
+      if (filters.maxAmount && balance > parseFloat(filters.maxAmount)) return false;
+      if (filters.minAge && age < parseInt(filters.minAge)) return false;
+      if (filters.maxAge && age > parseInt(filters.maxAge)) return false;
+
+      // 5. Risk Level
+      if (filters.riskLevels.length > 0 && !filters.riskLevels.includes(debt.riskLevel)) return false;
+
+      // 6. Tristate Filters - STRICT RULES
+      if (filters.contentieuxFilter !== 'off') {
+        const isC = checkContentieux(debt);
+        if (filters.contentieuxFilter === 'include' && !isC) return false;
+        if (filters.contentieuxFilter === 'exclude' && isC) return false;
+      }
+      if (filters.retainedFilter !== 'off') {
+        const isR = checkRetained(debt);
+        if (filters.retainedFilter === 'include' && !isR) return false;
+        if (filters.retainedFilter === 'exclude' && isR) return false;
+      }
+      if (filters.partialFilter !== 'off') {
+        const isP = checkPartial(debt);
+        if (filters.partialFilter === 'include' && !isP) return false;
+        if (filters.partialFilter === 'exclude' && isP) return false;
+      }
+
+      return true;
+    });
+
+    // Sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      switch (filters.sortBy) {
+        case 'name': comparison = (a.clientName || '').localeCompare(b.clientName || ''); break;
+        case 'amount': comparison = Number(a.amount || 0) - Number(b.amount || 0); break;
+        case 'age': comparison = Number(a.age || 0) - Number(b.age || 0); break;
+        case 'balance': comparison = Number(a.balance || 0) - Number(b.balance || 0); break;
+      }
+      return filters.sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [debts, filters, selectedClient, checkContentieux, checkRetained, checkPartial]);
 
   const handleClientSelect = useCallback((value: string) => {
     // Check if the selected value is an actual client name
@@ -87,7 +181,11 @@ export function DebtTable({ debts, onExport, onClientClick }: DebtTableProps) {
 
   return (
     <Card>
-      <ClientSearchFilters debts={debts} onFilterChange={setAdvancedFilteredDebts} />
+      <ClientSearchFilters 
+        debts={debts} 
+        filters={filters} 
+        onFiltersChange={setFilters} 
+      />
       
       <CardHeader>
         <div className="flex justify-between items-center">
