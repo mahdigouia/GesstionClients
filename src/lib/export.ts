@@ -577,7 +577,7 @@ Source: ${debt.sourceFile}
   }
 
   // Générer rapport Word avec analyse IA
-  static async generateWordReportWithAI(debts: ClientDebt[]): Promise<void> {
+  static async generateWordReportWithAI(debts: ClientDebt[], analysis?: AnalysisResult): Promise<void> {
     const reportDate = new Date().toLocaleDateString('fr-FR', {
       weekday: 'long',
       year: 'numeric',
@@ -585,13 +585,15 @@ Source: ${debt.sourceFile}
       day: 'numeric'
     });
     
-    // Trier par risque (critique d'abord)
-    const sortedDebts = [...debts].sort((a, b) => {
-      const riskOrder = { critical: 0, overdue: 1, monitoring: 2, healthy: 3 };
-      return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
-    });
-    
-    const criticalDebts = sortedDebts.filter(d => d.riskLevel === 'critical');
+    // Groupes par température de recouvrement
+    const zoneVerte = debts.filter(d => d.age < 30 && !d.isContentieux);
+    const zoneOrange = debts.filter(d => d.age >= 30 && d.age <= 90 && !d.isContentieux);
+    const zoneRouge = debts.filter(d => d.age > 90 || d.isContentieux);
+
+    // Calcul des totaux par zone
+    const totalVerte = zoneVerte.reduce((sum, d) => sum + d.balance, 0);
+    const totalOrange = zoneOrange.reduce((sum, d) => sum + d.balance, 0);
+    const totalRouge = zoneRouge.reduce((sum, d) => sum + d.balance, 0);
     
     // Créer le document
     const doc = new Document({
@@ -600,7 +602,7 @@ Source: ${debt.sourceFile}
         children: [
           // Titre
           new Paragraph({
-            text: 'RAPPORT D\'ANALYSE DES CRÉANCES',
+            text: 'RAPPORT STRATÉGIQUE D\'AUDIT DES CRÉANCES',
             heading: HeadingLevel.TITLE,
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 }
@@ -613,110 +615,146 @@ Source: ${debt.sourceFile}
             spacing: { after: 600 }
           }),
           
-          // Synthèse globale avec IA
+          // 1. Synthèse globale
           new Paragraph({
-            text: '1. SYNTHÈSE GLOBALE',
+            text: '1. SYNTHÈSE GLOBALE ET PERFORMANCE',
             heading: HeadingLevel.HEADING_1,
             spacing: { before: 400, after: 200 }
           }),
-          ...this.generateGlobalInsights(debts).split('\n\n').map(para => 
+          
+          new Paragraph({
+            children: [
+              new TextRun({ text: 'État de la Trésorerie : ', bold: true }),
+              new TextRun({ text: `${(totalVerte + totalOrange + totalRouge).toLocaleString('fr-FR')} TND en attente de recouvrement.\n` }),
+            ],
+            spacing: { after: 200 }
+          }),
+
+          // Point 5: Comparaison Performance (Simulée ou basée sur analysis si présent)
+          ...(analysis ? [
             new Paragraph({
-              children: [new TextRun({ text: para, size: 22 })],
+              text: 'Indicateurs de Performance :',
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 200, after: 100 }
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `• Taux de Recouvrement Global : `, bold: true }),
+                new TextRun({ text: `${analysis.recoveryRate.toFixed(1)}%\n` }),
+                new TextRun({ text: `• Taux de Recouvrement (Hors Contentieux) : `, bold: true }),
+                new TextRun({ text: `${analysis.recoveryRateNoContentieux.toFixed(1)}%\n` }),
+                new TextRun({ text: `• Nombre de clients audités : `, bold: true }),
+                new TextRun({ text: `${analysis.clientBreakdown.length}\n` }),
+              ],
               spacing: { after: 200 }
             })
-          ),
-          
-          // Analyse par document
+          ] : []),
+
+          // Point 3: Température de Recouvrement
           new Paragraph({
-            text: '2. ANALYSE DÉTAILLÉE PAR DOCUMENT',
+            text: '2. TEMPÉRATURE DE RECOUVREMENT (ZONAGE)',
+            heading: HeadingLevel.HEADING_1,
+            spacing: { before: 400, after: 200 }
+          }),
+
+          // Zone Rouge
+          new Paragraph({
+            text: '🔴 ZONE ROUGE : RISQUES ÉLEVÉS ET CONTENTIEUX',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 }
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Montant Total : `, bold: true }),
+              new TextRun({ text: `${totalRouge.toLocaleString('fr-FR')} TND\n`, color: 'FF0000', bold: true }),
+              new TextRun({ text: `Impact : Créances de plus de 90 jours ou en statut contentieux. Nécessite une intervention immédiate, voire juridique.` }),
+            ],
+            spacing: { after: 200 }
+          }),
+
+          // Zone Orange
+          new Paragraph({
+            text: '🟠 ZONE ORANGE : ALERTES ET SURVEILLANCE',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 }
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Montant Total : `, bold: true }),
+              new TextRun({ text: `${totalOrange.toLocaleString('fr-FR')} TND\n`, color: 'FF8C00', bold: true }),
+              new TextRun({ text: `Impact : Créances entre 30 et 90 jours. Risque de bascule vers le contentieux si non traitées rapidement.` }),
+            ],
+            spacing: { after: 200 }
+          }),
+
+          // Zone Verte
+          new Paragraph({
+            text: '🟢 ZONE VERTE : FLUX DE TRÉSORERIE SAIN',
+            heading: HeadingLevel.HEADING_2,
+            spacing: { before: 200, after: 100 }
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: `Montant Total : `, bold: true }),
+              new TextRun({ text: `${totalVerte.toLocaleString('fr-FR')} TND\n`, color: '008000', bold: true }),
+              new TextRun({ text: `Impact : Créances récentes (< 30 jours). Flux normal à sécuriser pour maintenir la liquidité.` }),
+            ],
+            spacing: { after: 200 }
+          }),
+          
+          // Analyse par document (Top 15 critiques)
+          new Paragraph({
+            text: '3. ANALYSE DÉTAILLÉE DES PRIORITÉS',
             heading: HeadingLevel.HEADING_1,
             spacing: { before: 600, after: 200 }
           }),
           
-          // Documents critiques
-          ...(criticalDebts.length > 0 ? [
+          ...zoneRouge.slice(0, 15).flatMap((debt, index) => [
             new Paragraph({
-              text: '2.1 DOCUMENTS À RISQUE CRITIQUE',
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 }
+              text: `Priorité ${index + 1} : ${debt.clientName} (${debt.documentNumber})`,
+              heading: HeadingLevel.HEADING_3,
+              spacing: { before: 300, after: 100 }
             }),
-            ...criticalDebts.flatMap((debt, index) => [
-              new Paragraph({
-                text: `Document ${index + 1} : ${debt.documentNumber}`,
-                heading: HeadingLevel.HEADING_3,
-                spacing: { before: 300, after: 100 }
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({ text: 'Client : ', bold: true }),
-                  new TextRun({ text: `${debt.clientName} (${debt.clientCode})\n` }),
-                  new TextRun({ text: 'Solde : ', bold: true }),
-                  new TextRun({ text: `${debt.balance.toFixed(2)} TND\n` }),
-                  new TextRun({ text: 'Âge : ', bold: true }),
-                  new TextRun({ text: `${debt.age} jours\n` }),
-                  new TextRun({ text: 'Contentieux : ', bold: true }),
-                  new TextRun({ text: `${debt.isContentieux ? 'Oui' : 'Non'}\n\n` }),
-                ],
-                spacing: { after: 100 }
-              }),
-              new Paragraph({
-                text: 'Analyse IA :',
-                spacing: { before: 100, after: 100 },
-                border: { bottom: { color: 'CCCCCC', size: 1, style: 'single' } }
-              }),
-              new Paragraph({
-                text: this.generateAIAnalysis(debt),
-                spacing: { after: 300 },
-                shading: { fill: 'F5F5F5' }
-              })
-            ])
-          ] : [new Paragraph({ text: 'Aucun document à risque critique identifié.', spacing: { after: 200 } })]),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Solde : ', bold: true }),
+                new TextRun({ text: `${debt.balance.toFixed(2)} TND | ` }),
+                new TextRun({ text: 'Âge : ', bold: true }),
+                new TextRun({ text: `${debt.age} jours\n` }),
+                new TextRun({ text: 'Analyse IA : ', bold: true, italic: true }),
+                new TextRun({ text: this.generateAIAnalysis(debt), italic: true }),
+              ],
+              spacing: { after: 200 }
+            })
+          ]),
           
           // Recommandations
           new Paragraph({
-            text: '3. RECOMMANDATIONS STRATÉGIQUES',
+            text: '4. RECOMMANDATIONS STRATÉGIQUES',
             heading: HeadingLevel.HEADING_1,
             spacing: { before: 600, after: 200 }
           }),
           new Paragraph({
             children: [
-              new TextRun({ 
-                text: `Basé sur l'analyse de ${debts.length} documents, les actions suivantes sont recommandées :\n\n`,
-                size: 22
-              }),
-              new TextRun({ text: '• ', size: 22 }),
-              new TextRun({ 
-                text: `Prioriser le recouvrement des ${criticalDebts.length} créances critiques\n`,
-                size: 22
-              }),
-              new TextRun({ text: '• ', size: 22 }),
-              new TextRun({ 
-                text: 'Mettre en place un suivi hebdomadaire des créances dépassant 60 jours\n',
-                size: 22
-              }),
-              new TextRun({ text: '• ', size: 22 }),
-              new TextRun({ 
-                text: 'Évaluer la nécessité de passer en contentieux pour les créances > 120 jours\n',
-                size: 22
-              }),
-              new TextRun({ text: '• ', size: 22 }),
-              new TextRun({ 
-                text: 'Renforcer la relation client avec les débiteurs à risque élevé',
-                size: 22
-              })
+              new TextRun({ text: '• Action Prioritaire : ', bold: true }),
+              new TextRun({ text: `Focaliser les relances sur les ${zoneRouge.length} créances de la Zone Rouge.\n` }),
+              new TextRun({ text: '• Flux Futur : ', bold: true }),
+              new TextRun({ text: `Sécuriser l'encaissement de la Zone Verte (${totalVerte.toLocaleString('fr-FR')} TND) pour couvrir les charges fixes.\n` }),
+              new TextRun({ text: '• Stratégie : ', bold: true }),
+              new TextRun({ text: `Pour la Zone Orange, proposer des échéanciers de paiement pour éviter le blocage total.` }),
             ],
             spacing: { after: 200 }
           }),
           
           // Conclusion
           new Paragraph({
-            text: '4. CONCLUSION',
+            text: '5. CONCLUSION',
             heading: HeadingLevel.HEADING_1,
             spacing: { before: 600, after: 200 }
           }),
           new Paragraph({
-            text: `Ce rapport, généré avec assistance IA, identifie les priorités de recouvrement et propose des actions ciblées. ` +
-                  `Un suivi régulier est essentiel pour maintenir la santé financière du portefeuille client.`,
+            text: `Ce rapport d'audit met en évidence une concentration de ${(totalRouge / (totalVerte + totalOrange + totalRouge) * 100).toFixed(1)}% de la dette en zone critique. ` +
+                  `Une action coordonnée entre les commerciaux et la comptabilité est impérative pour assainir le portefeuille.`,
             spacing: { after: 200 }
           })
         ]
