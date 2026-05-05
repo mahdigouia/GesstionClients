@@ -41,8 +41,8 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
     minAge: '',
     maxAge: '',
     riskLevels: [] as string[],
-    sortBy: 'age',
-    sortOrder: 'desc' as 'asc' | 'desc',
+    sortBy: 'extraction',
+    sortOrder: 'asc' as 'asc' | 'desc',
     contentieuxFilter: 'off' as 'off' | 'include' | 'exclude',
     retainedFilter: 'off' as 'off' | 'include' | 'exclude',
     partialFilter: 'off' as 'off' | 'include' | 'exclude',
@@ -153,6 +153,7 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
         case 'amount': comparison = Number(a.amount || 0) - Number(b.amount || 0); break;
         case 'age': comparison = Number(a.age || 0) - Number(b.age || 0); break;
         case 'balance': comparison = Number(a.balance || 0) - Number(b.balance || 0); break;
+        case 'extraction': comparison = Number(a.extractIndex || 0) - Number(b.extractIndex || 0); break;
       }
       return filters.sortOrder === 'asc' ? comparison : -comparison;
     });

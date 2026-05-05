@@ -35,6 +35,7 @@ export interface ClientDebt {
   // Tracking
   lastImportDate?: string;
   isRecentlyUpdated?: boolean;
+  extractIndex?: number;
 }
 
 export interface AnalysisResult {

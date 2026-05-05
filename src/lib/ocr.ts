@@ -294,7 +294,7 @@ export class OCRService {
         // Si aucun client détecté, utiliser un placeholder mais continuer à chercher
         const activeClient = currentClient || { code: '0000', name: 'CLIENT NON IDENTIFIÉ' };
         try {
-          const debtData = this.parseDataRow(line, activeClient, fileName);
+          const debtData = this.parseDataRow(line, activeClient, fileName, id++);
           if (debtData) debts.push(debtData);
         } catch (err) {
           // Ignorer les erreurs de parsing silencieusement
@@ -336,7 +336,8 @@ export class OCRService {
   private static parseDataRow(
     line: string,
     client: { code: string; name: string; phone?: string },
-    fileName: string
+    fileName: string,
+    extractIndex: number
   ): ClientDebt | null {
     // 1. Extraire les dates (DD/MM/YYYY)
     const dateMatches = [...line.matchAll(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g)];
@@ -417,7 +418,7 @@ export class OCRService {
       reglement: r,
       solde: s,
       description: description
-    });
+    }, extractIndex);
   }
 
   private static constructDebtObject(
@@ -428,7 +429,8 @@ export class OCRService {
     docNumber: string,
     ageStr: string,
     paymentDaysStr: string,
-    amounts: { montant: number; reglement: number; solde: number; description: string }
+    amounts: { montant: number; reglement: number; solde: number; description: string },
+    extractIndex?: number
   ): ClientDebt {
     const { montant: amount, reglement: settlement, solde: balance, description } = amounts;
     const ageDays = parseInt(ageStr, 10) || 0;
@@ -459,6 +461,7 @@ export class OCRService {
       commercialCode: this.currentCommercial?.code,
       commercialName: this.currentCommercial?.name,
       isContentieux: classification.isContentieux,
+      extractIndex: extractIndex,
     };
   }
 

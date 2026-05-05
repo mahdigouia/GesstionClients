@@ -66,7 +66,7 @@ export function transformExtractedDebts(
 function createClientDebt(
   data: ExtractedDebt,
   fileName: string,
-  id: number,
+  extractIndex: number,
   commercial?: { code: string; name: string }
 ): ClientDebt | null {
   try {
@@ -120,6 +120,7 @@ function createClientDebt(
       commercialCode: data.commercial_code || commercial?.code,
       commercialName: data.commercial_name || commercial?.name,
       isContentieux: classification.isContentieux,
+      extractIndex: extractIndex,
     };
 
   } catch (error) {

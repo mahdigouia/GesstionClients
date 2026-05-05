@@ -85,7 +85,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
       retainedFilter: 'off',
       partialFilter: 'off',
       contentieuxFilter: 'off',
-      sortBy: 'name',
+      sortBy: 'extraction',
       sortOrder: 'asc'
     });
   };
@@ -324,6 +324,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   onChange={(e) => updateFilter('sortBy', e.target.value as any)}
                   className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm"
                 >
+                  <option value="extraction">Ordre Document</option>
                   <option value="name">Trier par nom</option>
                   <option value="amount">Trier par montant</option>
                   <option value="age">Trier par âge</option>
