@@ -142,8 +142,11 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
       return true;
     });
 
-    // Sorting
+    // Sorting - Primary: Source File, Secondary: User Choice
     result.sort((a, b) => {
+      const sourceComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+      if (sourceComp !== 0) return sourceComp;
+
       let comparison = 0;
       switch (filters.sortBy) {
         case 'name': comparison = (a.clientName || '').localeCompare(b.clientName || ''); break;
