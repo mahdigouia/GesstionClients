@@ -338,73 +338,85 @@ export class OCRService {
     client: { code: string; name: string; phone?: string },
     fileName: string
   ): ClientDebt | null {
-
-    // --- STRATÉGIE "ENTITIES 2.0" ---
-    
-    // 1. Extraire toutes les dates (DD/MM/YYYY)
+    // 1. Extraire les dates (DD/MM/YYYY)
     const dateMatches = [...line.matchAll(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/g)];
     if (dateMatches.length < 2) return null;
     const dueDate = dateMatches[0][1];
     const docDate = dateMatches[dateMatches.length - 1][1];
 
-    // --- TOKENIZER DE PRÉCISION ---
-    
-    // 1. On isole le numéro de pièce et on l'enlève de la ligne pour éviter les collisions
+    // 2. Isoler le numéro de pièce et l'âge
     const docMatch = line.match(/(FT\d{6}|IC\d{6}|AVT\d{5,8}|AVS\d{5,8}|AV\d{5,8}|FRS\d+|FRT\d+)/i);
     const docNumber = docMatch ? docMatch[1].toUpperCase() : "DOC";
-    let workingLine = line.replace(docNumber, " [PIECE] ");
+    
+    // On nettoie la ligne pour extraire le reste
+    let workingLine = line
+      .replace(dueDate, "")
+      .replace(docDate, "")
+      .replace(docNumber, "")
+      .trim();
 
-    // 2. On isole les dates et on les enlève
-    workingLine = workingLine.replace(/\d{2}[\/\-]\d{2}[\/\-]\d{4}/g, " [DATE] ");
+    // 3. Extraction des montants par pattern (Montant, Règlement, Solde à la fin)
+    // Pattern: 1 234,567 ou 1234,567 ou 0,000
+    const amountPattern = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
+    const allAmounts = [...workingLine.matchAll(amountPattern)].map(m => m[0]);
+    
+    if (allAmounts.length < 1) return null;
 
-    // 3. On découpe en mots (tokens)
-    const tokens = workingLine.split(/\s+/).filter(t => t.length > 0 && t !== "[DATE]" && t !== "[PIECE]");
-
-    // 4. Extraction des montants (ceux qui ont une virgule)
-    const amountTokens: string[] = [];
-    const usedTokenIndices = new Set<number>(); // Track tokens used in amounts
-    for (let i = 0; i < tokens.length; i++) {
-        if (tokens[i].includes(',')) {
-            let fullAmount = tokens[i];
-            usedTokenIndices.add(i);
-            // Si le mot précédent est un petit chiffre (millier) ou négatif, on fusionne
-            if (i > 0 && /^-?\d{1,3}$/.test(tokens[i-1])) {
-                fullAmount = tokens[i-1] + fullAmount;
-                usedTokenIndices.add(i-1);
-            }
-            amountTokens.push(fullAmount);
-        }
-    }
-
-    // 5. Affectation des 3 montants (les 3 derniers avec virgule)
+    // On identifie les 3 derniers montants (m, r, s)
     let m = 0, r = 0, s = 0;
-    if (amountTokens.length >= 3) {
-        const last3 = amountTokens.slice(-3);
-        m = this.parseAmount(last3[0]);
-        r = this.parseAmount(last3[1]);
-        s = this.parseAmount(last3[2]);
-    } else if (amountTokens.length > 0) {
-        m = this.parseAmount(amountTokens[0]);
-        s = this.parseAmount(amountTokens[amountTokens.length - 1]);
-        r = Math.max(0, m - s);
+    const last3 = allAmounts.slice(-3);
+    
+    if (last3.length === 3) {
+      m = this.parseAmount(last3[0]);
+      r = this.parseAmount(last3[1]);
+      s = this.parseAmount(last3[2]);
+      
+      // Cohérence check: si m-r != s (avec tolérance), peut-être qu'il n'y a que 2 montants
+      if (Math.abs(m - r - s) > 2.0 && m !== 0) {
+          // Tentative si seulement 2 montants (Montant et Solde, Règlement implicite)
+          const last2 = allAmounts.slice(-2);
+          const m2 = this.parseAmount(last2[0]);
+          const s2 = this.parseAmount(last2[1]);
+          if (m2 >= s2) {
+            m = m2; s = s2; r = m2 - s2;
+          }
+      }
+    } else {
+      // Moins de 3 montants trouvés
+      m = this.parseAmount(allAmounts[0]);
+      s = this.parseAmount(allAmounts[allAmounts.length - 1]);
+      r = Math.max(0, m - s);
     }
 
-    // 6. Extraction de l'âge (le premier nombre sans virgule qui n'a pas été utilisé)
-    // L'âge vient toujours AVANT les montants dans le format standard
-    const ageToken = tokens.find((t, idx) => 
-        /^\d+$/.test(t) && 
-        t.length < 5 && 
-        !usedTokenIndices.has(idx) &&
-        idx < (tokens.findIndex((x, i) => i > 0 && x.includes(',')) || tokens.length) // Doit être avant le premier montant
-    );
-    const age = ageToken ? parseInt(ageToken) : 0;
-    const paymentDays = 0;
+    // 4. Extraire l'âge et la description
+    // On enlève les montants trouvés de la workingLine pour trouver l'âge et la description
+    let remaining = workingLine;
+    allAmounts.forEach(amt => { remaining = remaining.replace(amt, ""); });
+    
+    const tokens = remaining.split(/\s+/).filter(t => t.trim().length > 0);
+    
+    // L'âge est généralement le premier nombre pur au début (après les dates/pièce)
+    let age = 0;
+    let descriptionTokens = [];
+    
+    for (let i = 0; i < tokens.length; i++) {
+      if (i === 0 && /^\d+$/.test(tokens[i]) && tokens[i].length < 5) {
+        age = parseInt(tokens[i]);
+      } else if (i === 1 && age > 0 && /^\d+$/.test(tokens[i]) && tokens[i].length < 5) {
+        // Probablement NbrJP, on ignore pour l'âge
+      } else {
+        descriptionTokens.push(tokens[i]);
+      }
+    }
 
-    return this.constructDebtObject(client, fileName, dueDate, docDate, docNumber, age.toString(), paymentDays.toString(), {
+    let description = descriptionTokens.join(" ").trim();
+    if (!description || description.length < 2) description = "FACTURE";
+
+    return this.constructDebtObject(client, fileName, dueDate, docDate, docNumber, age.toString(), "0", {
       montant: m,
       reglement: r,
       solde: s,
-      description: "FACTURE"
+      description: description
     });
   }
 

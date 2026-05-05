@@ -164,11 +164,12 @@ export class ExportService {
 
     // 4. Tableau
     const cols = [
-      { h: 'Client', x: margin, w: 70 },
-      { h: 'N° Pièce', x: margin + 70, w: 30 },
-      { h: 'Date', x: margin + 100, w: 25 },
-      { h: 'Montant', x: margin + 125, w: 30, align: 'right' },
-      { h: 'Solde', x: margin + 155, w: 25, align: 'right' }
+      { h: 'Client', x: margin, w: 55 },
+      { h: 'N° Pièce', x: margin + 55, w: 30 },
+      { h: 'Date', x: margin + 85, w: 22 },
+      { h: 'Échéance', x: margin + 107, w: 22 },
+      { h: 'Montant', x: margin + 129, w: 28, align: 'right' },
+      { h: 'Solde', x: margin + 157, w: 23, align: 'right' }
     ];
 
     // Header Tableau
@@ -221,15 +222,16 @@ export class ExportService {
       }
 
       pdf.setTextColor(40, 40, 40);
-      const clientText = `${debt.clientCode} - ${debt.clientName.substring(0, 32)}`;
+      const clientText = `${debt.clientCode} - ${debt.clientName.substring(0, 24)}`;
       pdf.text(clientText, margin, currentY);
-      pdf.text(debt.documentNumber, margin + 70, currentY);
-      pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 100, currentY);
+      pdf.text(debt.documentNumber, margin + 55, currentY);
+      pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 85, currentY);
+      pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 107, currentY);
       
       // Montants alignés à droite
-      pdf.text(formatCurrency(debt.amount), margin + 125 + 30, currentY, { align: 'right' });
+      pdf.text(formatCurrency(debt.amount), margin + 129 + 28, currentY, { align: 'right' });
       pdf.setTextColor(debt.balance > 0 ? 192 : 40, debt.balance > 0 ? 57 : 40, debt.balance > 0 ? 43 : 40); // Rouge si solde > 0
-      pdf.text(formatCurrency(debt.balance), margin + 155 + 25, currentY, { align: 'right' });
+      pdf.text(formatCurrency(debt.balance), margin + 157 + 23, currentY, { align: 'right' });
       
       currentY += 7;
     });
