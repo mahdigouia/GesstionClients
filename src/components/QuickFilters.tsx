@@ -16,6 +16,7 @@ import {
 import { ClientDebt } from '@/types/debt';
 import { useState } from 'react';
 import { AutocompleteSearch } from './AutocompleteSearch';
+import { QuickClientProfile } from './QuickClientProfile';
 
 interface QuickFiltersProps {
   debts: ClientDebt[];
@@ -26,6 +27,11 @@ interface QuickFiltersProps {
 export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: QuickFiltersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
+
+  const clientDebts = selectedClient 
+    ? debts.filter(d => d.clientName === selectedClient)
+    : [];
 
   const isRetained = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();
@@ -119,6 +125,11 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     
+    // Clear selected client if user is typing manually (optional, but cleaner)
+    if (selectedClient && value !== selectedClient) {
+      setSelectedClient(null);
+    }
+    
     let filtered = applyFilter(activeFilter, debts);
     
     if (value) {
@@ -137,6 +148,14 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
 
   const handleSelectSuggestion = (value: string) => {
     setSearchTerm(value);
+    
+    // Check if the selected value corresponds to a client name
+    const isClient = debts.some(d => d.clientName === value);
+    if (isClient) {
+      setSelectedClient(value);
+    } else {
+      setSelectedClient(null);
+    }
     
     let filtered = applyFilter(activeFilter, debts);
     
@@ -185,6 +204,17 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
             placeholder="Rechercher N° pièce, client, représentant, téléphone..."
           />
         </div>
+
+        {/* Quick Client Profile - Slides down when a client is selected */}
+        {selectedClient && clientDebts.length > 0 && (
+          <div className="mb-6">
+            <QuickClientProfile 
+              clientName={selectedClient}
+              debts={clientDebts}
+              onClose={() => setSelectedClient(null)}
+            />
+          </div>
+        )}
 
         {/* Quick filter cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
