@@ -372,13 +372,13 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
                         v_s = parse_tunisian_amount(f"{candidates[2]['prefix']} {candidates[2]['full_str']}") if k and candidates[2]['prefix'] else candidates[2]['val']
                         
                         diff = abs((v_m - v_r) - v_s)
-                        curr_sum = v_m + v_r + v_s
+                        curr_sum_abs = abs(v_m) + abs(v_r) + abs(v_s)
                         
                         # Priorité absolue à la cohérence (diff proche de 0)
-                        # Puis priorité à la somme la plus grande (capture des milliers)
-                        if diff < best_diff - 0.001 or (abs(diff - best_diff) < 0.001 and curr_sum > best_sum):
+                        # Puis priorité à la somme absolue la plus grande (capture des milliers, même négatifs)
+                        if diff < best_diff - 0.001 or (abs(diff - best_diff) < 0.001 and curr_sum_abs > best_sum):
                             best_diff = diff
-                            best_sum = curr_sum
+                            best_sum = curr_sum_abs
                             best_vals = (v_m, v_r, v_s)
                             best_comb = (i, j, k)
             

@@ -358,9 +358,9 @@ export class OCRService {
       .replace(docDate, "")
       .trim();
 
-    // 3. Extraction des montants par pattern (Montant, Règlement, Solde à la fin)
-    // Pattern: 1 234,567 ou 1234,567 ou 0,000
-    const commaPattern = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
+    // 3. Extraire les montants (Pattern tunisien: X XXX,XXX ou XXX,XXX)
+    // On cherche d'abord les tokens avec virgule
+    const commaPattern = /(-?\d+,\d{3})/g;
     const commaMatches = [...workingLine.matchAll(commaPattern)].map(m => m[0]);
     
     if (commaMatches.length < 1) return null;
@@ -378,50 +378,57 @@ export class OCRService {
       };
     });
 
-    // Reconstruction des montants réels
-    const allAmounts: number[] = [];
-    let i = 0;
-    while (i < candidates.length) {
-      if (candidates[i].prefix) {
-        const fullVal = parseFloat(candidates[i].prefix! + "." + candidates[i].val.toString().split('.')[1]);
-        allAmounts.push(fullVal);
-        i++;
-      } else {
-        allAmounts.push(candidates[i].val);
-        i++;
-      }
-    }
-    
-    // On identifie les 3 derniers montants (m, r, s)
     let m = 0, r = 0, s = 0;
-    const last3 = allAmounts.slice(-3);
-    
-    if (last3.length === 3) {
-      m = last3[0];
-      r = last3[1];
-      s = last3[2];
-      
-      // Cohérence check: si m-r != s (avec tolérance), peut-être qu'il n'y a que 2 montants
-      if (Math.abs(m - r - s) > 2.0 && m !== 0) {
-          // Tentative si seulement 2 montants (Montant et Solde, Règlement implicite)
-          const last2 = allAmounts.slice(-2);
-          const m2 = last2[0];
-          const s2 = last2[1];
-          if (m2 >= s2) {
-            m = m2; s = s2; r = m2 - s2;
+    const usedPrefixes: string[] = [];
+
+    if (candidates.length >= 3) {
+      const last3 = candidates.slice(-3);
+      let bestDiff = 999999;
+      let bestSumAbs = -1;
+      let bestVals = [0, 0, 0];
+      let bestComb = [false, false, false];
+
+      for (let i = 0; i <= 1; i++) {
+        for (let j = 0; j <= 1; j++) {
+          for (let k = 0; k <= 1; k++) {
+            const v_m = i && last3[0].prefix ? this.parseAmount(`${last3[0].prefix} ${last3[0].full_str}`) : last3[0].val;
+            const v_r = j && last3[1].prefix ? this.parseAmount(`${last3[1].prefix} ${last3[1].full_str}`) : last3[1].val;
+            const v_s = k && last3[2].prefix ? this.parseAmount(`${last3[2].prefix} ${last3[2].full_str}`) : last3[2].val;
+            
+            const diff = Math.abs((v_m - v_r) - v_s);
+            const sumAbs = Math.abs(v_m) + Math.abs(v_r) + Math.abs(v_s);
+
+            if (diff < bestDiff - 0.001 || (Math.abs(diff - bestDiff) < 0.001 && sumAbs > bestSumAbs)) {
+              bestDiff = diff;
+              bestSumAbs = sumAbs;
+              bestVals = [v_m, v_r, v_s];
+              bestComb = [!!(i && last3[0].prefix), !!(j && last3[1].prefix), !!(k && last3[2].prefix)];
+            }
           }
+        }
       }
+      [m, r, s] = bestVals;
+      if (bestComb[0]) usedPrefixes.push(last3[0].prefix!);
+      if (bestComb[1]) usedPrefixes.push(last3[1].prefix!);
+      if (bestComb[2]) usedPrefixes.push(last3[2].prefix!);
     } else {
-      // Moins de 3 montants trouvés
-      m = this.parseAmount(allAmounts[0]);
-      s = this.parseAmount(allAmounts[allAmounts.length - 1]);
-      r = Math.max(0, m - s);
+      // Fallback simple
+      m = candidates[0].prefix ? this.parseAmount(`${candidates[0].prefix} ${candidates[0].full_str}`) : candidates[0].val;
+      s = candidates[candidates.length - 1].prefix ? this.parseAmount(`${candidates[candidates.length-1].prefix} ${candidates[candidates.length-1].full_str}`) : candidates[candidates.length - 1].val;
+      r = m - s;
+      if (candidates[0].prefix) usedPrefixes.push(candidates[0].prefix!);
+      if (candidates[candidates.length-1].prefix) usedPrefixes.push(candidates[candidates.length-1].prefix!);
     }
 
     // 4. Extraire l'âge et la description
-    // On enlève les montants trouvés de la workingLine pour trouver l'âge et la description
     let remaining = workingLine;
-    allAmounts.forEach(amt => { remaining = remaining.replace(amt, ""); });
+    // Enlever les montants exacts
+    commaMatches.forEach(ct => { remaining = remaining.replace(ct, ""); });
+    // Enlever les milliers utilisés
+    usedPrefixes.forEach(p => { 
+      const reg = new RegExp(`\\b${p}\\b`, 'g');
+      remaining = remaining.replace(reg, ""); 
+    });
     
     const tokens = remaining.split(/\s+/).filter(t => t.trim().length > 0);
     
@@ -439,11 +446,8 @@ export class OCRService {
         if (i + 1 < tokens.length && /^\d{3}$/.test(tokens[i+1])) {
           age = parseInt(tokens[i] + tokens[i+1]);
           skipNext = true;
-          // Chercher nbr_jp après l'âge fusionné
           if (i + 2 < tokens.length && /^\d+$/.test(tokens[i+2])) {
             nbr_jp = parseInt(tokens[i+2]);
-            // On sautera aussi i+2 au prochain tour
-            // skipNext ne gère qu'un tour, on va utiliser i++ manuellement
             i += 2; skipNext = false;
           }
         } else {
@@ -461,7 +465,7 @@ export class OCRService {
     let description = descriptionTokens.join(" ").trim();
     if (!description || description.length < 2) description = "FACTURE";
 
-    return this.constructDebtObject(client, fileName, dueDate, docDate, docNumber, age.toString(), "0", {
+    return this.constructDebtObject(client, fileName, dueDate, docDate, docNumber, age.toString(), nbr_jp.toString(), {
       montant: m,
       reglement: r,
       solde: s,
