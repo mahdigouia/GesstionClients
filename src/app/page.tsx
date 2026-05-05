@@ -487,7 +487,7 @@ export default function Home() {
                               value={selectedClientCommercial} 
                               onValueChange={setSelectedClientCommercial}
                             >
-                              <SelectTrigger className="w-[180px] h-9 bg-white border-slate-200">
+                              <SelectTrigger className="w-[200px] h-9 bg-white border-slate-200">
                                 <SelectValue placeholder="Filtrer par commercial" />
                               </SelectTrigger>
                               <SelectContent>
@@ -560,7 +560,7 @@ export default function Home() {
                                 setClientHistoryDebts(debts.filter(d => d.clientName === client.clientName));
                                 setIsHistoryModalOpen(true);
                               }}
-                              className="group flex items-center justify-between p-5 border border-slate-100 rounded-2xl hover:border-violet-200 hover:bg-violet-50/30 hover:shadow-md transition-all cursor-pointer"
+                              className="group flex items-center justify-between p-5 border border-slate-100 rounded-2xl hover:border-violet-200 hover:bg-violet-50/30 hover:shadow-md transition-all cursor-pointer bg-white"
                             >
                               <div className="flex items-center gap-4">
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shadow-sm ${
