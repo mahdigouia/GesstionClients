@@ -215,7 +215,19 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => ExportService.exportFilteredToPDF(filteredDebts, "Rapport des Créances")}
+              onClick={() => {
+                const activeLabels = [];
+                if (filters.contentieuxFilter === 'include') activeLabels.push('Contentieux');
+                if (filters.retainedFilter === 'include') activeLabels.push('Retenue');
+                if (filters.partialFilter === 'include') activeLabels.push('Partiel');
+                if (selectedClient) activeLabels.push(`Client: ${selectedClient}`);
+                
+                ExportService.exportFilteredToPDF(
+                  filteredDebts, 
+                  "Rapport des Créances", 
+                  activeLabels.length > 0 ? activeLabels.join(' + ') : 'Aucun filtre'
+                );
+              }}
               className="bg-red-50 hover:bg-red-100 border-red-200 text-red-700"
             >
               <FilePdf className="h-4 w-4 mr-2" />

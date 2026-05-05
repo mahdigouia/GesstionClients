@@ -101,88 +101,139 @@ export class ExportService {
     pdf.save(fileName || defaultFileName);
   }
 
-  static async exportFilteredToPDF(debts: ClientDebt[], title: string = "Rapport des Créances"): Promise<void> {
+  static async exportFilteredToPDF(debts: ClientDebt[], title: string = "Rapport des Créances", activeFilters?: string): Promise<void> {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = 210;
+    const pageHeight = 297;
     const margin = 15;
     let currentY = 20;
 
-    // 1. Ajouter le Logo
-    try {
-      // On utilise le logo qui a été copié dans public
-      pdf.addImage('/logo.png', 'PNG', margin, currentY, 40, 20);
-      currentY += 25;
-    } catch (e) {
-      console.warn("Logo non chargé, continuation sans logo");
-      currentY += 10;
-    }
+    // Helper pour le formatage monétaire (Éviter les slashs dus aux espaces insécables)
+    const formatCurrency = (val: number) => {
+      return val.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    };
 
-    // 2. En-tête
-    pdf.setFontSize(18);
-    pdf.setTextColor(40, 40, 40);
+    const addHeader = (pageNum: number) => {
+      // 1. Logo
+      try {
+        // Tentative de chargement du logo
+        pdf.addImage('/logo.png', 'PNG', margin, 15, 35, 15);
+      } catch (e) {
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text("MG GROUP", margin, 20);
+      }
+
+      // 2. Infos Rapport (Droite)
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      const dateStr = `Généré le : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`;
+      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 15);
+      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 20);
+
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, 32, pageWidth - margin, 32);
+      return 38;
+    };
+
+    let pageNum = 1;
+    currentY = addHeader(pageNum);
+
+    // 3. Titre et Filtres
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(44, 62, 80);
     pdf.text(title, margin, currentY);
     currentY += 8;
-    
-    pdf.setFontSize(10);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text(`Généré le : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, margin, currentY);
-    currentY += 15;
 
-    // 3. Résumé Rapide
+    if (activeFilters) {
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setTextColor(52, 73, 94);
+      pdf.text(`Filtres actifs : ${activeFilters}`, margin, currentY);
+      currentY += 6;
+    }
+
     const totalBalance = debts.reduce((sum, d) => sum + d.balance, 0);
-    pdf.setFontSize(12);
-    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`Total des créances filtrées : ${totalBalance.toLocaleString('fr-FR')} TND`, margin, currentY);
-    currentY += 10;
-    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(`Total : ${formatCurrency(totalBalance)} TND (${debts.length} lignes)`, margin, currentY);
+    currentY += 12;
 
-    // 4. Tableau (Manuel)
-    const columns = [
-      { header: 'Client', x: margin, w: 60 },
-      { header: 'Facture', x: margin + 60, w: 30 },
-      { header: 'Date', x: margin + 90, w: 25 },
-      { header: 'Montant', x: margin + 115, w: 30 },
-      { header: 'Solde', x: margin + 145, w: 30 }
+    // 4. Tableau
+    const cols = [
+      { h: 'Client', x: margin, w: 70 },
+      { h: 'N° Pièce', x: margin + 70, w: 30 },
+      { h: 'Date', x: margin + 100, w: 25 },
+      { h: 'Montant', x: margin + 125, w: 30, align: 'right' },
+      { h: 'Solde', x: margin + 155, w: 25, align: 'right' }
     ];
 
     // Header Tableau
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
+    pdf.setFillColor(44, 62, 80); // Bleu foncé pro
+    pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 8, 'F');
     pdf.setFontSize(9);
+    pdf.setTextColor(255, 255, 255);
     pdf.setFont('helvetica', 'bold');
-    columns.forEach(col => {
-      pdf.text(col.header, col.x, currentY);
+    cols.forEach(col => {
+      if (col.align === 'right') {
+        pdf.text(col.h, col.x + col.w, currentY, { align: 'right' });
+      } else {
+        pdf.text(col.h, col.x, currentY);
+      }
     });
-    currentY += 7;
-    pdf.setFont('helvetica', 'normal');
+    currentY += 8;
 
     // Lignes
-    debts.slice(0, 30).forEach((debt, index) => { // Limité à 30 pour la première page, on pourrait paginer
-      if (currentY > 280) {
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    
+    debts.forEach((debt, index) => {
+      // Saut de page si nécessaire
+      if (currentY > 275) {
         pdf.addPage();
-        currentY = 20;
+        pageNum++;
+        currentY = addHeader(pageNum);
+        
+        // Ré-afficher le header du tableau sur la nouvelle page
+        pdf.setFillColor(44, 62, 80);
+        pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 8, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFont('helvetica', 'bold');
+        cols.forEach(col => {
+          if (col.align === 'right') {
+            pdf.text(col.h, col.x + col.w, currentY, { align: 'right' });
+          } else {
+            pdf.text(col.h, col.x, currentY);
+          }
+        });
+        currentY += 8;
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
       }
 
-      pdf.text(debt.clientName.substring(0, 30), margin, currentY);
-      pdf.text(debt.documentNumber, margin + 60, currentY);
-      pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 90, currentY);
-      pdf.text(debt.amount.toLocaleString('fr-FR'), margin + 115, currentY);
-      pdf.text(debt.balance.toLocaleString('fr-FR'), margin + 145, currentY);
+      // Alternance de couleur
+      if (index % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
+      }
+
+      pdf.setTextColor(40, 40, 40);
+      pdf.text(debt.clientName.substring(0, 38), margin, currentY);
+      pdf.text(debt.documentNumber, margin + 70, currentY);
+      pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 100, currentY);
+      
+      // Montants alignés à droite
+      pdf.text(formatCurrency(debt.amount), margin + 125 + 30, currentY, { align: 'right' });
+      pdf.setTextColor(debt.balance > 0 ? 192 : 40, debt.balance > 0 ? 57 : 40, debt.balance > 0 ? 43 : 40); // Rouge si solde > 0
+      pdf.text(formatCurrency(debt.balance), margin + 155 + 25, currentY, { align: 'right' });
       
       currentY += 7;
-      // Ligne de séparation
-      pdf.setDrawColor(230, 230, 230);
-      pdf.line(margin, currentY - 5, pageWidth - margin, currentY - 5);
     });
 
-    if (debts.length > 30) {
-      pdf.setFontSize(8);
-      pdf.setTextColor(150, 150, 150);
-      pdf.text(`... et ${debts.length - 30} autres créances (voir Excel pour le détail complet)`, margin, currentY + 5);
-    }
-
-    const fileName = `export-${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `Rapport_Creances_${new Date().toISOString().split('T')[0]}.pdf`;
     pdf.save(fileName);
   }
 
