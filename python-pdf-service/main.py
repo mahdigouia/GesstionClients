@@ -318,87 +318,100 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
 
         # 4. Extraire les montants
         # On cherche d'abord tous les tokens avec virgule
-        comma_tokens = re.findall(r'-?\d+,\d{3}', line)
-        if len(comma_tokens) < 1:
+        # On utilise une approche par tokens pour être sûr des positions
+        tokens_all = line.split()
+        amounts_candidates = []
+        
+        for i, t in enumerate(tokens_all):
+            if re.search(r'-?\d+,\d{3}', t):
+                val_base = parse_tunisian_amount(t)
+                prefix = None
+                # Vérifier le token précédent
+                if i > 0 and re.match(r'^\d{1,3}$', tokens_all[i-1]):
+                    # C'est un millier potentiel
+                    prefix = tokens_all[i-1]
+                
+                amounts_candidates.append({
+                    "val": val_base,
+                    "full_str": t,
+                    "prefix": prefix
+                })
+        
+        if len(amounts_candidates) < 1:
             return None
             
-        # Tentative de fusion des milliers pour chaque comma_token
-        amounts = []
-        for ct in comma_tokens:
-            val = parse_tunisian_amount(ct)
-            # Chercher si le mot juste avant dans la ligne est un millier
-            # On cherche " X " + ct
-            prefix_match = re.search(r'\b(\d{1,3})\s+' + re.escape(ct), line)
-            if prefix_match:
-                # On teste si la fusion est plus cohérente plus tard, ou on fusionne d'office si c'est raisonnable
-                # Ici on garde les deux versions pour le check de cohérence
-                amounts.append({"val": val, "full_str": ct, "prefix": prefix_match.group(1)})
-            else:
-                amounts.append({"val": val, "full_str": ct, "prefix": None})
-        
         # Résolution des 3 montants (M, R, S)
         m = r = s = 0.0
-        if len(amounts) >= 3:
+        used_prefixes = []
+        
+        if len(amounts_candidates) >= 3:
             # On prend les 3 derniers
-            candidates = amounts[-3:]
+            candidates = amounts_candidates[-3:]
             
-            # Pour chaque candidat, décider si on garde le prefix ou pas basé sur la cohérence M - R = S
-            # On essaie les combinaisons (8 combinaisons possibles max)
             best_diff = 999999.0
+            best_sum = -1.0
             best_vals = (0.0, 0.0, 0.0)
+            best_comb = (0, 0, 0)
             
-            for i in [0, 1]: # Prefix pour M
-                for j in [0, 1]: # Prefix pour R
-                    for k in [0, 1]: # Prefix pour S
+            # Essayer toutes les combinaisons de préfixes
+            for i in [0, 1]:
+                for j in [0, 1]:
+                    for k in [0, 1]:
                         v_m = parse_tunisian_amount(f"{candidates[0]['prefix']} {candidates[0]['full_str']}") if i and candidates[0]['prefix'] else candidates[0]['val']
                         v_r = parse_tunisian_amount(f"{candidates[1]['prefix']} {candidates[1]['full_str']}") if j and candidates[1]['prefix'] else candidates[1]['val']
                         v_s = parse_tunisian_amount(f"{candidates[2]['prefix']} {candidates[2]['full_str']}") if k and candidates[2]['prefix'] else candidates[2]['val']
                         
                         diff = abs((v_m - v_r) - v_s)
-                        if diff < best_diff:
+                        curr_sum = v_m + v_r + v_s
+                        
+                        # Priorité absolue à la cohérence (diff proche de 0)
+                        # Puis priorité à la somme la plus grande (capture des milliers)
+                        if diff < best_diff - 0.001 or (abs(diff - best_diff) < 0.001 and curr_sum > best_sum):
                             best_diff = diff
+                            best_sum = curr_sum
                             best_vals = (v_m, v_r, v_s)
+                            best_comb = (i, j, k)
             
             m, r, s = best_vals
-            # Si même le meilleur diff est grand, on prend les valeurs brutes sans prefix par défaut
-            if best_diff > 2.0:
-                m = candidates[0]['val']
-                r = candidates[1]['val']
-                s = candidates[2]['val']
-        elif len(amounts) == 2:
-            m = amounts[0]['val']
-            s = amounts[1]['val']
+            if best_comb[0] and candidates[0]['prefix']: used_prefixes.append(candidates[0]['prefix'])
+            if best_comb[1] and candidates[1]['prefix']: used_prefixes.append(candidates[1]['prefix'])
+            if best_comb[2] and candidates[2]['prefix']: used_prefixes.append(candidates[2]['prefix'])
+        elif len(amounts_candidates) == 2:
+            # Souvent Montant et Solde
+            m = parse_tunisian_amount(f"{amounts_candidates[0]['prefix']} {amounts_candidates[0]['full_str']}") if amounts_candidates[0]['prefix'] else amounts_candidates[0]['val']
+            s = parse_tunisian_amount(f"{amounts_candidates[1]['prefix']} {amounts_candidates[1]['full_str']}") if amounts_candidates[1]['prefix'] else amounts_candidates[1]['val']
             r = m - s
+            if amounts_candidates[0]['prefix']: used_prefixes.append(amounts_candidates[0]['prefix'])
+            if amounts_candidates[1]['prefix']: used_prefixes.append(amounts_candidates[1]['prefix'])
         else:
-            m = s = amounts[0]['val']
+            m = s = parse_tunisian_amount(f"{amounts_candidates[0]['prefix']} {amounts_candidates[0]['full_str']}") if amounts_candidates[0]['prefix'] else amounts_candidates[0]['val']
             r = 0.0
+            if amounts_candidates[0]['prefix']: used_prefixes.append(amounts_candidates[0]['prefix'])
 
         # 5. Extraire la description
-        # Enlever tout ce qu'on a déjà identifié
         remaining = line
         for d in dates: remaining = remaining.replace(f"{d[0]}/{d[1]}/{d[2]}", "")
         if doc_match: remaining = remaining.replace(doc_match.group(0), "")
         if age > 0: remaining = remaining.replace(str(age), "", 1)
         if nbr_jp > 0: remaining = remaining.replace(str(nbr_jp), "", 1)
         
-        # Enlever les montants (les chaînes exactes trouvées)
-        # Attention à ne pas enlever le "3" de "korba 3" si on a décidé de ne pas le fusionner
-        # On n'enlève que les comma_tokens
-        for ct in comma_tokens:
+        # Enlever les montants exacts (comma tokens)
+        for ct in [c['full_str'] for c in amounts_candidates]:
             remaining = remaining.replace(ct, "")
         
-        # Enlever les milliers fusionnés (seulement ceux qui ont été utilisés)
-        # Pour simplifier, on nettoie juste les chiffres restants à la fin si nécessaire, 
-        # mais gardons les tokens de texte
+        # Enlever SEULEMENT les milliers UTILISÉS
+        for p in used_prefixes:
+            remaining = re.sub(r'\b' + re.escape(p) + r'\b', "", remaining, count=1)
+        
+        # Nettoyer les tokens restants
         desc_tokens = remaining.split()
         clean_desc_tokens = []
         for t in desc_tokens:
-            # Si c'est un petit nombre restant, c'est peut-être un millier non utilisé ou un chiffre de description
-            if re.match(r'^\d+$', t) and len(t) < 4:
-                # On le garde si c'est probablement une partie du nom (ex: "korba 3")
+            # Garder si c'est du texte ou un nombre significatif (pas un millier résiduel d'un montant)
+            if not re.match(r'^\d+$', t) or len(t) > 3:
                 clean_desc_tokens.append(t)
-            elif not re.search(r'\d', t) or len(t) > 3:
-                # Token de texte ou nombre long (probablement pas un montant restant)
+            elif t in ["2", "3", "4", "5", "6", "7", "8", "9"] and len(remaining) > 20:
+                # Probablement un chiffre dans le nom si la ligne est longue
                 clean_desc_tokens.append(t)
         
         description = " ".join(clean_desc_tokens).strip()
