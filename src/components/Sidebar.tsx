@@ -48,9 +48,13 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   const { initials, fullName, user } = useAuth();
   const { analysis } = useDebtContext();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   
   const recoveryRate = analysis?.recoveryRate || 0;
   const currentRecoveryRate = analysis?.recoveryRateNoContentieux || 0;
+
+  // Sync isCollapsed with Hover
+  const effectiveCollapsed = isCollapsed && !isHovered;
 
   // Persist collapse state
   useEffect(() => {
@@ -72,29 +76,28 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   }, [pathname]);
 
   const sidebarContent = (
-    <div className="flex flex-col h-full relative">
-      {/* Collapse Toggle Button (Desktop) */}
-      <button
+    <div 
+      className="flex flex-col h-full relative"
+      onMouseEnter={() => isCollapsed && setIsHovered(true)}
+      onMouseLeave={() => isCollapsed && setIsHovered(false)}
+    >
+      {/* Interaction Zone - Click to toggle permanently, Hover to peak */}
+      <div 
         onClick={toggleCollapse}
-        className="hidden md:flex absolute -right-3 top-24 z-50 h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-all"
-      >
-        {isCollapsed ? (
-          <ChevronRight className="h-3 w-3 text-slate-600" />
-        ) : (
-          <ChevronLeft className="h-3 w-3 text-slate-600" />
-        )}
-      </button>
+        className="absolute inset-y-0 right-0 w-1 cursor-pointer hover:bg-blue-500/30 transition-colors z-[100]"
+        title={isCollapsed ? "Cliquer pour épingler" : "Cliquer pour réduire"}
+      />
 
       {/* Header - Dark blue professional */}
       <div className={cn(
         "flex items-center bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden flex-shrink-0 transition-all duration-300",
-        isCollapsed ? "h-20 px-2 justify-center" : "h-20 px-6"
+        effectiveCollapsed ? "h-20 px-2 justify-center" : "h-20 px-6"
       )}>
         {/* Glassmorphism overlay */}
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
         
         {/* Decorative elements */}
-        {!isCollapsed && (
+        {!effectiveCollapsed && (
           <>
             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl" />
             <div className="absolute bottom-0 left-0 w-24 h-24 bg-violet-500/20 rounded-full blur-2xl" />
@@ -103,12 +106,12 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
         
         <div className={cn(
           "flex items-center gap-4 relative z-10 w-full",
-          isCollapsed ? "justify-center" : ""
+          effectiveCollapsed ? "justify-center" : ""
         )}>
           {/* User Avatar */}
           <Avatar className={cn(
             "border-2 border-white/20 shadow-lg ring-2 ring-blue-500/30 transition-all duration-300",
-            isCollapsed ? "h-10 w-10" : "h-12 w-12"
+            effectiveCollapsed ? "h-10 w-10" : "h-12 w-12"
           )}>
             <AvatarImage src="/avatar.png" />
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-violet-600 text-white font-bold text-lg">
@@ -116,7 +119,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
             </AvatarFallback>
           </Avatar>
           
-          {!isCollapsed && (
+          {!effectiveCollapsed && (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Link href="/" className="hover:opacity-80 transition-opacity cursor-pointer truncate">
@@ -146,10 +149,13 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
 
       {/* Navigation - Modern cards */}
       <div className={cn(
-        "flex-1 overflow-y-auto py-6 transition-all duration-300",
-        isCollapsed ? "px-2" : "px-4"
+        "flex-1 transition-all duration-300",
+        effectiveCollapsed ? "px-2 py-4" : "px-4 py-6"
       )}>
-        <nav className="space-y-1">
+        <nav className={cn(
+          "space-y-1",
+          effectiveCollapsed ? "flex flex-col items-center" : ""
+        )}>
           {navigation.map((item) => {
             const isActive = pathname === item.href || (item.href === '/' && pathname === '/');
             const Icon = item.icon;
@@ -159,11 +165,11 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
                 key={item.name}
                 href={item.href}
                 onClick={onMobileClose}
-                title={isCollapsed ? item.name : undefined}
+                title={effectiveCollapsed ? item.name : undefined}
                 className={cn(
                   "group flex items-center rounded-xl transition-all duration-300",
                   "hover:shadow-lg hover:scale-[1.02]",
-                  isCollapsed ? "justify-center px-0 py-2 h-12" : "gap-3 px-4 py-3 text-sm h-auto",
+                  effectiveCollapsed ? "justify-center px-0 py-1.5 h-10 w-10 mb-1" : "gap-3 px-4 py-2.5 text-sm h-auto",
                   isActive 
                     ? "bg-white shadow-lg border-l-4 border-blue-500 text-slate-800" 
                     : "text-slate-600 hover:bg-white/60 hover:text-slate-800"
@@ -171,14 +177,15 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
               >
                 {/* Icon with colored background */}
                 <div className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-xl shadow-md transition-transform group-hover:scale-110 flex-shrink-0",
+                  "flex items-center justify-center rounded-xl shadow-md transition-transform group-hover:scale-110 flex-shrink-0",
+                  effectiveCollapsed ? "h-8 w-8" : "h-10 w-10",
                   item.color,
                   "text-white"
                 )}>
-                  <Icon className="h-5 w-5" />
+                  <Icon className={cn(effectiveCollapsed ? "h-4 w-4" : "h-5 w-5")} />
                 </div>
                 
-                {!isCollapsed && (
+                {!effectiveCollapsed && (
                   <>
                     <span className="flex-1 truncate font-semibold">{item.name}</span>
                     {isActive && (
@@ -195,21 +202,21 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
         
         {/* Quick Stats Card */}
         <div className={cn(
-          "mt-6 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-xl relative overflow-hidden border border-white/10 transition-all duration-300",
-          isCollapsed ? "p-2" : "p-4"
+          "mt-4 rounded-2xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white shadow-xl relative overflow-hidden border border-white/10 transition-all duration-300",
+          effectiveCollapsed ? "p-1.5" : "p-4"
         )}>
           <div className="absolute inset-0 bg-white/5 backdrop-blur-[2px]" />
-          {!isCollapsed && <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-3xl" />}
+          {!effectiveCollapsed && <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-3xl" />}
           
-          <div className="relative z-10 space-y-4">
-            <div className={cn("flex items-center gap-2 mb-1", isCollapsed ? "justify-center" : "")}>
+          <div className={cn("relative z-10", effectiveCollapsed ? "space-y-2" : "space-y-4")}>
+            <div className={cn("flex items-center gap-2 mb-1", effectiveCollapsed ? "justify-center" : "")}>
               <Zap className="h-4 w-4 text-yellow-300 fill-yellow-300" />
-              {!isCollapsed && <span className="font-bold text-xs uppercase tracking-wider opacity-90">Performance</span>}
+              {!effectiveCollapsed && <span className="font-bold text-xs uppercase tracking-wider opacity-90">Performance</span>}
             </div>
 
             {/* Global Recovery */}
             <div className="space-y-1.5">
-              {!isCollapsed && (
+              {!effectiveCollapsed && (
                 <div className="flex justify-between text-[11px]">
                   <span className="text-blue-100/90">Recouvrement</span>
                   <span className="font-bold">{recoveryRate.toFixed(1)}%</span>
@@ -217,20 +224,20 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
               )}
               <div className={cn(
                 "bg-white/20 rounded-full overflow-hidden",
-                isCollapsed ? "h-8 w-1 flex flex-col justify-end mx-auto" : "h-1.5 w-full"
+                effectiveCollapsed ? "h-6 w-1 flex flex-col justify-end mx-auto" : "h-1.5 w-full"
               )}>
                 <div 
                   className={cn(
                     "bg-gradient-to-r from-blue-400 to-blue-300 transition-all duration-1000 shadow-[0_0_8px_rgba(255,255,255,0.4)]",
-                    isCollapsed ? "w-full" : "h-full"
+                    effectiveCollapsed ? "w-full" : "h-full"
                   )} 
-                  style={isCollapsed ? { height: `${Math.min(recoveryRate, 100)}%` } : { width: `${Math.min(recoveryRate, 100)}%` }}
+                  style={effectiveCollapsed ? { height: `${Math.min(recoveryRate, 100)}%` } : { width: `${Math.min(recoveryRate, 100)}%` }}
                 />
               </div>
             </div>
 
             {/* Current Recovery (Sans Contentieux) */}
-            {!isCollapsed && (
+            {!effectiveCollapsed && (
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between text-[11px]">
                   <span className="text-emerald-100/90 font-medium italic text-[9px]">Courant</span>
@@ -251,14 +258,14 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       {/* Footer - Glassmorphism */}
       <div className={cn(
         "bg-white/80 backdrop-blur-xl border-t border-white/20 flex-shrink-0 transition-all duration-300",
-        isCollapsed ? "p-2" : "p-4"
+        effectiveCollapsed ? "p-2" : "p-4"
       )}>
-        <div className={cn("flex items-center", isCollapsed ? "justify-center" : "justify-between")}>
+        <div className={cn("flex items-center", effectiveCollapsed ? "justify-center" : "justify-between")}>
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
               <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
             </div>
-            {!isCollapsed && (
+            {!effectiveCollapsed && (
               <div>
                 <div className="text-xs font-bold text-slate-700">Système Actif</div>
                 <div className="text-[10px] text-slate-500">v2.0.1 Pro</div>
@@ -266,7 +273,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
             )}
           </div>
           
-          {!isCollapsed && (
+          {!effectiveCollapsed && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-600">© 2026</span>
               <span className="text-[8px] text-slate-400">Mg</span>
@@ -282,7 +289,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       {/* Desktop sidebar - always visible */}
       <div className={cn(
         "hidden md:block min-h-screen bg-gray-50 border-r border-gray-200 relative transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-20" : "w-72",
+        effectiveCollapsed ? "w-20" : "w-72",
         className
       )}>
         {sidebarContent}
