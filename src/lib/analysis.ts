@@ -7,7 +7,7 @@ function generateAlerts(debts: ClientDebt[]): Alert[] {
     let alertId = 1;
     debts.filter(d => Number(d.balance || 0) > 10000).forEach(d => {
       alerts.push({
-        id: `a${alertId++}`,
+        id: `critical_${d.clientName}_${d.balance}`,
         type: 'critical_debt',
         clientName: d.clientName,
         message: `Solde important: ${Number(d.balance).toFixed(2)}`,

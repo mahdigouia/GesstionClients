@@ -35,6 +35,8 @@ import {
 import { AnalysisResult } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { useState } from 'react';
+import { DebtEvolutionChart } from './DebtEvolutionChart';
+import { useDebtContext } from '@/lib/DebtContext';
 
 interface DashboardProps {
   analysis: AnalysisResult;
@@ -43,6 +45,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardProps) {
+  const { history } = useDebtContext();
   const [selectedRisk, setSelectedRisk] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -141,6 +144,9 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
           </CardContent>
         </Card>
       </div>
+
+      {/* Historique d'Évolution (Pro) */}
+      <DebtEvolutionChart history={history} />
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

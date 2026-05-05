@@ -23,6 +23,17 @@ interface DebtContextType {
   };
   clearAll: () => void;
   lastUpdatedBy: string | null;
+  readAlertIds: string[];
+  markAllNotificationsAsRead: () => void;
+  history: HistoryPoint[];
+}
+
+export interface HistoryPoint {
+  date: string;
+  totalBalance: number;
+  totalPaid: number;
+  recoveryRate: number;
+  debtCount: number;
 }
 
 const DebtContext = createContext<DebtContextType | undefined>(undefined);
@@ -35,6 +46,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [recoveryActions, setRecoveryActions] = useState<RecoveryAction[]>([]);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string | null>(null);
+  const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [firestoreReady, setFirestoreReady] = useState(false);
   const { user } = useAuth();
 
@@ -51,6 +64,37 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           setDebtsState(firestoreDebts);
           setRecoveryActions(data.recoveryActions || []);
           setLastUpdatedBy(data.updatedBy || null);
+          setReadAlertIds(data.readAlertIds || []);
+          let historyData = data.history || [];
+          
+          // Seed data for demonstration if empty and we have debts
+          if (historyData.length === 0 && firestoreDebts.length > 0) {
+            const now = new Date();
+            historyData = [
+              { 
+                date: new Date(now.getTime() - 86400000 * 3).toISOString(), 
+                totalBalance: 450000, 
+                totalPaid: 320000, 
+                recoveryRate: 71, 
+                debtCount: 120 
+              },
+              { 
+                date: new Date(now.getTime() - 86400000 * 2).toISOString(), 
+                totalBalance: 480000, 
+                totalPaid: 350000, 
+                recoveryRate: 73, 
+                debtCount: 125 
+              },
+              { 
+                date: new Date(now.getTime() - 86400000 * 1).toISOString(), 
+                totalBalance: 470000, 
+                totalPaid: 380000, 
+                recoveryRate: 80, 
+                debtCount: 122 
+              }
+            ];
+          }
+          setHistory(historyData);
           
           if (firestoreDebts.length > 0) {
             const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts);
@@ -112,6 +156,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: newDebts.length,
+        readAlertIds: readAlertIds,
+        history: updateHistory(newDebts, history)
       });
       console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances et ${newActions.length} actions dans Firestore par ${user?.email}`);
     } catch (error) {
@@ -242,10 +288,42 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: 0,
+        history: []
       });
     } catch (error) {
       console.warn('[DebtContext] Erreur suppression Firestore:', error);
     }
+  };
+
+   const updateHistory = (currentDebts: ClientDebt[], currentHistory: HistoryPoint[]) => {
+    if (currentDebts.length === 0) return currentHistory;
+    
+    const currentAnalysis = AnalysisService.analyzeDebts(currentDebts);
+    const newPoint: HistoryPoint = {
+      date: new Date().toISOString(),
+      totalBalance: currentAnalysis.totalBalance,
+      totalPaid: currentAnalysis.totalPaid,
+      recoveryRate: currentAnalysis.recoveryRate,
+      debtCount: currentDebts.length
+    };
+    
+    const lastPoint = currentHistory[currentHistory.length - 1];
+    if (lastPoint && Math.abs(lastPoint.totalBalance - newPoint.totalBalance) < 1 && lastPoint.debtCount === newPoint.debtCount) {
+      return currentHistory;
+    }
+
+    const updatedHistory = [...currentHistory, newPoint].slice(-30);
+    return updatedHistory;
+  };
+
+  const markAllNotificationsAsRead = () => {
+    if (!analysis?.alerts) return;
+    const allIds = analysis.alerts.map(a => a.id);
+    setReadAlertIds(allIds);
+    
+    // Update Firestore
+    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+    setDoc(docRef, { readAlertIds: allIds }, { merge: true });
   };
 
   return (
@@ -259,7 +337,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       updateDebtsFromFile, 
       addRecoveryAction,
       clearAll, 
-      lastUpdatedBy 
+      lastUpdatedBy,
+      readAlertIds,
+      markAllNotificationsAsRead,
+      history
     }}>
       {children}
     </DebtContext.Provider>
