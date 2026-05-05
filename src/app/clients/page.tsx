@@ -71,6 +71,7 @@ export default function ClientsPage() {
 
   // Filtered client list logic
   const filteredClients = useMemo(() => {
+    if (!analysis) return [];
     let list = analysis.clientBreakdown || [];
     
     // 1. Filter by Commercial
@@ -119,6 +120,7 @@ export default function ClientsPage() {
 
   const commercialOptions = useMemo(() => {
     const map = new Map<string, string>();
+    if (!analysis) return [];
     (analysis.clientBreakdown || []).forEach((c: any) => {
       if (c.commercialName && c.commercialCode) {
         map.set(c.commercialName, c.commercialCode);
