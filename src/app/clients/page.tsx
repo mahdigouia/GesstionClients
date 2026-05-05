@@ -16,7 +16,6 @@ import {
   Expand,
   Shrink,
   X,
-  Phone,
   Scale,
   ShieldCheck,
   CreditCard
@@ -52,7 +51,7 @@ export default function ClientsPage() {
   const [retainedFilter, setRetainedFilter] = useState<'off' | 'include' | 'exclude'>('off');
   const [partialFilter, setPartialFilter] = useState<'off' | 'include' | 'exclude'>('off');
 
-  // Business logic for filters
+  // Business logic for filters (DRY)
   const isContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
   const isRetained = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();
@@ -68,6 +67,21 @@ export default function ClientsPage() {
     const ratio = (debt.balance / debt.amount) * 100;
     return ratio > 1.5 && ratio < 99;
   };
+
+  // Helper to get client-level matches
+  const clientHasContentieux = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isContentieux);
+  const clientHasRetained = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isRetained);
+  const clientHasPartial = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isPartial);
+
+  // Counts for tristate filters (relative to current list)
+  const stats = useMemo(() => {
+    const list = analysis?.clientBreakdown || [];
+    return {
+      contentieux: list.filter(c => clientHasContentieux(c.clientName)).length,
+      retained: list.filter(c => clientHasRetained(c.clientName)).length,
+      partial: list.filter(c => clientHasPartial(c.clientName)).length
+    };
+  }, [analysis, debts]);
 
   // Filtered client list logic
   const filteredClients = useMemo(() => {
@@ -88,48 +102,50 @@ export default function ClientsPage() {
       );
     }
 
-    // 3. Apply Tristate Filters (based on debts within client)
+    // 3. Apply Tristate Filters
     return list.filter((client: any) => {
-      const clientDebts = debts.filter(d => d.clientName === client.clientName);
-      
       const matchesContentieux =
         contentieuxFilter === 'off' ? true :
-        contentieuxFilter === 'include' ? clientDebts.some(isContentieux) :
-        !clientDebts.some(isContentieux);
+        contentieuxFilter === 'include' ? clientHasContentieux(client.clientName) :
+        !clientHasContentieux(client.clientName);
 
       const matchesRetained =
         retainedFilter === 'off' ? true :
-        retainedFilter === 'include' ? clientDebts.some(isRetained) :
-        !clientDebts.some(isRetained);
+        retainedFilter === 'include' ? clientHasRetained(client.clientName) :
+        !clientHasRetained(client.clientName);
 
       const matchesPartial =
         partialFilter === 'off' ? true :
-        partialFilter === 'include' ? clientDebts.some(isPartial) :
-        !clientDebts.some(isPartial);
+        partialFilter === 'include' ? clientHasPartial(client.clientName) :
+        !clientHasPartial(client.clientName);
 
       return matchesContentieux && matchesRetained && matchesPartial;
     });
-  }, [analysis.clientBreakdown, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter]);
+  }, [analysis, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter]);
 
-  // Expand by default when list changes
+  // Expand all by default
   useEffect(() => {
-    if (filteredClients.length > 0) {
+    if (filteredClients.length > 0 && expandedClients.size === 0) {
       setExpandedClients(new Set(filteredClients.map((c: any) => c.clientName)));
     }
   }, [filteredClients]);
 
   const commercialOptions = useMemo(() => {
-    const map = new Map<string, string>();
     if (!analysis) return [];
+    const map = new Map<string, any>();
     (analysis.clientBreakdown || []).forEach((c: any) => {
-      if (c.commercialName && c.commercialCode) {
-        map.set(c.commercialName, c.commercialCode);
+      if (c.commercialName) {
+        if (!map.has(c.commercialName)) {
+          map.set(c.commercialName, {
+            name: c.commercialName,
+            code: c.commercialCode || '?',
+            source: c.sourceFile || '?'
+          });
+        }
       }
     });
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, code]) => ({ name, code }));
-  }, [analysis.clientBreakdown]);
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [analysis]);
 
   const toggleClient = (name: string) => {
     const next = new Set(expandedClients);
@@ -155,34 +171,43 @@ export default function ClientsPage() {
               <div>
                 <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Portefeuille Clients</h1>
                 <p className="text-slate-500 text-sm font-medium">
-                  {filteredClients.length} clients affichés
+                  {filteredClients.length} clients affichés sur {analysis?.clientBreakdown?.length || 0}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="relative w-64">
+              <div className="relative w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Rechercher un client..."
-                  className="w-full pl-10 pr-4 py-2 bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl text-sm transition-all outline-none"
+                  placeholder="Nom, code client..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl text-sm transition-all outline-none"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               
               <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
-                <SelectTrigger className="w-[240px] bg-white border-slate-200 rounded-xl">
+                <SelectTrigger className="w-[300px] h-11 bg-white border-slate-200 rounded-xl text-slate-700">
                   <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder="Filtrer par commercial" />
+                  <SelectValue placeholder="Commercial" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-[400px]">
                   <SelectItem value="all">Tous les commerciaux</SelectItem>
                   {commercialOptions.map(opt => (
                     <SelectItem key={opt.name} value={opt.name}>
-                      <span className="text-[10px] font-mono text-slate-400 mr-2">[{opt.code}]</span>
-                      {opt.name}
+                      <div className="flex flex-col py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">
+                            {opt.code}
+                          </span>
+                          <span className="font-semibold text-slate-700">{opt.name}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                          <FileText className="h-3 w-3" /> {opt.source}
+                        </span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -192,7 +217,7 @@ export default function ClientsPage() {
                 variant="outline" 
                 size="sm"
                 onClick={() => allExpanded ? setExpandedClients(new Set()) : setExpandedClients(new Set(filteredClients.map((c: any) => c.clientName)))}
-                className="rounded-xl h-10 px-4 bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="rounded-xl h-11 px-4 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold"
               >
                 {allExpanded ? <Shrink className="h-4 w-4 mr-2" /> : <Expand className="h-4 w-4 mr-2" />}
                 {allExpanded ? 'Tout replier' : 'Tout déplier'}
@@ -202,7 +227,7 @@ export default function ClientsPage() {
                 <Button 
                   variant="outline" 
                   onClick={() => ExportService.exportClientsToExcel(filteredClients)}
-                  className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-10 px-4"
+                  className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-11 px-5 font-bold"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Excel
@@ -210,7 +235,7 @@ export default function ClientsPage() {
                 <Button 
                   variant="outline" 
                   onClick={() => ExportService.exportClientsToPDF(filteredClients)}
-                  className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-10 px-4"
+                  className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-11 px-5 font-bold"
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   PDF
@@ -223,7 +248,7 @@ export default function ClientsPage() {
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <Badge
               variant="outline"
-              className={`cursor-pointer px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
                 contentieuxFilter === 'include' ? 'bg-rose-600 text-white border-rose-600' :
                 contentieuxFilter === 'exclude' ? 'bg-slate-800 text-white border-slate-800' :
                 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
@@ -231,12 +256,12 @@ export default function ClientsPage() {
               onClick={() => setContentieuxFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
             >
               <Scale className="h-3.5 w-3.5" />
-              Contentieux {contentieuxFilter === 'include' ? '✓' : contentieuxFilter === 'exclude' ? '✗' : ''}
+              ⚖️ Contentieux ({stats.contentieux}) {contentieuxFilter === 'include' ? '✓' : contentieuxFilter === 'exclude' ? '✗' : ''}
             </Badge>
             
             <Badge
               variant="outline"
-              className={`cursor-pointer px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
                 retainedFilter === 'include' ? 'bg-violet-600 text-white border-violet-600' :
                 retainedFilter === 'exclude' ? 'bg-slate-800 text-white border-slate-800' :
                 'bg-white text-violet-600 border-violet-200 hover:bg-violet-50'
@@ -244,12 +269,12 @@ export default function ClientsPage() {
               onClick={() => setRetainedFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              Retenue {retainedFilter === 'include' ? '✓' : retainedFilter === 'exclude' ? '✗' : ''}
+              🛡️ Retenue ({stats.retained}) {retainedFilter === 'include' ? '✓' : retainedFilter === 'exclude' ? '✗' : ''}
             </Badge>
             
             <Badge
               variant="outline"
-              className={`cursor-pointer px-4 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
                 partialFilter === 'include' ? 'bg-amber-600 text-white border-amber-600' :
                 partialFilter === 'exclude' ? 'bg-slate-800 text-white border-slate-800' :
                 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
@@ -257,14 +282,14 @@ export default function ClientsPage() {
               onClick={() => setPartialFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
             >
               <CreditCard className="h-3.5 w-3.5" />
-              Partiel {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
+              💳 Partiel ({stats.partial}) {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
             </Badge>
 
             {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off') && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-slate-400 hover:text-slate-600 gap-1 h-8 text-[10px] uppercase font-bold"
+                className="text-slate-400 hover:text-slate-600 gap-1 h-8 text-[10px] uppercase font-black tracking-widest"
                 onClick={() => {
                   setContentieuxFilter('off');
                   setRetainedFilter('off');
@@ -285,22 +310,22 @@ export default function ClientsPage() {
               const clientDebts = debts.filter(d => d.clientName === client.clientName);
               
               return (
-                <Card key={idx} className="border-0 shadow-sm bg-white overflow-hidden rounded-3xl transition-all">
+                <Card key={idx} className="border-0 shadow-md bg-white overflow-hidden rounded-[32px] transition-all hover:shadow-xl">
                   {/* Client Card Header */}
                   <div 
                     onClick={() => toggleClient(client.clientName)}
-                    className="p-6 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors"
+                    className="p-8 flex items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors"
                   >
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-center gap-6">
                       <div className="flex-shrink-0">
                         {isExpanded ? (
-                          <ChevronDown className="h-5 w-5 text-slate-400" />
+                          <ChevronDown className="h-6 w-6 text-slate-400" />
                         ) : (
-                          <ChevronRight className="h-5 w-5 text-slate-400" />
+                          <ChevronRight className="h-6 w-6 text-slate-400" />
                         )}
                       </div>
                       
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl shadow-inner ${
+                      <div className={`w-16 h-16 rounded-[20px] flex items-center justify-center font-black text-2xl shadow-inner ${
                         client.totalBalance > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
                       }`}>
                         {client.clientName?.[0] || '?'}
@@ -308,74 +333,74 @@ export default function ClientsPage() {
                       
                       <div>
                         <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-bold font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg">
+                          <span className="text-[11px] font-black font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
                             {client.sourceFile || '?'}
                           </span>
-                          <h4 className="font-bold text-slate-800 text-lg">
+                          <h4 className="font-black text-slate-800 text-xl tracking-tight">
                             {client.clientName}
                           </h4>
                         </div>
                         
-                        <div className="flex items-center gap-4 text-sm text-slate-500 mt-2">
-                          <span className="flex items-center gap-1.5 font-medium bg-slate-50 px-2.5 py-1 rounded-lg text-[11px] text-slate-600 border border-slate-100">
-                            <strong>Code client:</strong> {client.clientCode}
+                        <div className="flex items-center gap-6 text-sm text-slate-500 mt-3">
+                          <span className="flex items-center gap-1.5 font-bold bg-slate-50 px-3 py-1.5 rounded-xl text-xs text-slate-700 border border-slate-100">
+                            Code client: <span className="text-blue-600 font-black ml-1">{client.clientCode}</span>
                           </span>
-                          <span className="flex items-center gap-1.5 text-[11px]">
-                            <FileText className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="flex items-center gap-2 font-semibold">
+                            <FileText className="h-4 w-4 text-slate-400" />
                             {client.debtCount} factures
                           </span>
-                          <span className="text-emerald-600 font-semibold flex items-center gap-1.5 text-[11px]">
-                            <Users className="h-3.5 w-3.5" />
+                          <span className="text-emerald-600 font-black flex items-center gap-2 bg-emerald-50/50 px-3 py-1.5 rounded-xl border border-emerald-100/50">
+                            <Users className="h-4 w-4" />
                             {client.commercialName}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-10 pr-4">
                       <div className="text-right">
-                        <div className={`text-2xl font-black tracking-tight ${client.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {(client.totalBalance ?? 0).toLocaleString('fr-FR')} <span className="text-sm font-normal opacity-60">TND</span>
+                        <div className={`text-3xl font-black tracking-tighter ${client.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {(client.totalBalance ?? 0).toLocaleString('fr-FR')} <span className="text-base font-medium opacity-60">TND</span>
                         </div>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Solde restant</div>
+                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1 text-right">Solde global</div>
                       </div>
                     </div>
                   </div>
 
                   {/* Expanded Table Section */}
                   {isExpanded && (
-                    <div className="px-6 pb-6 pt-0 border-t border-slate-50">
-                      <div className="bg-slate-50/50 rounded-2xl overflow-hidden border border-slate-100">
+                    <div className="px-8 pb-8 pt-0 border-t border-slate-50">
+                      <div className="bg-white rounded-[24px] overflow-hidden border border-slate-200 shadow-inner">
                         <Table>
                           <TableHeader>
-                            <TableRow className="bg-slate-100/50 border-0 hover:bg-slate-100/50">
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">N° Facture</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Date</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Montant</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Réglé</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Solde</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">Âge</TableHead>
-                              <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-500 text-center">Type</TableHead>
+                            <TableRow className="bg-slate-50/80 border-b border-slate-100 hover:bg-slate-50/80">
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 py-5 px-6">N° Facture</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 py-5">Date</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-right py-5">Montant</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-right py-5">Réglé</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-right py-5">Solde</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-center py-5">Âge</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-center py-5 px-6">Alertes</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {clientDebts.map((debt, i) => (
-                              <TableRow key={i} className="border-slate-50 hover:bg-white transition-colors group">
-                                <TableCell className="font-mono text-xs font-bold text-slate-600">{debt.documentNumber}</TableCell>
-                                <TableCell className="text-[11px] text-slate-500">{new Date(debt.documentDate).toLocaleDateString('fr-FR')}</TableCell>
-                                <TableCell className="text-[11px] font-bold text-slate-700 text-right">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</TableCell>
-                                <TableCell className="text-[11px] font-bold text-emerald-600 text-right">{(debt.payment ?? 0).toLocaleString('fr-FR')} TND</TableCell>
-                                <TableCell className="text-[11px] font-black text-rose-600 text-right">{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</TableCell>
-                                <TableCell className="text-center">
-                                  <Badge className={debt.age > 90 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'}>
+                              <TableRow key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-colors group">
+                                <TableCell className="font-mono text-sm font-bold text-slate-700 py-5 px-6">{debt.documentNumber}</TableCell>
+                                <TableCell className="text-sm font-medium text-slate-600 py-5">{new Date(debt.documentDate).toLocaleDateString('fr-FR')}</TableCell>
+                                <TableCell className="text-sm font-bold text-slate-800 text-right py-5">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</TableCell>
+                                <TableCell className="text-sm font-bold text-emerald-600 text-right py-5">{(debt.settlement ?? debt.payment ?? 0).toLocaleString('fr-FR')} TND</TableCell>
+                                <TableCell className="text-base font-black text-rose-600 text-right py-5">{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</TableCell>
+                                <TableCell className="text-center py-5">
+                                  <Badge className={`font-black px-3 py-1 rounded-lg ${debt.age > 90 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'}`}>
                                     {debt.age} j
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-center">
-                                  <div className="flex justify-center gap-1">
-                                    {isContentieux(debt) && <Badge className="bg-rose-500 text-white border-0 h-4 px-1 text-[8px]">C</Badge>}
-                                    {isRetained(debt) && <Badge className="bg-violet-500 text-white border-0 h-4 px-1 text-[8px]">R</Badge>}
-                                    {isPartial(debt) && <Badge className="bg-amber-500 text-white border-0 h-4 px-1 text-[8px]">P</Badge>}
+                                <TableCell className="text-center py-5 px-6">
+                                  <div className="flex justify-center gap-2">
+                                    {isContentieux(debt) && <Badge className="bg-rose-500 text-white border-0 h-6 px-2 text-[10px] font-black">CONTENTIEUX</Badge>}
+                                    {isRetained(debt) && <Badge className="bg-violet-500 text-white border-0 h-6 px-2 text-[10px] font-black">RETENUE</Badge>}
+                                    {isPartial(debt) && <Badge className="bg-amber-500 text-white border-0 h-6 px-2 text-[10px] font-black">PARTIEL</Badge>}
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -390,10 +415,10 @@ export default function ClientsPage() {
             })}
             
             {filteredClients.length === 0 && (
-              <div className="text-center py-20">
-                <div className="bg-white p-12 rounded-3xl shadow-sm border border-slate-100 inline-block">
-                  <Users className="h-16 w-16 text-slate-200 mx-auto mb-4" />
-                  <p className="text-slate-400 font-medium">Aucun client trouvé pour ces critères.</p>
+              <div className="text-center py-24">
+                <div className="bg-white p-16 rounded-[40px] shadow-sm border border-slate-100 inline-block">
+                  <Users className="h-20 w-20 text-slate-200 mx-auto mb-6" />
+                  <p className="text-slate-400 font-bold text-lg">Aucun client trouvé pour ces critères.</p>
                 </div>
               </div>
             )}

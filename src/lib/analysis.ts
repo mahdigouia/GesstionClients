@@ -60,6 +60,7 @@ export const AnalysisService = {
             clientName: debt.clientName,
             clientCode: debt.clientCode || '?',
             commercialName: debt.commercialName || 'Non assigné',
+            commercialCode: debt.commercialCode || '?',
             sourceFile: debt.sourceFile || '?',
             totalAmount: 0,
             totalBalance: 0,
@@ -76,6 +77,7 @@ export const AnalysisService = {
         
         // Mise à jour du commercial et source si non renseignés
         if (client.commercialName === 'Non assigné' && debt.commercialName) client.commercialName = debt.commercialName;
+        if (client.commercialCode === '?' && debt.commercialCode) client.commercialCode = debt.commercialCode;
         if (client.sourceFile === '?' && debt.sourceFile) client.sourceFile = debt.sourceFile;
         
         if (debt.riskLevel === 'critical' || client.riskLevel === 'critical') client.riskLevel = 'critical';
