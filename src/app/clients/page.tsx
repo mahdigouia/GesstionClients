@@ -350,6 +350,7 @@ export default function ClientsPage() {
                             <TableRow className="bg-slate-50/80 border-b border-slate-100 hover:bg-slate-50/80">
                               <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 py-5 px-6">N° Facture</TableHead>
                               <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 py-5">Date</TableHead>
+                              <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 py-5">Intitulé / BC</TableHead>
                               <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-right py-5">Montant</TableHead>
                               <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-right py-5">Réglé</TableHead>
                               <TableHead className="text-xs font-black uppercase tracking-wider text-slate-500 text-right py-5">Solde</TableHead>
@@ -364,6 +365,7 @@ export default function ClientsPage() {
                                 <TableRow key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-colors group">
                                   <TableCell className="font-mono text-sm font-bold text-slate-700 py-5 px-6">{debt.documentNumber}</TableCell>
                                   <TableCell className="text-sm font-medium text-slate-600 py-5">{new Date(debt.documentDate).toLocaleDateString('fr-FR')}</TableCell>
+                                  <TableCell className="text-xs font-semibold text-slate-500 py-5 italic">{debt.description || '-'}</TableCell>
                                   <TableCell className="text-sm font-bold text-slate-800 text-right py-5">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</TableCell>
                                   <TableCell className="text-sm font-bold text-emerald-600 text-right py-5">{(debt.settlement ?? 0).toLocaleString('fr-FR')} TND</TableCell>
                                   <TableCell className="text-base font-black text-rose-600 text-right py-5">{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</TableCell>

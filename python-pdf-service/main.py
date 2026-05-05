@@ -212,7 +212,8 @@ def parse_data_row(
         amounts = []
         for cell in row:
             # Pattern montant tunisien: 1 264,277 ou 264,277 ou 0,000 ou -28,808
-            amount_matches = re.findall(r'(?:-?\d{1,3}(?:\s\d{3})*,\d{3}|-?\d+,\d{3})', cell)
+            # Utilisation de lookbehind pour éviter de coller un chiffre précédent (ex: BC number)
+            amount_matches = re.findall(r'(?<!\d)(?:-?\d{1,3}(?:\s\d{3})*,\d{3}|-?\d+,\d{3})', cell)
             for match in amount_matches:
                 amounts.append(parse_tunisian_amount(match))
         
@@ -292,8 +293,8 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         
         # 3. Isoler la partie "Montants" (généralement à la fin de la ligne)
         # Les montants tunisiens finissent par ,XXX (3 chiffres après la virgule)
-        # Pattern: un ou plusieurs blocs de chiffres séparés par espace, puis virgule, puis exactement 3 chiffres
-        amount_pattern = r'-?\d{1,3}(?:\s\d{3})*,\d{3}'
+        # Utilisation de lookbehind (?<!\d) pour éviter de capturer la fin d'un numéro de BC ou autre code
+        amount_pattern = r'(?<!\d)(?:-?\d{1,3}(?:\s\d{3})*,\d{3})'
         amounts_found = re.findall(amount_pattern, line)
         
         if len(amounts_found) < 1:
@@ -316,16 +317,35 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             payment = 0.0
 
         # 4. Extraire l'âge (un entier simple entre les dates et les montants)
-        # On cherche un nombre qui n'est pas une date et n'a pas de virgule
         age = 0
         potential_ages = re.findall(r'\b(\d{1,4})\b', line)
         for val_str in potential_ages:
             val = int(val_str)
-            # Un âge est raisonnablement entre 0 et 5000 et n'est pas le code client ni une partie de date
             if 0 <= val < 4000 and val_str not in [d[0] for d in dates] and val_str not in [d[1] for d in dates] and val_str not in [d[2] for d in dates]:
                 if val_str != client.get("code"):
                     age = val
                     break
+
+        # 5. Extraire la description (l'intitulé)
+        # C'est ce qui se trouve entre le numéro de pièce et le premier montant
+        description = "FACTURE"
+        if document_number != "DOC":
+            try:
+                parts = line.split(document_number)
+                if len(parts) > 1:
+                    after_doc = parts[1]
+                    # Enlever les montants de la fin
+                    for amt_str in amounts_found:
+                        after_doc = after_doc.replace(amt_str, "")
+                    # Enlever l'âge
+                    if age > 0:
+                        after_doc = after_doc.replace(str(age), "", 1)
+                    
+                    desc_candidate = after_doc.strip()
+                    if len(desc_candidate) > 2:
+                        description = desc_candidate
+            except:
+                pass
 
         # Générer ID unique
         debt_id = len(context.debts) + 1
@@ -342,7 +362,7 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             payment=payment,
             balance=balance,
             age=age,
-            description="FACTURE",
+            description=description,
             settlement=payment,
             commercial_code=context.current_commercial.get("code") if context.current_commercial else None,
             commercial_name=context.current_commercial.get("name") if context.current_commercial else None
