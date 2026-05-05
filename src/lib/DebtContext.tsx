@@ -26,6 +26,7 @@ interface DebtContextType {
   readAlertIds: string[];
   markAllNotificationsAsRead: () => void;
   history: HistoryPoint[];
+  clearHistory: () => void;
 }
 
 export interface HistoryPoint {
@@ -65,36 +66,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           setRecoveryActions(data.recoveryActions || []);
           setLastUpdatedBy(data.updatedBy || null);
           setReadAlertIds(data.readAlertIds || []);
-          let historyData = data.history || [];
-          
-          // Seed data for demonstration if empty and we have debts
-          if (historyData.length === 0 && firestoreDebts.length > 0) {
-            const now = new Date();
-            historyData = [
-              { 
-                date: new Date(now.getTime() - 86400000 * 3).toISOString(), 
-                totalBalance: 450000, 
-                totalPaid: 320000, 
-                recoveryRate: 71, 
-                debtCount: 120 
-              },
-              { 
-                date: new Date(now.getTime() - 86400000 * 2).toISOString(), 
-                totalBalance: 480000, 
-                totalPaid: 350000, 
-                recoveryRate: 73, 
-                debtCount: 125 
-              },
-              { 
-                date: new Date(now.getTime() - 86400000 * 1).toISOString(), 
-                totalBalance: 470000, 
-                totalPaid: 380000, 
-                recoveryRate: 80, 
-                debtCount: 122 
-              }
-            ];
-          }
-          setHistory(historyData);
+          setHistory(data.history || []);
           
           if (firestoreDebts.length > 0) {
             const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts);
@@ -322,8 +294,18 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     setReadAlertIds(allIds);
     
     // Update Firestore
-    const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+     const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
     setDoc(docRef, { readAlertIds: allIds }, { merge: true });
+  };
+
+  const clearHistory = async () => {
+    setHistory([]);
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      await setDoc(docRef, { history: [] }, { merge: true });
+    } catch (error) {
+      console.warn('[DebtContext] Erreur suppression historique:', error);
+    }
   };
 
   return (
@@ -340,7 +322,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       lastUpdatedBy,
       readAlertIds,
       markAllNotificationsAsRead,
-      history
+      history,
+      clearHistory
     }}>
       {children}
     </DebtContext.Provider>

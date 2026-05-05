@@ -53,6 +53,12 @@ export default function SettingsPage() {
     }
   };
 
+  const handleClearHistory = () => {
+    if (confirm('Êtes-vous sûr de vouloir réinitialiser l\'historique d\'évolution ?')) {
+      clearHistory();
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -178,6 +184,16 @@ export default function SettingsPage() {
                 <Button onClick={handleClearData} variant="destructive" size="sm" disabled={debts.length === 0}>
                   <Trash2 className="h-4 w-4 mr-2" />
                   Supprimer
+                </Button>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-amber-200 rounded-lg bg-amber-50">
+                <div>
+                  <h4 className="font-medium text-amber-800">Réinitialiser l'historique</h4>
+                  <p className="text-sm text-amber-600">Supprimer les points de données d'évolution</p>
+                </div>
+                <Button onClick={handleClearHistory} variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Réinitialiser
                 </Button>
               </div>
             </CardContent>

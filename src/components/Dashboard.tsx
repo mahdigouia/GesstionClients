@@ -148,54 +148,102 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
       {/* Historique d'Évolution (Pro) */}
       <DebtEvolutionChart history={history} />
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Aging Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par Ancienneté</CardTitle>
+        <Card className="border-0 shadow-xl bg-white overflow-hidden">
+          <CardHeader className="border-b border-gray-50 bg-gray-50/30">
+            <CardTitle className="text-lg font-bold text-slate-800">Répartition par Ancienneté</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analysis.agingBreakdown}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="range" />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: any, name: any) => [
-                    typeof value === 'number' ? value.toFixed(2) + ' TND' : value,
-                    name === 'amount' ? 'Montant' : 'Nombre'
-                  ]}
+              <BarChart data={analysis.agingBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis 
+                  dataKey="range" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
+                  dy={10}
                 />
-                <Bar dataKey="amount" fill="#8884d8" />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
+                  tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
+                />
+                <Tooltip 
+                  cursor={{ fill: '#f8fafc' }}
+                  contentStyle={{ 
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                    padding: '12px'
+                  }}
+                  formatter={(value: any) => [`${Number(value).toLocaleString('fr-FR')} TND`, 'Montant']}
+                />
+                <Bar 
+                  dataKey="amount" 
+                  fill="url(#barGradient)" 
+                  radius={[6, 6, 0, 0]} 
+                  barSize={40}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Risk Distribution Pie Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par Risque</CardTitle>
+        {/* Risk Distribution Pie Chart - Donut style */}
+        <Card className="border-0 shadow-xl bg-white overflow-hidden">
+          <CardHeader className="border-b border-gray-50 bg-gray-50/30">
+            <CardTitle className="text-lg font-bold text-slate-800">Répartition par Risque</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
                   data={analysis.agingBreakdown}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
-                  label={({ range, percentage }) => `${range}: ${percentage.toFixed(1)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
+                  innerRadius={70}
+                  outerRadius={100}
+                  paddingAngle={5}
                   dataKey="amount"
                 >
                   {analysis.agingBreakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={pieColors[index % pieColors.length]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={pieColors[index % pieColors.length]} 
+                      stroke="none"
+                    />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: any) => [typeof value === 'number' ? value.toFixed(2) + ' TND' : value, 'Montant']} />
+                <Tooltip 
+                  contentStyle={{ 
+                    borderRadius: '12px', 
+                    border: 'none', 
+                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
+                  }}
+                  formatter={(value: any, name: any, props: any) => [
+                    `${Number(value).toLocaleString('fr-FR')} TND`, 
+                    props.payload.range
+                  ]}
+                />
+                <Legend 
+                  verticalAlign="bottom" 
+                  height={36}
+                  iconType="circle"
+                  formatter={(value, entry: any) => (
+                    <span className="text-xs font-semibold text-slate-600">
+                      {entry.payload.range}
+                    </span>
+                  )}
+                />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
