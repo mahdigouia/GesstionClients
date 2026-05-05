@@ -66,7 +66,8 @@ export const AnalysisService = {
             totalBalance: 0,
             totalPaid: 0,
             riskLevel: 'healthy',
-            debtCount: 0
+            debtCount: 0,
+            minExtractIndex: debt.extractIndex ?? 999999
           });
         }
         const client = clientMap.get(debt.clientName);
@@ -75,6 +76,11 @@ export const AnalysisService = {
         client.totalPaid += debt.settlement;
         client.debtCount++;
         
+        // Track the earliest extract index for this client
+        if (debt.extractIndex !== undefined && debt.extractIndex < client.minExtractIndex) {
+          client.minExtractIndex = debt.extractIndex;
+        }
+
         // Mise à jour du commercial et source si non renseignés
         if (client.commercialName === 'Non assigné' && debt.commercialName) client.commercialName = debt.commercialName;
         if (client.commercialCode === '?' && debt.commercialCode) client.commercialCode = debt.commercialCode;
@@ -85,7 +91,14 @@ export const AnalysisService = {
 
       const clientBreakdown = Array.from(clientMap.values())
         .map(c => ({ ...c, averagePaymentDelay: 0 }))
-        .sort((a, b) => b.totalBalance - a.totalBalance);
+        .sort((a, b) => {
+          // Primary sort by source file (alphabetical)
+          const sourceComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+          if (sourceComp !== 0) return sourceComp;
+          
+          // Secondary sort by first appearance in file
+          return (a.minExtractIndex || 0) - (b.minExtractIndex || 0);
+        });
 
       // Aging
       const agingRanges = [

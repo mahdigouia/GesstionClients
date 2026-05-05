@@ -305,7 +305,9 @@ export default function ClientsPage() {
           <div className="max-w-7xl mx-auto space-y-6">
             {filteredClients.map((client: any, idx: number) => {
               const isExpanded = expandedClients.has(client.clientName);
-              const clientDebts = debts.filter(d => d.clientName === client.clientName);
+              const clientDebts = debts
+                .filter(d => d.clientName === client.clientName)
+                .sort((a, b) => (a.extractIndex || 0) - (b.extractIndex || 0));
               
               return (
                 <Card key={idx} className="border-0 shadow-md bg-white overflow-hidden rounded-[32px] transition-all hover:shadow-xl">
