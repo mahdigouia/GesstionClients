@@ -221,7 +221,8 @@ export class ExportService {
       }
 
       pdf.setTextColor(40, 40, 40);
-      pdf.text(debt.clientName.substring(0, 38), margin, currentY);
+      const clientText = `${debt.clientCode} - ${debt.clientName.substring(0, 32)}`;
+      pdf.text(clientText, margin, currentY);
       pdf.text(debt.documentNumber, margin + 70, currentY);
       pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 100, currentY);
       
@@ -232,6 +233,22 @@ export class ExportService {
       
       currentY += 7;
     });
+
+    // 5. Ligne de Total final
+    if (currentY > 280) {
+      pdf.addPage();
+      currentY = addHeader(++pageNum);
+    }
+    
+    pdf.setFillColor(236, 240, 241);
+    pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 8, 'F');
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text("TOTAL GÉNÉRAL", margin, currentY);
+    
+    const totalAmount = debts.reduce((sum, d) => sum + d.amount, 0);
+    pdf.text(formatCurrency(totalAmount), margin + 125 + 30, currentY, { align: 'right' });
+    pdf.text(formatCurrency(totalBalance), margin + 155 + 25, currentY, { align: 'right' });
 
     const fileName = `Rapport_Creances_${new Date().toISOString().split('T')[0]}.pdf`;
     pdf.save(fileName);
