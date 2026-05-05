@@ -27,7 +27,8 @@ import {
   Settings,
   Save,
   X,
-  Menu
+  Menu,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -473,14 +474,35 @@ export default function Home() {
                               <p className="text-slate-500">{analysis.clientBreakdown?.length || 0} clients actifs</p>
                             </div>
                           </div>
-                          <div className="flex gap-2">
-                            <Badge className="bg-emerald-100 text-emerald-700 px-3 py-1">
-                              {analysis.clientBreakdown?.filter((c: any) => c.totalBalance === 0).length || 0} Sains
-                            </Badge>
-                            <Badge className="bg-red-100 text-red-700 px-3 py-1">
-                              {analysis.clientBreakdown?.filter((c: any) => c.totalBalance > 0).length || 0} À risque
-                            </Badge>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => ExportService.exportClientsToExcel(analysis.clientBreakdown)}
+                              className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 h-9"
+                            >
+                              <FileSpreadsheet className="h-4 w-4 mr-2" />
+                              Excel
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => ExportService.exportClientsToPDF(analysis.clientBreakdown)}
+                              className="bg-red-50 hover:bg-red-100 border-red-200 text-red-700 h-9"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              PDF
+                            </Button>
                           </div>
+                        </div>
+                        
+                        <div className="flex gap-2 mb-6">
+                          <Badge className="bg-emerald-100 text-emerald-700 px-3 py-1">
+                            {analysis.clientBreakdown?.filter((c: any) => c.totalBalance === 0).length || 0} Sains
+                          </Badge>
+                          <Badge className="bg-red-100 text-red-700 px-3 py-1">
+                            {analysis.clientBreakdown?.filter((c: any) => c.totalBalance > 0).length || 0} À risque
+                          </Badge>
                         </div>
                         
                         <div className="grid grid-cols-1 gap-3">

@@ -70,6 +70,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
             <div className="text-3xl font-bold">
               {Number(analysis.totalDebts || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-lg">TND</span>
             </div>
+            <div className="text-[10px] opacity-80 font-normal mt-0.5">(Total facturé)</div>
             <div className="flex items-center gap-1 mt-2 text-blue-100 text-sm">
               <ArrowUpRight className="h-4 w-4" />
               <span>{Number(analysis.totalBalance || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TND en attente</span>
