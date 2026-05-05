@@ -101,6 +101,91 @@ export class ExportService {
     pdf.save(fileName || defaultFileName);
   }
 
+  static async exportFilteredToPDF(debts: ClientDebt[], title: string = "Rapport des Créances"): Promise<void> {
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210;
+    const margin = 15;
+    let currentY = 20;
+
+    // 1. Ajouter le Logo
+    try {
+      // On utilise le logo qui a été copié dans public
+      pdf.addImage('/logo.png', 'PNG', margin, currentY, 40, 20);
+      currentY += 25;
+    } catch (e) {
+      console.warn("Logo non chargé, continuation sans logo");
+      currentY += 10;
+    }
+
+    // 2. En-tête
+    pdf.setFontSize(18);
+    pdf.setTextColor(40, 40, 40);
+    pdf.text(title, margin, currentY);
+    currentY += 8;
+    
+    pdf.setFontSize(10);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`Généré le : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, margin, currentY);
+    currentY += 15;
+
+    // 3. Résumé Rapide
+    const totalBalance = debts.reduce((sum, d) => sum + d.balance, 0);
+    pdf.setFontSize(12);
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Total des créances filtrées : ${totalBalance.toLocaleString('fr-FR')} TND`, margin, currentY);
+    currentY += 10;
+    pdf.setFont('helvetica', 'normal');
+
+    // 4. Tableau (Manuel)
+    const columns = [
+      { header: 'Client', x: margin, w: 60 },
+      { header: 'Facture', x: margin + 60, w: 30 },
+      { header: 'Date', x: margin + 90, w: 25 },
+      { header: 'Montant', x: margin + 115, w: 30 },
+      { header: 'Solde', x: margin + 145, w: 30 }
+    ];
+
+    // Header Tableau
+    pdf.setFillColor(240, 240, 240);
+    pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    columns.forEach(col => {
+      pdf.text(col.header, col.x, currentY);
+    });
+    currentY += 7;
+    pdf.setFont('helvetica', 'normal');
+
+    // Lignes
+    debts.slice(0, 30).forEach((debt, index) => { // Limité à 30 pour la première page, on pourrait paginer
+      if (currentY > 280) {
+        pdf.addPage();
+        currentY = 20;
+      }
+
+      pdf.text(debt.clientName.substring(0, 30), margin, currentY);
+      pdf.text(debt.documentNumber, margin + 60, currentY);
+      pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 90, currentY);
+      pdf.text(debt.amount.toLocaleString('fr-FR'), margin + 115, currentY);
+      pdf.text(debt.balance.toLocaleString('fr-FR'), margin + 145, currentY);
+      
+      currentY += 7;
+      // Ligne de séparation
+      pdf.setDrawColor(230, 230, 230);
+      pdf.line(margin, currentY - 5, pageWidth - margin, currentY - 5);
+    });
+
+    if (debts.length > 30) {
+      pdf.setFontSize(8);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`... et ${debts.length - 30} autres créances (voir Excel pour le détail complet)`, margin, currentY + 5);
+    }
+
+    const fileName = `export-${title.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    pdf.save(fileName);
+  }
+
   static generateReport(debts: ClientDebt[], analysis: AnalysisResult): string {
     const reportDate = new Date().toLocaleDateString('fr-FR');
     

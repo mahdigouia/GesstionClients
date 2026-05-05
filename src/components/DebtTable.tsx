@@ -17,6 +17,8 @@ import { ClientDebt } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { ClientSearchFilters } from './ClientSearchFilters';
 import { AutocompleteSearch } from './AutocompleteSearch';
+import { ExportService } from '@/lib/export';
+import { FileSpreadsheet, FileText as FilePdf } from 'lucide-react';
 
 interface DebtTableProps {
   debts: ClientDebt[];
@@ -204,10 +206,20 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => onExport?.(filteredDebts)}
+              onClick={() => ExportService.exportToExcel(filteredDebts)}
+              className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Exporter
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Excel
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => ExportService.exportFilteredToPDF(filteredDebts, "Rapport des Créances")}
+              className="bg-red-50 hover:bg-red-100 border-red-200 text-red-700"
+            >
+              <FilePdf className="h-4 w-4 mr-2" />
+              PDF
             </Button>
           </div>
         </div>
