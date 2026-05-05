@@ -335,7 +335,7 @@ export default function ClientsPage() {
                     <div className="flex items-center gap-8">
                       <div className="text-right">
                         <div className={`text-2xl font-black tracking-tight ${client.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {client.totalBalance.toLocaleString('fr-FR')} <span className="text-sm font-normal opacity-60">TND</span>
+                          {(client.totalBalance ?? 0).toLocaleString('fr-FR')} <span className="text-sm font-normal opacity-60">TND</span>
                         </div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Solde restant</div>
                       </div>
@@ -363,9 +363,9 @@ export default function ClientsPage() {
                               <TableRow key={i} className="border-slate-50 hover:bg-white transition-colors group">
                                 <TableCell className="font-mono text-xs font-bold text-slate-600">{debt.documentNumber}</TableCell>
                                 <TableCell className="text-[11px] text-slate-500">{new Date(debt.documentDate).toLocaleDateString('fr-FR')}</TableCell>
-                                <TableCell className="text-[11px] font-bold text-slate-700 text-right">{debt.amount.toLocaleString('fr-FR')} TND</TableCell>
-                                <TableCell className="text-[11px] font-bold text-emerald-600 text-right">{debt.payment.toLocaleString('fr-FR')} TND</TableCell>
-                                <TableCell className="text-[11px] font-black text-rose-600 text-right">{debt.balance.toLocaleString('fr-FR')} TND</TableCell>
+                                <TableCell className="text-[11px] font-bold text-slate-700 text-right">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</TableCell>
+                                <TableCell className="text-[11px] font-bold text-emerald-600 text-right">{(debt.payment ?? 0).toLocaleString('fr-FR')} TND</TableCell>
+                                <TableCell className="text-[11px] font-black text-rose-600 text-right">{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</TableCell>
                                 <TableCell className="text-center">
                                   <Badge className={debt.age > 90 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'}>
                                     {debt.age} j
