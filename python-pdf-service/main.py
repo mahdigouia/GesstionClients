@@ -310,11 +310,20 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         
         # L'âge et NbrJP sont généralement les premiers nombres après [PIECE] ou au début
         if numeric_tokens:
-            age = int(numeric_tokens[0][1])
-            if len(numeric_tokens) > 1:
-                # Si le 2ème nombre est juste après le 1er ou très proche, c'est NbrJP
-                if numeric_tokens[1][0] <= numeric_tokens[0][0] + 2:
-                    nbr_jp = int(numeric_tokens[1][1])
+            first_val = numeric_tokens[0][1]
+            # Cas spécial: âge avec millier séparé (ex: "2 455")
+            if len(numeric_tokens) >= 2 and len(numeric_tokens[1][1]) == 3 and numeric_tokens[1][0] == numeric_tokens[0][0] + 1:
+                # On fusionne les deux premiers tokens pour l'âge
+                age = int(first_val + numeric_tokens[1][1])
+                if len(numeric_tokens) > 2:
+                    nbr_jp = int(numeric_tokens[2][1])
+            else:
+                # Cas standard
+                age = int(first_val)
+                if len(numeric_tokens) > 1:
+                    # Si le 2ème nombre est juste après le 1er ou très proche, c'est NbrJP
+                    if numeric_tokens[1][0] <= numeric_tokens[0][0] + 2:
+                        nbr_jp = int(numeric_tokens[1][1])
 
         # 4. Extraire les montants
         # On cherche d'abord tous les tokens avec virgule
@@ -392,8 +401,21 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         remaining = line
         for d in dates: remaining = remaining.replace(f"{d[0]}/{d[1]}/{d[2]}", "")
         if doc_match: remaining = remaining.replace(doc_match.group(0), "")
-        if age > 0: remaining = remaining.replace(str(age), "", 1)
-        if nbr_jp > 0: remaining = remaining.replace(str(nbr_jp), "", 1)
+        
+        # Enlever l'âge et nbr_jp (les tokens exacts)
+        used_age_tokens = []
+        if numeric_tokens:
+            if len(numeric_tokens) >= 2 and len(numeric_tokens[1][1]) == 3 and numeric_tokens[1][0] == numeric_tokens[0][0] + 1:
+                used_age_tokens.append(numeric_tokens[0][1])
+                used_age_tokens.append(numeric_tokens[1][1])
+                if len(numeric_tokens) > 2: used_age_tokens.append(numeric_tokens[2][1])
+            else:
+                used_age_tokens.append(numeric_tokens[0][1])
+                if len(numeric_tokens) > 1 and numeric_tokens[1][0] <= numeric_tokens[0][0] + 2:
+                    used_age_tokens.append(numeric_tokens[1][1])
+                    
+        for t in used_age_tokens:
+            remaining = re.sub(r'\b' + re.escape(t) + r'\b', "", remaining, count=1)
         
         # Enlever les montants exacts (comma tokens)
         for ct in [c['full_str'] for c in amounts_candidates]:

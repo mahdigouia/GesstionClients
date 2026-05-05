@@ -396,15 +396,34 @@ export class OCRService {
     
     const tokens = remaining.split(/\s+/).filter(t => t.trim().length > 0);
     
-    // L'âge est généralement le premier nombre pur au début (après les dates/pièce)
+    // L'âge et NbrJP (avec gestion des milliers type "2 455")
     let age = 0;
+    let nbr_jp = 0;
     let descriptionTokens = [];
     
+    let skipNext = false;
     for (let i = 0; i < tokens.length; i++) {
-      if (i === 0 && /^\d+$/.test(tokens[i]) && tokens[i].length < 5) {
-        age = parseInt(tokens[i]);
-      } else if (i === 1 && age > 0 && /^\d+$/.test(tokens[i]) && tokens[i].length < 5) {
-        // Probablement NbrJP, on ignore pour l'âge
+      if (skipNext) { skipNext = false; continue; }
+      
+      if (i === 0 && /^\d{1,3}$/.test(tokens[i])) {
+        // Test si c'est un âge à 2 tokens (ex: "2" "455")
+        if (i + 1 < tokens.length && /^\d{3}$/.test(tokens[i+1])) {
+          age = parseInt(tokens[i] + tokens[i+1]);
+          skipNext = true;
+          // Chercher nbr_jp après l'âge fusionné
+          if (i + 2 < tokens.length && /^\d+$/.test(tokens[i+2])) {
+            nbr_jp = parseInt(tokens[i+2]);
+            // On sautera aussi i+2 au prochain tour
+            // skipNext ne gère qu'un tour, on va utiliser i++ manuellement
+            i += 2; skipNext = false;
+          }
+        } else {
+          age = parseInt(tokens[i]);
+          if (i + 1 < tokens.length && /^\d+$/.test(tokens[i+1])) {
+             nbr_jp = parseInt(tokens[i+1]);
+             skipNext = true;
+          }
+        }
       } else {
         descriptionTokens.push(tokens[i]);
       }
