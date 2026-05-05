@@ -73,6 +73,7 @@ export default function Home() {
 
   // Initialize filtered debts when debts change
   useEffect(() => {
+    console.log("Debts updated, re-filtering...");
     setFilteredDebts(debts);
   }, [debts]);
 
