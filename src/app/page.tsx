@@ -224,16 +224,6 @@ export default function Home() {
             </div>
             
             <div className="flex items-center space-x-2 md:space-x-3">
-              {/* Search Bar - Hidden on small screens to save space */}
-              <div className="relative hidden lg:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Rechercher..."
-                  className="pl-9 pr-4 py-1.5 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-32 md:w-64 bg-gray-50/50"
-                />
-              </div>
-
               {/* Action Buttons - Excel and Word */}
               {debts.length > 0 && (
                 <div className="flex items-center space-x-1 md:space-x-2">
