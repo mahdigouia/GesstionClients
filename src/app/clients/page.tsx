@@ -51,7 +51,7 @@ export default function ClientsPage() {
   const [retainedFilter, setRetainedFilter] = useState<'off' | 'include' | 'exclude'>('off');
   const [partialFilter, setPartialFilter] = useState<'off' | 'include' | 'exclude'>('off');
 
-  // Business logic for filters (DRY)
+  // Business logic for filters
   const isContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
   const isRetained = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();
@@ -73,13 +73,16 @@ export default function ClientsPage() {
   const clientHasRetained = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isRetained);
   const clientHasPartial = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isPartial);
 
-  // Counts for tristate filters (relative to current list)
+  // Counts for tristate filters (relative to global data)
   const stats = useMemo(() => {
     const list = analysis?.clientBreakdown || [];
     return {
       contentieux: list.filter(c => clientHasContentieux(c.clientName)).length,
       retained: list.filter(c => clientHasRetained(c.clientName)).length,
-      partial: list.filter(c => clientHasPartial(c.clientName)).length
+      partial: list.filter(c => clientHasPartial(c.clientName)).length,
+      nonContentieux: list.filter(c => !clientHasContentieux(c.clientName)).length,
+      nonRetained: list.filter(c => !clientHasRetained(c.clientName)).length,
+      nonPartial: list.filter(c => !clientHasPartial(c.clientName)).length
     };
   }, [analysis, debts]);
 
@@ -244,45 +247,45 @@ export default function ClientsPage() {
             </div>
           </div>
 
-          {/* Tristate Filters Bar */}
+          {/* Tristate Filters Bar - ALIGNED WITH DASHBOARD BEHAVIOR */}
           <div className="flex flex-wrap items-center gap-3 mt-6">
             <Badge
               variant="outline"
               className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                contentieuxFilter === 'include' ? 'bg-rose-600 text-white border-rose-600' :
-                contentieuxFilter === 'exclude' ? 'bg-slate-800 text-white border-slate-800' :
-                'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'
+                contentieuxFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
+                contentieuxFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
+                'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
               onClick={() => setContentieuxFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
             >
               <Scale className="h-3.5 w-3.5" />
-              ⚖️ Contentieux ({stats.contentieux}) {contentieuxFilter === 'include' ? '✓' : contentieuxFilter === 'exclude' ? '✗' : ''}
+              {contentieuxFilter === 'exclude' ? 'Non ' : ''}Contentieux ({contentieuxFilter === 'exclude' ? stats.nonContentieux : stats.contentieux}) {contentieuxFilter === 'include' ? '✓' : contentieuxFilter === 'exclude' ? '✗' : ''}
             </Badge>
             
             <Badge
               variant="outline"
               className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                retainedFilter === 'include' ? 'bg-violet-600 text-white border-violet-600' :
-                retainedFilter === 'exclude' ? 'bg-slate-800 text-white border-slate-800' :
-                'bg-white text-violet-600 border-violet-200 hover:bg-violet-50'
+                retainedFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
+                retainedFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
+                'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
               onClick={() => setRetainedFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
             >
               <ShieldCheck className="h-3.5 w-3.5" />
-              🛡️ Retenue ({stats.retained}) {retainedFilter === 'include' ? '✓' : retainedFilter === 'exclude' ? '✗' : ''}
+              {retainedFilter === 'exclude' ? 'Non ' : ''}Retenue ({retainedFilter === 'exclude' ? stats.nonRetained : stats.retained}) {retainedFilter === 'include' ? '✓' : retainedFilter === 'exclude' ? '✗' : ''}
             </Badge>
             
             <Badge
               variant="outline"
               className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                partialFilter === 'include' ? 'bg-amber-600 text-white border-amber-600' :
-                partialFilter === 'exclude' ? 'bg-slate-800 text-white border-slate-800' :
-                'bg-white text-amber-600 border-amber-200 hover:bg-amber-50'
+                partialFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
+                partialFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
+                'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
               onClick={() => setPartialFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
             >
               <CreditCard className="h-3.5 w-3.5" />
-              💳 Partiel ({stats.partial}) {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
+              {partialFilter === 'exclude' ? 'Non ' : ''}Partiel ({partialFilter === 'exclude' ? stats.nonPartial : stats.partial}) {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
             </Badge>
 
             {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off') && (
