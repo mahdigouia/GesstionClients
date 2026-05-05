@@ -387,6 +387,8 @@ Source: ${debt.sourceFile}
     const data = clients.map(c => ({
       'Code Client': c.clientCode,
       'Nom Client': c.clientName,
+      'Commercial': c.commercialName,
+      'Fichier Source': c.sourceFile,
       'Nombre de Factures': c.debtCount,
       'Solde Total (TND)': c.totalBalance,
       'Délai Moyen (jours)': Math.round(c.averagePaymentDelay)
@@ -428,11 +430,13 @@ Source: ${debt.sourceFile}
     currentY += 12;
 
     const cols = [
-      { h: 'Code', x: margin, w: 25 },
-      { h: 'Nom Client', x: margin + 25, w: 85 },
-      { h: 'Docs', x: margin + 110, w: 15 },
-      { h: 'Délai', x: margin + 125, w: 20 },
-      { h: 'Solde Total', x: margin + 145, w: 35, align: 'right' }
+      { h: 'Code', x: margin, w: 20 },
+      { h: 'Nom Client', x: margin + 20, w: 60 },
+      { h: 'Commercial', x: margin + 80, w: 30 },
+      { h: 'Source', x: margin + 110, w: 25 },
+      { h: 'Docs', x: margin + 135, w: 10 },
+      { h: 'Délai', x: margin + 145, w: 15 },
+      { h: 'Solde Total', x: margin + 160, w: 35, align: 'right' }
     ];
 
     pdf.setFillColor(44, 62, 80);
@@ -462,10 +466,12 @@ Source: ${debt.sourceFile}
       }
 
       pdf.text(c.clientCode || '?', margin, currentY);
-      pdf.text((c.clientName || 'Inconnu').substring(0, 45), margin + 25, currentY);
-      pdf.text(String(c.debtCount), margin + 110, currentY);
-      pdf.text(`${Math.round(c.averagePaymentDelay)}j`, margin + 125, currentY);
-      pdf.text(formatCurrency(c.totalBalance), margin + 145 + 35, currentY, { align: 'right' });
+      pdf.text((c.clientName || 'Inconnu').substring(0, 35), margin + 20, currentY);
+      pdf.text((c.commercialName || '').substring(0, 18), margin + 80, currentY);
+      pdf.text((c.sourceFile || '').substring(0, 15), margin + 110, currentY);
+      pdf.text(String(c.debtCount), margin + 135, currentY);
+      pdf.text(`${Math.round(c.averagePaymentDelay)}j`, margin + 145, currentY);
+      pdf.text(formatCurrency(c.totalBalance), margin + 160 + 35, currentY, { align: 'right' });
       currentY += 7;
     });
 

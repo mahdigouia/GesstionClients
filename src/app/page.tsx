@@ -39,6 +39,13 @@ import { NotificationPopover } from '@/components/NotificationPopover';
 import { ClientHistoryModal } from '@/components/ClientHistoryModal';
 import { useToast } from '@/hooks/use-toast';
 import { ContactDirectory } from '@/components/ContactDirectory';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 export default function Home() {
   const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis, addRecoveryAction } = useDebtContext();
@@ -62,6 +69,7 @@ export default function Home() {
   const [quickActionClient, setQuickActionClient] = useState('');
 
   const [waitingMessage, setWaitingMessage] = useState<string | null>(null);
+  const [selectedClientCommercial, setSelectedClientCommercial] = useState('all');
 
   // Initialize filtered debts when debts change
   useEffect(() => {
@@ -461,10 +469,9 @@ export default function Home() {
                   </TabsContent>
 
                   <TabsContent value="clients" className="space-y-6">
-                    {/* Modern Clients Card with glassmorphism */}
                     <Card className="overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-white to-violet-50/30">
                       <CardContent className="p-8">
-                        <div className="flex items-center justify-between mb-8">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                           <div className="flex items-center gap-3">
                             <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
                               <Users className="h-6 w-6 text-white" />
@@ -474,11 +481,36 @@ export default function Home() {
                               <p className="text-slate-500">{analysis.clientBreakdown?.length || 0} clients actifs</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Select 
+                              value={selectedClientCommercial} 
+                              onValueChange={setSelectedClientCommercial}
+                            >
+                              <SelectTrigger className="w-[180px] h-9 bg-white border-slate-200">
+                                <SelectValue placeholder="Filtrer par commercial" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">Tous les commerciaux</SelectItem>
+                                {Array.from(new Set(analysis.clientBreakdown?.map((c: any) => c.commercialName)))
+                                  .filter(Boolean)
+                                  .sort()
+                                  .map((comm: any) => (
+                                    <SelectItem key={comm} value={comm}>{comm}</SelectItem>
+                                  ))
+                                }
+                              </SelectContent>
+                            </Select>
+                            
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => ExportService.exportClientsToExcel(analysis.clientBreakdown)}
+                              onClick={() => {
+                                const list = selectedClientCommercial === 'all' 
+                                  ? analysis.clientBreakdown 
+                                  : analysis.clientBreakdown?.filter((c: any) => c.commercialName === selectedClientCommercial);
+                                ExportService.exportClientsToExcel(list);
+                              }}
                               className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 h-9"
                             >
                               <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -487,7 +519,12 @@ export default function Home() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => ExportService.exportClientsToPDF(analysis.clientBreakdown)}
+                              onClick={() => {
+                                const list = selectedClientCommercial === 'all' 
+                                  ? analysis.clientBreakdown 
+                                  : analysis.clientBreakdown?.filter((c: any) => c.commercialName === selectedClientCommercial);
+                                ExportService.exportClientsToPDF(list);
+                              }}
                               className="bg-red-50 hover:bg-red-100 border-red-200 text-red-700 h-9"
                             >
                               <FileText className="h-4 w-4 mr-2" />
@@ -498,70 +535,68 @@ export default function Home() {
                         
                         <div className="flex gap-2 mb-6">
                           <Badge className="bg-emerald-100 text-emerald-700 px-3 py-1">
-                            {analysis.clientBreakdown?.filter((c: any) => c.totalBalance === 0).length || 0} Sains
+                            {(selectedClientCommercial === 'all' 
+                              ? analysis.clientBreakdown 
+                              : analysis.clientBreakdown?.filter((c: any) => c.commercialName === selectedClientCommercial)
+                             )?.filter((c: any) => c.totalBalance === 0).length || 0} Sains
                           </Badge>
                           <Badge className="bg-red-100 text-red-700 px-3 py-1">
-                            {analysis.clientBreakdown?.filter((c: any) => c.totalBalance > 0).length || 0} À risque
+                            {(selectedClientCommercial === 'all' 
+                              ? analysis.clientBreakdown 
+                              : analysis.clientBreakdown?.filter((c: any) => c.commercialName === selectedClientCommercial)
+                             )?.filter((c: any) => c.totalBalance > 0).length || 0} À risque
                           </Badge>
                         </div>
                         
                         <div className="grid grid-cols-1 gap-3">
-                          {analysis.clientBreakdown?.map((client: any, index: number) => (
+                          {(selectedClientCommercial === 'all' 
+                            ? analysis.clientBreakdown 
+                            : analysis.clientBreakdown?.filter((c: any) => c.commercialName === selectedClientCommercial)
+                          )?.map((client: any, index: number) => (
                             <div 
-                              key={index} 
-                              className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.01] cursor-pointer"
-                              onClick={() => handleShowClientHistory(client.clientName)}
+                              key={index}
+                              onClick={() => {
+                                setSelectedClientName(client.clientName);
+                                setClientHistoryDebts(debts.filter(d => d.clientName === client.clientName));
+                                setIsHistoryModalOpen(true);
+                              }}
+                              className="group flex items-center justify-between p-5 border border-slate-100 rounded-2xl hover:border-violet-200 hover:bg-violet-50/30 hover:shadow-md transition-all cursor-pointer"
                             >
-                              <div className={`
-                                absolute left-0 top-0 bottom-0 w-1
-                                ${client.totalBalance > 1000 ? 'bg-gradient-to-b from-red-500 to-rose-600' :
-                                  client.totalBalance > 500 ? 'bg-gradient-to-b from-amber-500 to-orange-500' :
-                                  'bg-gradient-to-b from-emerald-500 to-green-600'}
-                              `} />
-                              
-                              <div className="p-5 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  {/* Avatar with gradient */}
-                                  <div className={`
-                                    w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg
-                                    ${client.totalBalance > 1000 ? 'bg-gradient-to-br from-red-500 to-rose-600' :
-                                      client.totalBalance > 500 ? 'bg-gradient-to-br from-amber-500 to-orange-500' :
-                                      'bg-gradient-to-br from-emerald-500 to-green-600'}
-                                  `}>
-                                    <span className="text-white font-bold text-lg">
-                                      {(client.clientName || '?').charAt(0).toUpperCase()}
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shadow-sm ${
+                                  client.totalBalance > 0 
+                                    ? 'bg-red-100 text-red-600' 
+                                    : 'bg-emerald-100 text-emerald-600'
+                                }`}>
+                                  {client.clientName?.[0] || '?'}
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                      {client.sourceFile || '?'}
+                                    </span>
+                                    <h4 className="font-bold text-slate-800 group-hover:text-violet-600 transition-colors">
+                                      {client.clientName}
+                                    </h4>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
+                                    <span className="font-medium bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                      Code: {client.clientCode}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      {client.debtCount} factures
+                                    </span>
+                                    <span className="text-violet-500 font-medium">
+                                      • {client.commercialName}
                                     </span>
                                   </div>
-                                  
-                                  <div>
-                                    <div className="font-bold text-slate-800 text-lg">{client.clientName || 'Client inconnu'}</div>
-                                    <div className="flex items-center gap-3 text-sm">
-                                      <span className="text-slate-500">
-                                        <span className="font-semibold text-slate-700">{client.debtCount}</span> factures
-                                      </span>
-                                      <span className="text-slate-300">|</span>
-                                      <span className="text-slate-500">
-                                        Délai moy: <span className="font-semibold text-slate-700">{Math.round(client.averagePaymentDelay)}j</span>
-                                      </span>
-                                    </div>
-                                  </div>
                                 </div>
-                                
-                                <div className="text-right">
-                                  <div className="text-2xl font-bold text-slate-800">
-                                    {client.totalBalance.toLocaleString('fr-FR')} <span className="text-sm font-normal text-slate-500">TND</span>
-                                  </div>
-                                  <div className={`
-                                    inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold mt-1
-                                    ${client.totalBalance > 1000 ? 'bg-red-100 text-red-700' :
-                                      client.totalBalance > 500 ? 'bg-amber-100 text-amber-700' :
-                                      'bg-emerald-100 text-emerald-700'}
-                                  `}>
-                                    {client.totalBalance > 1000 ? '🔴 Risque élevé' :
-                                      client.totalBalance > 500 ? '🟠 Surveillance' :
-                                      '🟢 Client sain'}
-                                  </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`text-xl font-bold ${client.totalBalance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                  {client.totalBalance.toLocaleString('fr-FR')} <span className="text-sm font-normal opacity-70">TND</span>
                                 </div>
+                                <div className="text-xs text-slate-400 mt-1">Solde Total</div>
                               </div>
                             </div>
                           ))}

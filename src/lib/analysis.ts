@@ -58,6 +58,9 @@ export const AnalysisService = {
         if (!clientMap.has(debt.clientName)) {
           clientMap.set(debt.clientName, {
             clientName: debt.clientName,
+            clientCode: debt.clientCode || '?',
+            commercialName: debt.commercialName || 'Non assigné',
+            sourceFile: debt.sourceFile || '?',
             totalAmount: 0,
             totalBalance: 0,
             totalPaid: 0,
@@ -70,6 +73,11 @@ export const AnalysisService = {
         client.totalBalance += debt.balance;
         client.totalPaid += debt.settlement;
         client.debtCount++;
+        
+        // Mise à jour du commercial et source si non renseignés
+        if (client.commercialName === 'Non assigné' && debt.commercialName) client.commercialName = debt.commercialName;
+        if (client.sourceFile === '?' && debt.sourceFile) client.sourceFile = debt.sourceFile;
+        
         if (debt.riskLevel === 'critical' || client.riskLevel === 'critical') client.riskLevel = 'critical';
       });
 
