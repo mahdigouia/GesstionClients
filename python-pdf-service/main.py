@@ -275,10 +275,10 @@ def parse_data_row(
 def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContext) -> Optional[DebtData]:
     """Parse une ligne de créance avec une robustesse accrue pour les montants tunisiens"""
     try:
-        # Nettoyage initial: enlever les doubles espaces et guillemets
+        # Nettoyage initial
         line = line.replace('""', '"').strip()
         
-        # 1. Extraire les dates DD/MM/YYYY (doivent avoir 4 chiffres pour l'année)
+        # 1. Extraire les dates
         dates = re.findall(r'(\d{2})[\/\-](\d{2})[\/\-](\d{4})', line)
         if len(dates) < 1:
             return None
@@ -286,94 +286,144 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         due_date = f"{dates[0][2]}-{dates[0][1]}-{dates[0][0]}"
         doc_date = f"{dates[1][2]}-{dates[1][1]}-{dates[1][0]}" if len(dates) > 1 else due_date
         
-        # 2. Identifier le numéro de pièce (FT/FS/IC/AV + 6-8 chiffres)
-        # On exclut les correspondances qui ressemblent à des dates
+        # 2. Identifier le numéro de pièce
         doc_match = re.search(r'\b(FT\d{6}|FS\d{6}|IC\d{6}|AV[A-Z]*\d+)\b', line, re.IGNORECASE)
         document_number = doc_match.group(1).upper() if doc_match else "DOC"
         
-        # 3. Isoler la partie "Montants" (généralement à la fin de la ligne)
-        # Les montants tunisiens finissent par ,XXX (3 chiffres après la virgule)
-        # Utilisation de lookbehind (?<!\d) pour éviter de capturer la fin d'un numéro de BC ou autre code
-        amount_pattern = r'(?<!\d)(?:-?\d{1,3}(?:\s\d{3})*,\d{3})'
-        amounts_found = re.findall(amount_pattern, line)
+        # 3. Extraire l'âge et NbrJP
+        # On cherche les nombres simples (sans virgule) qui suivent le doc_number ou les dates
+        age = 0
+        nbr_jp = 0
         
-        if len(amounts_found) < 1:
+        # On nettoie temporairement la ligne pour trouver les tokens restants
+        temp_line = line
+        for d in dates:
+            temp_line = temp_line.replace(f"{d[0]}/{d[1]}/{d[2]}", " [DATE] ")
+        if doc_match:
+            temp_line = temp_line.replace(doc_match.group(0), " [PIECE] ")
+            
+        tokens = temp_line.split()
+        numeric_tokens = []
+        for i, t in enumerate(tokens):
+            if re.match(r'^\d+$', t) and len(t) < 5:
+                numeric_tokens.append((i, t))
+        
+        # L'âge et NbrJP sont généralement les premiers nombres après [PIECE] ou au début
+        if numeric_tokens:
+            age = int(numeric_tokens[0][1])
+            if len(numeric_tokens) > 1:
+                # Si le 2ème nombre est juste après le 1er ou très proche, c'est NbrJP
+                if numeric_tokens[1][0] <= numeric_tokens[0][0] + 2:
+                    nbr_jp = int(numeric_tokens[1][1])
+
+        # 4. Extraire les montants
+        # On cherche d'abord tous les tokens avec virgule
+        comma_tokens = re.findall(r'-?\d+,\d{3}', line)
+        if len(comma_tokens) < 1:
             return None
             
-        # Convertir les montants trouvés
-        numbers = [parse_tunisian_amount(a) for a in amounts_found]
+        # Tentative de fusion des milliers pour chaque comma_token
+        amounts = []
+        for ct in comma_tokens:
+            val = parse_tunisian_amount(ct)
+            # Chercher si le mot juste avant dans la ligne est un millier
+            # On cherche " X " + ct
+            prefix_match = re.search(r'\b(\d{1,3})\s+' + re.escape(ct), line)
+            if prefix_match:
+                # On teste si la fusion est plus cohérente plus tard, ou on fusionne d'office si c'est raisonnable
+                # Ici on garde les deux versions pour le check de cohérence
+                amounts.append({"val": val, "full_str": ct, "prefix": prefix_match.group(1)})
+            else:
+                amounts.append({"val": val, "full_str": ct, "prefix": None})
         
-        # Structure standard: Montant, Règlement, Solde
-        if len(numbers) >= 3:
-            amount = numbers[-3]
-            payment = numbers[-2]
-            balance = numbers[-1]
-        elif len(numbers) == 2:
-            amount = numbers[0]
-            balance = numbers[1]
-            payment = round(amount - balance, 3)
+        # Résolution des 3 montants (M, R, S)
+        m = r = s = 0.0
+        if len(amounts) >= 3:
+            # On prend les 3 derniers
+            candidates = amounts[-3:]
+            
+            # Pour chaque candidat, décider si on garde le prefix ou pas basé sur la cohérence M - R = S
+            # On essaie les combinaisons (8 combinaisons possibles max)
+            best_diff = 999999.0
+            best_vals = (0.0, 0.0, 0.0)
+            
+            for i in [0, 1]: # Prefix pour M
+                for j in [0, 1]: # Prefix pour R
+                    for k in [0, 1]: # Prefix pour S
+                        v_m = parse_tunisian_amount(f"{candidates[0]['prefix']} {candidates[0]['full_str']}") if i and candidates[0]['prefix'] else candidates[0]['val']
+                        v_r = parse_tunisian_amount(f"{candidates[1]['prefix']} {candidates[1]['full_str']}") if j and candidates[1]['prefix'] else candidates[1]['val']
+                        v_s = parse_tunisian_amount(f"{candidates[2]['prefix']} {candidates[2]['full_str']}") if k and candidates[2]['prefix'] else candidates[2]['val']
+                        
+                        diff = abs((v_m - v_r) - v_s)
+                        if diff < best_diff:
+                            best_diff = diff
+                            best_vals = (v_m, v_r, v_s)
+            
+            m, r, s = best_vals
+            # Si même le meilleur diff est grand, on prend les valeurs brutes sans prefix par défaut
+            if best_diff > 2.0:
+                m = candidates[0]['val']
+                r = candidates[1]['val']
+                s = candidates[2]['val']
+        elif len(amounts) == 2:
+            m = amounts[0]['val']
+            s = amounts[1]['val']
+            r = m - s
         else:
-            amount = balance = numbers[0]
-            payment = 0.0
+            m = s = amounts[0]['val']
+            r = 0.0
 
-        # 4. Extraire l'âge (un entier simple entre les dates et les montants)
-        age = 0
-        potential_ages = re.findall(r'\b(\d{1,4})\b', line)
-        for val_str in potential_ages:
-            val = int(val_str)
-            if 0 <= val < 4000 and val_str not in [d[0] for d in dates] and val_str not in [d[1] for d in dates] and val_str not in [d[2] for d in dates]:
-                if val_str != client.get("code"):
-                    age = val
-                    break
-
-        # 5. Extraire la description (l'intitulé)
-        # C'est ce qui se trouve entre le numéro de pièce et le premier montant
-        description = "FACTURE"
-        if document_number != "DOC":
-            try:
-                parts = line.split(document_number)
-                if len(parts) > 1:
-                    after_doc = parts[1]
-                    # Enlever les montants de la fin
-                    for amt_str in amounts_found:
-                        after_doc = after_doc.replace(amt_str, "")
-                    # Enlever l'âge
-                    if age > 0:
-                        after_doc = after_doc.replace(str(age), "", 1)
-                    
-                    desc_candidate = after_doc.strip()
-                    if len(desc_candidate) > 2:
-                        description = desc_candidate
-            except:
-                pass
-
-        # Générer ID unique
-        debt_id = len(context.debts) + 1
+        # 5. Extraire la description
+        # Enlever tout ce qu'on a déjà identifié
+        remaining = line
+        for d in dates: remaining = remaining.replace(f"{d[0]}/{d[1]}/{d[2]}", "")
+        if doc_match: remaining = remaining.replace(doc_match.group(0), "")
+        if age > 0: remaining = remaining.replace(str(age), "", 1)
+        if nbr_jp > 0: remaining = remaining.replace(str(nbr_jp), "", 1)
         
+        # Enlever les montants (les chaînes exactes trouvées)
+        # Attention à ne pas enlever le "3" de "korba 3" si on a décidé de ne pas le fusionner
+        # On n'enlève que les comma_tokens
+        for ct in comma_tokens:
+            remaining = remaining.replace(ct, "")
+        
+        # Enlever les milliers fusionnés (seulement ceux qui ont été utilisés)
+        # Pour simplifier, on nettoie juste les chiffres restants à la fin si nécessaire, 
+        # mais gardons les tokens de texte
+        desc_tokens = remaining.split()
+        clean_desc_tokens = []
+        for t in desc_tokens:
+            # Si c'est un petit nombre restant, c'est peut-être un millier non utilisé ou un chiffre de description
+            if re.match(r'^\d+$', t) and len(t) < 4:
+                # On le garde si c'est probablement une partie du nom (ex: "korba 3")
+                clean_desc_tokens.append(t)
+            elif not re.search(r'\d', t) or len(t) > 3:
+                # Token de texte ou nombre long (probablement pas un montant restant)
+                clean_desc_tokens.append(t)
+        
+        description = " ".join(clean_desc_tokens).strip()
+        if not description or len(description) < 2:
+            description = "FACTURE"
+
         return DebtData(
-            id=debt_id,
+            id=len(context.debts) + 1,
             client_code=client["code"],
             client_name=client["name"],
             client_phone=client.get("phone"),
             document_number=document_number,
             due_date=due_date,
             document_date=doc_date,
-            amount=amount,
-            payment=payment,
-            balance=balance,
+            amount=m,
+            settlement=r,
+            balance=s,
             age=age,
             description=description,
-            settlement=payment,
             commercial_code=context.current_commercial.get("code") if context.current_commercial else None,
             commercial_name=context.current_commercial.get("name") if context.current_commercial else None
         )
         
     except Exception as e:
-        print(f"[PDF Extract] Erreur critique parse_text_line: {e}")
-        return None
-        
-    except Exception as e:
-        print(f"[PDF Extract] Erreur parse_text_line: {e} sur ligne: {line[:60]}")
+        print(f"[PDF Extract] Erreur parse_text_line: {e}")
         return None
 
 
