@@ -225,7 +225,7 @@ export default function Home() {
             
             <div className="flex items-center space-x-2 md:space-x-3">
               {/* Search Bar - Hidden on small screens to save space */}
-              <div className="relative hidden sm:block">
+              <div className="relative hidden lg:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
@@ -234,19 +234,40 @@ export default function Home() {
                 />
               </div>
 
+              {/* Action Buttons - Excel and Word */}
+              {debts.length > 0 && (
+                <div className="flex items-center space-x-1 md:space-x-2">
+                  <Button 
+                    onClick={() => ExportService.exportToExcelByCommercial(debts)} 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-2 md:px-3 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 gap-1.5"
+                    title="Rapport Excel"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    <span className="hidden sm:inline text-xs font-bold">Excel</span>
+                  </Button>
+                  <Button 
+                    onClick={() => ExportService.generateWordReportWithAI(debts, analysis || undefined)} 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 px-2 md:px-3 bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700 gap-1.5"
+                    title="Rapport Word IA"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span className="hidden sm:inline text-xs font-bold">Word IA</span>
+                  </Button>
+                </div>
+              )}
+
               {/* Notifications */}
               <NotificationPopover />
 
-              {/* Export & Save - Icon only on mobile */}
+              {/* Save - Icon only */}
               {debts.length > 0 && (
-                <div className="flex items-center space-x-1 md:space-x-2">
-                  <Button onClick={handleSaveAnalysis} variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-gray-50" title="Sauvegarder">
-                    <Save className="h-4 w-4 text-gray-600" />
-                  </Button>
-                  <Button onClick={handleExportExcel} variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-gray-50" title="Excel">
-                    <Download className="h-4 w-4 text-green-600" />
-                  </Button>
-                </div>
+                <Button onClick={handleSaveAnalysis} variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-gray-50" title="Sauvegarder">
+                  <Save className="h-4 w-4 text-gray-600" />
+                </Button>
               )}
             </div>
           </div>
@@ -362,30 +383,6 @@ export default function Home() {
                   </div>
 
                   <TabsContent value="dashboard" className="space-y-6">
-                    {/* Boutons de génération de rapports */}
-                    <div className="flex flex-wrap gap-3 mb-4">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => ExportService.exportToExcelByCommercial(debts)}
-                        className="gap-2 bg-blue-50 hover:bg-blue-100 border-blue-200"
-                      >
-                        <svg className="h-4 w-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        <span>📊 Rapport Excel par Commercial</span>
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => ExportService.generateWordReportWithAI(debts)}
-                        className="gap-2 bg-indigo-50 hover:bg-indigo-100 border-indigo-200"
-                      >
-                        <svg className="h-4 w-4 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        <span>📝 Rapport Word IA par Document</span>
-                      </Button>
-                    </div>
-                    
                     <QuickFilters 
                       debts={debts}
                       onFilterChange={(filtered, activeFilter) => {
