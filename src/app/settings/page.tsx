@@ -3,7 +3,7 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -11,7 +11,7 @@ import { ExportService } from '@/lib/export';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
-  const { debts, analysis, clearAll } = useDebtContext();
+  const { debts, analysis, clearAll, clearHistory } = useDebtContext();
   const { user, initials, fullName, logout } = useAuth();
   const router = useRouter();
 
