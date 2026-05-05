@@ -272,116 +272,61 @@ def parse_data_row(
 
 
 def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContext) -> Optional[DebtData]:
-    """Parse une ligne de créance depuis le texte brut du PDF
-    Format attendu: Echéance  Date  N°pièce  Age  Nbr.J.P  Intitulé  Montant  Règlement  Solde
-    Ex: 14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277
-    """
+    """Parse une ligne de créance avec une robustesse accrue pour les montants tunisiens"""
     try:
-        # Extraire toutes les dates au format DD/MM/YYYY
-        dates = re.findall(r'(\d{2})[\/](\d{2})[\/](\d{4})', line)
+        # Nettoyage initial: enlever les doubles espaces et guillemets
+        line = line.replace('""', '"').strip()
+        
+        # 1. Extraire les dates DD/MM/YYYY (doivent avoir 4 chiffres pour l'année)
+        dates = re.findall(r'(\d{2})[\/\-](\d{2})[\/\-](\d{4})', line)
         if len(dates) < 1:
             return None
         
-        # Convertir dates en format standard YYYY-MM-DD
         due_date = f"{dates[0][2]}-{dates[0][1]}-{dates[0][0]}"
         doc_date = f"{dates[1][2]}-{dates[1][1]}-{dates[1][0]}" if len(dates) > 1 else due_date
         
-        # Chercher le numéro de pièce (FT######, FS######, IC######, AVT/AVS######, AV######, etc.)
-        doc_match = re.search(r'(AVT\d{5,8}|AVS\d{5,8}|FRS\d+|FRT\d+|FS\d{6}|[A-Z]{2}\d{6})', line)
-        document_number = doc_match.group(1) if doc_match else ""
+        # 2. Identifier le numéro de pièce (FT/FS/IC/AV + 6-8 chiffres)
+        # On exclut les correspondances qui ressemblent à des dates
+        doc_match = re.search(r'\b(FT\d{6}|FS\d{6}|IC\d{6}|AV[A-Z]*\d+)\b', line, re.IGNORECASE)
+        document_number = doc_match.group(1).upper() if doc_match else "DOC"
         
-        # Supprimer les dates et le numéro de pièce pour analyser le reste
-        work_line = line
-        for d in dates:
-            date_str = f"{d[0]}/{d[1]}/{d[2]}"
-            work_line = work_line.replace(date_str, ' ', 1)
-        if doc_match:
-            work_line = work_line.replace(doc_match.group(1), ' ')
+        # 3. Isoler la partie "Montants" (généralement à la fin de la ligne)
+        # Les montants tunisiens finissent par ,XXX (3 chiffres après la virgule)
+        # Pattern: un ou plusieurs blocs de chiffres séparés par espace, puis virgule, puis exactement 3 chiffres
+        amount_pattern = r'-?\d{1,3}(?:\s\d{3})*,\d{3}'
+        amounts_found = re.findall(amount_pattern, line)
         
-        # Debug: afficher la ligne de travail
-        print(f"[PDF Extract] Work line: {work_line[:80]}")
-        
-        # D'ABORD chercher l'âge (avant d'extraire les montants)
-        # Format PDF: "14/08/2019 14/08/2019 IC000262 2 436 0 1 264,277 0,000 1 264,277"
-        # L'âge "2 436" doit être extrait comme 2436 (sans l'espace)
-        age = 0
-        
-        # Approche simple: chercher tous les nombres qui ne sont pas des montants (pas de virgule)
-        # Un montant tunisien a toujours une virgule: "1 264,277" ou "0,000"
-        # L'âge n'a pas de virgule: "2 436" ou "209" ou "336"
-        
-        # Chercher les nombres avec espace mais SANS virgule après
-        # Pattern: nombre + espace + 3 chiffres + (pas de virgule après)
-        # Ex: "2 436" matche, mais "1 264,277" ne matche pas (virgule après)
-        candidates = []
-        for match in re.finditer(r'(\d{1,3})\s+(\d{3})\b(?!\s*,)', work_line):
-            val = int(match.group(1) + match.group(2))
-            candidates.append((val, match.start()))
-            print(f"[PDF Extract] Candidate (space): {val} at pos {match.start()}")
-        
-        # Chercher aussi les entiers simples (sans espace) SANS virgule après
-        # Ex: "336" matche, mais "1,264" ne matche pas
-        # IMPORTANT: Ne pas matcher un chiffre précédé d'un moins (ex: -1 367,895)
-        for match in re.finditer(r'(?<![-\d])\b(\d{1,4})\b(?!\s*,)', work_line):
-            val = int(match.group(1))
-            # Vérifier qu'on n'a pas déjà trouvé ce nombre avec espace
-            already_found = any(c[0] == val for c in candidates)
-            # Âge = 0 est valide, mais on filtre les faux positifs (nombres faisant partie de montants)
-            if not already_found and val >= 0 and match.start() < work_line.find(','):
-                candidates.append((val, match.start()))
-                print(f"[PDF Extract] Candidate (simple): {val} at pos {match.start()}")
-        
-        # Trier par position et prendre le premier (l'âge est toujours avant les montants)
-        if candidates:
-            candidates.sort(key=lambda x: x[1])
-            age = candidates[0][0]
-            print(f"[PDF Extract] Age sélectionné: {age}")
-            
-            # Supprimer l'âge de work_line
-            age_str = str(age)
-            if ' ' in work_line and age >= 1000:
-                # L'âge avait un espace, reconstruire le pattern
-                age_part1 = age_str[:-3]
-                age_part2 = age_str[-3:]
-                age_pattern = f"{age_part1} {age_part2}"
-                work_line = work_line.replace(age_pattern, ' ', 1)
-            else:
-                work_line = work_line.replace(age_str, ' ', 1)
-            print(f"[PDF Extract] Work line after age removal: {work_line[:80]}")
-        
-        # Pattern pour les montants tunisiens (avec espace et virgule)
-        # Format: "1 264,277" ou "0,000" ou "-28,808"
-        numbers = []
-        pattern_tnd = r'-?\d{1,3}(?:\s\d{3})*,\d+'
-        for match in re.finditer(pattern_tnd, work_line):
-            val_str = match.group().replace(' ', '').replace(',', '.')
-            try:
-                numbers.append(float(val_str))
-            except:
-                pass
-        
-        # Si on n'a pas trouvé assez de nombres, essayer avec juste la virgule
-        if len(numbers) < 3:
-            pattern_simple = r'\d+,\d+'
-            for match in re.finditer(pattern_simple, work_line):
-                val_str = match.group().replace(',', '.')
-                try:
-                    val = float(val_str)
-                    if val not in numbers:
-                        numbers.append(val)
-                except:
-                    pass
-        
-        if len(numbers) < 3:
-            print(f"[PDF Extract] Pas assez de montants trouvés: {len(numbers)} dans: {line[:60]}")
+        if len(amounts_found) < 1:
             return None
+            
+        # Convertir les montants trouvés
+        numbers = [parse_tunisian_amount(a) for a in amounts_found]
         
-        # Structure: [Age, Nbr.J.P, (Intitulé optionnel), Montant, Règlement, Solde]
-        # Les 3 derniers sont toujours: Montant, Règlement, Solde
-        amount = numbers[-3]
-        payment = numbers[-2]
-        balance = numbers[-1]
-        
+        # Structure standard: Montant, Règlement, Solde
+        if len(numbers) >= 3:
+            amount = numbers[-3]
+            payment = numbers[-2]
+            balance = numbers[-1]
+        elif len(numbers) == 2:
+            amount = numbers[0]
+            balance = numbers[1]
+            payment = round(amount - balance, 3)
+        else:
+            amount = balance = numbers[0]
+            payment = 0.0
+
+        # 4. Extraire l'âge (un entier simple entre les dates et les montants)
+        # On cherche un nombre qui n'est pas une date et n'a pas de virgule
+        age = 0
+        potential_ages = re.findall(r'\b(\d{1,4})\b', line)
+        for val_str in potential_ages:
+            val = int(val_str)
+            # Un âge est raisonnablement entre 0 et 5000 et n'est pas le code client ni une partie de date
+            if 0 <= val < 4000 and val_str not in [d[0] for d in dates] and val_str not in [d[1] for d in dates] and val_str not in [d[2] for d in dates]:
+                if val_str != client.get("code"):
+                    age = val
+                    break
+
         # Générer ID unique
         debt_id = len(context.debts) + 1
         
@@ -397,11 +342,15 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             payment=payment,
             balance=balance,
             age=age,
-            description="",
+            description="FACTURE",
             settlement=payment,
             commercial_code=context.current_commercial.get("code") if context.current_commercial else None,
             commercial_name=context.current_commercial.get("name") if context.current_commercial else None
         )
+        
+    except Exception as e:
+        print(f"[PDF Extract] Erreur critique parse_text_line: {e}")
+        return None
         
     except Exception as e:
         print(f"[PDF Extract] Erreur parse_text_line: {e} sur ligne: {line[:60]}")
