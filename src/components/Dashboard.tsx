@@ -31,7 +31,9 @@ import {
   FileText,
   Bell,
   Eye,
-  Download
+  Download,
+  Zap,
+  ChevronRight
 } from 'lucide-react';
 import { AnalysisResult } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
@@ -58,6 +60,36 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
   };
 
   const pieColors = ['#10b981', '#f59e0b', '#f97316', '#ef4444'];
+
+  // Logic for Potential Liquidity Opportunities (< 90 days, > 10k TND cumul per client)
+  const liquidityOpportunities = (() => {
+    if (!analysis.processedDebts) return [];
+
+    const clientOpportunities = new Map<string, {
+      clientName: string;
+      totalRecentBalance: number;
+      debtCount: number;
+    }>();
+
+    analysis.processedDebts.forEach(debt => {
+      // Criteria: age < 90, not contentieux, balance > 0
+      if (debt.age < 90 && !debt.isContentieux && debt.balance > 0) {
+        const existing = clientOpportunities.get(debt.clientName) || {
+          clientName: debt.clientName,
+          totalRecentBalance: 0,
+          debtCount: 0
+        };
+        
+        existing.totalRecentBalance += debt.balance;
+        existing.debtCount += 1;
+        clientOpportunities.set(debt.clientName, existing);
+      }
+    });
+
+    return Array.from(clientOpportunities.values())
+      .filter(opp => opp.totalRecentBalance > 10000)
+      .sort((a, b) => b.totalRecentBalance - a.totalRecentBalance);
+  })();
 
   return (
     <div className="space-y-6">
@@ -150,146 +182,115 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
       <DebtEvolutionChart history={history} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Aging Chart */}
+        {/* Potential Liquidity Opportunities */}
         <Card className="border-0 shadow-xl bg-white overflow-hidden">
-          <CardHeader className="border-b border-gray-50 bg-gray-50/30">
-            <CardTitle className="text-lg font-bold text-slate-800">Répartition par Ancienneté</CardTitle>
+          <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-blue-50 to-indigo-50 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold text-blue-900 flex items-center gap-2">
+                <Zap className="h-5 w-5 text-blue-600 fill-blue-600" />
+                Opportunités de Liquidité Rapide
+              </CardTitle>
+              <p className="text-xs text-blue-700 font-medium mt-1">Clients &lt; 90 jours avec solde &gt; 10k TND</p>
+            </div>
+            <Badge className="bg-blue-600 text-white border-0">
+              {liquidityOpportunities.length} opportunités
+            </Badge>
           </CardHeader>
-          <CardContent className="pt-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analysis.agingBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
-                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="range" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }}
-                  tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: 'none', 
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                    padding: '12px'
-                  }}
-                  formatter={(value: any) => [`${Number(value).toLocaleString('fr-FR')} TND`, 'Montant']}
-                />
-                <Bar 
-                  dataKey="amount" 
-                  fill="url(#barGradient)" 
-                  radius={[6, 6, 0, 0]} 
-                  barSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          <CardContent className="p-0">
+            <div className="divide-y divide-gray-100">
+              {liquidityOpportunities.length > 0 ? (
+                liquidityOpportunities.map((opp, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-center justify-between p-4 hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                    onClick={() => onClientClick?.(opp.clientName)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 font-bold shadow-sm group-hover:scale-110 transition-transform">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800 group-hover:text-blue-700 transition-colors">{opp.clientName}</div>
+                        <div className="text-xs text-slate-500 font-medium">{opp.debtCount} facture{opp.debtCount > 1 ? 's' : ''} récente{opp.debtCount > 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-lg font-black text-blue-700">
+                          {opp.totalRecentBalance.toLocaleString('fr-FR')} <span className="text-[10px] font-bold">TND</span>
+                        </div>
+                        <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Potentiel Immédiat</div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 text-slate-400 mb-3">
+                    <Zap className="h-6 w-6" />
+                  </div>
+                  <p className="text-slate-500 text-sm font-medium">Aucune opportunité de liquidité &gt; 10k TND détectée actuellement.</p>
+                </div>
+              )}
+            </div>
+            {liquidityOpportunities.length > 0 && (
+              <div className="p-3 bg-blue-50/30 border-t border-gray-100 text-center">
+                <p className="text-[11px] text-blue-600 font-bold">
+                  Total potentiel : {liquidityOpportunities.reduce((sum, o) => sum + o.totalRecentBalance, 0).toLocaleString('fr-FR')} TND
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Risk Distribution Pie Chart - Donut style */}
+        {/* Top Risk Clients */}
         <Card className="border-0 shadow-xl bg-white overflow-hidden">
-          <CardHeader className="border-b border-gray-50 bg-gray-50/30">
-            <CardTitle className="text-lg font-bold text-slate-800">Répartition par Risque</CardTitle>
+          <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-red-50 to-orange-50">
+            <CardTitle className="text-lg font-bold text-red-900 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              Clients à Risque Élevé
+            </CardTitle>
+            <p className="text-xs text-red-700 font-medium mt-1">Factures critiques nécessitant une attention</p>
           </CardHeader>
-          <CardContent className="pt-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={analysis.agingBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="amount"
+          <CardContent className="p-0">
+            <div className="divide-y divide-gray-100">
+              {analysis.topRiskClients.slice(0, 6).map((client) => (
+                <div 
+                  key={client.id} 
+                  className="flex items-center justify-between p-4 hover:bg-red-50/50 transition-colors cursor-pointer group"
+                  onClick={() => onClientClick?.(client.clientName)}
                 >
-                  {analysis.agingBreakdown.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={pieColors[index % pieColors.length]} 
-                      stroke="none"
-                    />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: 'none', 
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' 
-                  }}
-                  formatter={(value: any, name: any, props: any) => [
-                    `${Number(value).toLocaleString('fr-FR')} TND`, 
-                    props.payload.range
-                  ]}
-                />
-                <Legend 
-                  verticalAlign="bottom" 
-                  height={36}
-                  iconType="circle"
-                  formatter={(value, entry: any) => (
-                    <span className="text-xs font-semibold text-slate-600">
-                      {entry.payload.range}
-                    </span>
-                  )}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-800 group-hover:text-red-700 transition-colors">{client.clientName}</div>
+                    <div className="text-xs text-slate-500 font-medium">
+                      Facture {client.documentNumber} • {client.age} jours
+                    </div>
+                  </div>
+                  <div className="text-right flex items-center gap-4">
+                    <div>
+                      <div className="font-bold text-lg text-slate-900">
+                        {client.balance.toLocaleString('fr-FR')} <span className="text-[10px]">TND</span>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className="text-[9px] h-4 py-0 font-bold border-0"
+                        style={{ 
+                          backgroundColor: riskColors[client.riskLevel] + '20',
+                          color: riskColors[client.riskLevel]
+                        }}
+                      >
+                        {AnalysisService.getRiskLabel(client.riskLevel)}
+                      </Badge>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-red-500 transition-colors" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Top Risk Clients */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Clients à Risque Élevé</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {analysis.topRiskClients.slice(0, 5).map((client) => (
-              <div 
-                key={client.id} 
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 cursor-pointer transition-colors group"
-                onClick={() => onClientClick?.(client.clientName)}
-              >
-                <div className="flex-1">
-                  <div className="font-medium group-hover:text-blue-600 transition-colors">{client.clientName}</div>
-                  <div className="text-sm text-gray-500">
-                    Facture {client.documentNumber} • {client.age} jours
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-lg">
-                    {client.balance.toFixed(2)} TND
-                  </div>
-                  <Badge 
-                    variant="outline" 
-                    style={{ 
-                      backgroundColor: riskColors[client.riskLevel] + '20',
-                      borderColor: riskColors[client.riskLevel],
-                      color: riskColors[client.riskLevel]
-                    }}
-                  >
-                    {AnalysisService.getRiskLabel(client.riskLevel)}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Notifications Panel */}
       {showNotifications && analysis.alerts.length > 0 && (
