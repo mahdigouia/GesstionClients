@@ -17,7 +17,8 @@ import {
   Pie,
   Cell,
   AreaChart,
-  Area
+  Area,
+  Legend
 } from 'recharts';
 import { 
   AlertTriangle, 
