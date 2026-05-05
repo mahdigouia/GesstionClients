@@ -345,39 +345,68 @@ export class OCRService {
     const dueDate = dateMatches[0][1];
     const docDate = dateMatches[dateMatches.length - 1][1];
 
-    // 2. Isoler le numéro de pièce et l'âge
-    const docMatch = line.match(/(FT\d{6}|IC\d{6}|AVT\d{5,8}|AVS\d{5,8}|AV\d{5,8}|FRS\d+|FRT\d+)/i);
+    // 2. Extraire le numéro de pièce (FT, FS, FRT, FRS, IC, AV...)
+    const docPattern = /\b(FT\d{6}|FS\d{6}|FRT\d{6}|FRS\d{6}|IC\d{6}|AV[A-Z]*\d+)\b/i;
+    let workingLine = line;
+    const docMatch = workingLine.match(docPattern);
     const docNumber = docMatch ? docMatch[1].toUpperCase() : "DOC";
+    if (docMatch) workingLine = workingLine.replace(docMatch[0], "");
     
     // On nettoie la ligne pour extraire le reste
-    let workingLine = line
+    workingLine = workingLine
       .replace(dueDate, "")
       .replace(docDate, "")
-      .replace(docNumber, "")
       .trim();
 
     // 3. Extraction des montants par pattern (Montant, Règlement, Solde à la fin)
     // Pattern: 1 234,567 ou 1234,567 ou 0,000
-    const amountPattern = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
-    const allAmounts = [...workingLine.matchAll(amountPattern)].map(m => m[0]);
+    const commaPattern = /(\d{1,3}(?:\s?\d{3})*[\.,]\s?\d{3})/g;
+    const commaMatches = [...workingLine.matchAll(commaPattern)].map(m => m[0]);
     
-    if (allAmounts.length < 1) return null;
+    if (commaMatches.length < 1) return null;
 
+    // Tentative de fusion avec les milliers
+    const candidates = commaMatches.map(ct => {
+      const val = this.parseAmount(ct);
+      // Chercher si le nombre juste avant est un millier (1-3 chiffres, éventuellement négatif)
+      const prefixRegex = new RegExp(`\\b(-?\\d{1,3})\\s+${ct.replace(',', ',')}`);
+      const prefixMatch = workingLine.match(prefixRegex);
+      return {
+        val,
+        full_str: ct,
+        prefix: prefixMatch ? prefixMatch[1] : null
+      };
+    });
+
+    // Reconstruction des montants réels
+    const allAmounts: number[] = [];
+    let i = 0;
+    while (i < candidates.length) {
+      if (candidates[i].prefix) {
+        const fullVal = parseFloat(candidates[i].prefix! + "." + candidates[i].val.toString().split('.')[1]);
+        allAmounts.push(fullVal);
+        i++;
+      } else {
+        allAmounts.push(candidates[i].val);
+        i++;
+      }
+    }
+    
     // On identifie les 3 derniers montants (m, r, s)
     let m = 0, r = 0, s = 0;
     const last3 = allAmounts.slice(-3);
     
     if (last3.length === 3) {
-      m = this.parseAmount(last3[0]);
-      r = this.parseAmount(last3[1]);
-      s = this.parseAmount(last3[2]);
+      m = last3[0];
+      r = last3[1];
+      s = last3[2];
       
       // Cohérence check: si m-r != s (avec tolérance), peut-être qu'il n'y a que 2 montants
       if (Math.abs(m - r - s) > 2.0 && m !== 0) {
           // Tentative si seulement 2 montants (Montant et Solde, Règlement implicite)
           const last2 = allAmounts.slice(-2);
-          const m2 = this.parseAmount(last2[0]);
-          const s2 = this.parseAmount(last2[1]);
+          const m2 = last2[0];
+          const s2 = last2[1];
           if (m2 >= s2) {
             m = m2; s = s2; r = m2 - s2;
           }

@@ -286,8 +286,9 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         due_date = f"{dates[0][2]}-{dates[0][1]}-{dates[0][0]}"
         doc_date = f"{dates[1][2]}-{dates[1][1]}-{dates[1][0]}" if len(dates) > 1 else due_date
         
-        # 2. Identifier le numéro de pièce
-        doc_match = re.search(r'\b(FT\d{6}|FS\d{6}|IC\d{6}|AV[A-Z]*\d+)\b', line, re.IGNORECASE)
+        # 2. Extraire le numéro de pièce
+        # On ajoute FRT/FRS/AVT/AVS pour être plus exhaustif
+        doc_match = re.search(r'\b(FT\d{6}|FS\d{6}|FRT\d{6}|FRS\d{6}|IC\d{6}|AV[A-Z]*\d+)\b', line, re.IGNORECASE)
         document_number = doc_match.group(1).upper() if doc_match else "DOC"
         
         # 3. Extraire l'âge et NbrJP
@@ -335,8 +336,8 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
             if re.search(r'-?\d+,\d{3}', t):
                 val_base = parse_tunisian_amount(t)
                 prefix = None
-                # Vérifier le token précédent
-                if i > 0 and re.match(r'^\d{1,3}$', tokens_all[i-1]):
+                # Vérifier le token précédent (peut être un millier, éventuellement négatif)
+                if i > 0 and re.match(r'^-?\d{1,3}$', tokens_all[i-1]):
                     # C'est un millier potentiel
                     prefix = tokens_all[i-1]
                 
