@@ -165,31 +165,38 @@ export default function ClientsPage() {
       // Get all debts for this client
       const allClientDebts = debts.filter(d => d.clientName === client.clientName);
       
-      // Filter the debts based on the 3 tristate filters AND age exclusions
+      // Filter the debts based on all active criteria
       const filteredDebts = allClientDebts.filter(debt => {
-        // Age exclusion logic: if a range is selected, any invoice in that range is OUT
+        // 1. Age exclusion logic
         const age = Number(debt.age || 0);
         const matchesAgeExclusion = !isAgeExcluded(age);
+        if (!matchesAgeExclusion) return false;
 
-        // Min amount logic: if filter is ON, only invoices >= 5000 are IN
-        const matchesMinAmount = minAmountFilter ? (Number(debt.amount || 0) >= 5000) : true;
+        // 2. Min amount logic (Inclusion: if filter is ON, must be >= 5000)
+        const amount = Number(debt.amount || 0);
+        const matchesMinAmount = minAmountFilter ? (amount >= 5000) : true;
+        if (!matchesMinAmount) return false;
 
+        // 3. Status filters (Tristate)
         const matchesContentieux =
           contentieuxFilter === 'off' ? true :
           contentieuxFilter === 'include' ? isContentieux(debt) :
           !isContentieux(debt);
+        if (!matchesContentieux) return false;
 
         const matchesRetained =
           retainedFilter === 'off' ? true :
           retainedFilter === 'include' ? isRetained(debt) :
           !isRetained(debt);
+        if (!matchesRetained) return false;
 
         const matchesPartial =
           partialFilter === 'off' ? true :
           partialFilter === 'include' ? isPartial(debt) :
           !isPartial(debt);
+        if (!matchesPartial) return false;
 
-        return matchesAgeExclusion && matchesMinAmount && matchesContentieux && matchesRetained && matchesPartial;
+        return true;
       });
 
       // Recalculate totals for this client based on visible lines
