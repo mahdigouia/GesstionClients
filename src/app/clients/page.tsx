@@ -234,7 +234,7 @@ export default function ClientsPage() {
         debtCount
       };
     }).filter(client => client.debtCount > 0); // Only show clients with at least one matching line
-  }, [analysis, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter]);
+  }, [analysis, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter, excludedAgeRanges, minAmountFilter]);
 
   useEffect(() => {
     if (filteredClients.length > 0 && expandedClients.size === 0) {
