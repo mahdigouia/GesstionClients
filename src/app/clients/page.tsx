@@ -72,7 +72,9 @@ export default function ClientsPage() {
     setExcludedAgeRanges(next);
   };
 
-  const isAgeExcluded = (age: number) => {
+  const isAgeExcluded = (ageValue: any) => {
+    const age = typeof ageValue === 'number' ? ageValue : parseInt(String(ageValue).replace(/[^0-9]/g, '')) || 0;
+    
     for (const rangeId of Array.from(excludedAgeRanges)) {
       const range = ageRanges.find(r => r.id === rangeId);
       if (range && age >= range.min && age <= range.max) return true;
@@ -100,27 +102,33 @@ export default function ClientsPage() {
   // Helper to get client-level matches
   const clientHasContentieux = (clientName: string) => {
     return debts.filter(d => d.clientName === clientName).some(d => {
-      const age = Number(d.age || 0);
-      const amount = Number(d.amount || 0);
-      const matchesAgeExclusion = !isAgeExcluded(age);
+      const rawAge = d.age;
+      const rawAmount = d.amount;
+      const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+      
+      const matchesAgeExclusion = !isAgeExcluded(rawAge);
       const matchesMinAmount = minAmountFilter ? amount >= 5000 : true;
       return isContentieux(d) && matchesAgeExclusion && matchesMinAmount;
     });
   };
   const clientHasRetained = (clientName: string) => {
     return debts.filter(d => d.clientName === clientName).some(d => {
-      const age = Number(d.age || 0);
-      const amount = Number(d.amount || 0);
-      const matchesAgeExclusion = !isAgeExcluded(age);
+      const rawAge = d.age;
+      const rawAmount = d.amount;
+      const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+      
+      const matchesAgeExclusion = !isAgeExcluded(rawAge);
       const matchesMinAmount = minAmountFilter ? amount >= 5000 : true;
       return isRetained(d) && matchesAgeExclusion && matchesMinAmount;
     });
   };
   const clientHasPartial = (clientName: string) => {
     return debts.filter(d => d.clientName === clientName).some(d => {
-      const age = Number(d.age || 0);
-      const amount = Number(d.amount || 0);
-      const matchesAgeExclusion = !isAgeExcluded(age);
+      const rawAge = d.age;
+      const rawAmount = d.amount;
+      const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+      
+      const matchesAgeExclusion = !isAgeExcluded(rawAge);
       const matchesMinAmount = minAmountFilter ? amount >= 5000 : true;
       return isPartial(d) && matchesAgeExclusion && matchesMinAmount;
     });
@@ -167,13 +175,15 @@ export default function ClientsPage() {
       
       // Filter the debts based on all active criteria
       const filteredDebts = allClientDebts.filter(debt => {
-        // 1. Age exclusion logic
-        const age = Number(debt.age || 0);
-        const matchesAgeExclusion = !isAgeExcluded(age);
+        // 1. Age exclusion logic - CRITICAL: Strict numeric conversion
+        const rawAge = debt.age;
+        const matchesAgeExclusion = !isAgeExcluded(rawAge);
         if (!matchesAgeExclusion) return false;
 
-        // 2. Min amount logic (Inclusion: if filter is ON, must be >= 5000)
-        const amount = Number(debt.amount || 0);
+        // 2. Min amount logic - CRITICAL: Handle numeric conversion from string/number
+        const rawAmount = debt.amount;
+        const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+        
         const matchesMinAmount = minAmountFilter ? (amount >= 5000) : true;
         if (!matchesMinAmount) return false;
 
