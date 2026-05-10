@@ -101,21 +101,21 @@ export default function ClientsPage() {
   const clientHasContentieux = (clientName: string) => {
     return debts.filter(d => d.clientName === clientName).some(d => {
       const matchesAgeExclusion = !isAgeExcluded(d.age);
-      const matchesMinAmount = minAmountFilter ? d.balance >= 5000 : true;
+      const matchesMinAmount = minAmountFilter ? d.amount >= 5000 : true;
       return isContentieux(d) && matchesAgeExclusion && matchesMinAmount;
     });
   };
   const clientHasRetained = (clientName: string) => {
     return debts.filter(d => d.clientName === clientName).some(d => {
       const matchesAgeExclusion = !isAgeExcluded(d.age);
-      const matchesMinAmount = minAmountFilter ? d.balance >= 5000 : true;
+      const matchesMinAmount = minAmountFilter ? d.amount >= 5000 : true;
       return isRetained(d) && matchesAgeExclusion && matchesMinAmount;
     });
   };
   const clientHasPartial = (clientName: string) => {
     return debts.filter(d => d.clientName === clientName).some(d => {
       const matchesAgeExclusion = !isAgeExcluded(d.age);
-      const matchesMinAmount = minAmountFilter ? d.balance >= 5000 : true;
+      const matchesMinAmount = minAmountFilter ? d.amount >= 5000 : true;
       return isPartial(d) && matchesAgeExclusion && matchesMinAmount;
     });
   };
@@ -177,7 +177,7 @@ export default function ClientsPage() {
           !isPartial(debt);
 
         const matchesAgeExclusion = !isAgeExcluded(debt.age);
-        const matchesMinAmount = minAmountFilter ? debt.balance >= 5000 : true;
+        const matchesMinAmount = minAmountFilter ? debt.amount >= 5000 : true;
 
         return matchesContentieux && matchesRetained && matchesPartial && matchesAgeExclusion && matchesMinAmount;
       });
@@ -362,7 +362,7 @@ export default function ClientsPage() {
               onClick={() => setMinAmountFilter(!minAmountFilter)}
             >
               <Target className="h-3.5 w-3.5" />
-              Solde ≥ 5 000 TND {minAmountFilter ? '✓' : ''}
+              Montant ≥ 5 000 TND {minAmountFilter ? '✓' : ''}
             </Badge>
 
             {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0 || minAmountFilter) && (
