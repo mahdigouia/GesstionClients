@@ -98,13 +98,34 @@ export default function ClientsPage() {
   };
 
   // Helper to get client-level matches
-  const clientHasContentieux = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isContentieux);
-  const clientHasRetained = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isRetained);
-  const clientHasPartial = (clientName: string) => debts.filter(d => d.clientName === clientName).some(isPartial);
+  const clientHasContentieux = (clientName: string) => {
+    return debts.filter(d => d.clientName === clientName).some(d => {
+      const matchesAgeExclusion = !isAgeExcluded(d.age);
+      const matchesMinAmount = minAmountFilter ? d.balance >= 5000 : true;
+      return isContentieux(d) && matchesAgeExclusion && matchesMinAmount;
+    });
+  };
+  const clientHasRetained = (clientName: string) => {
+    return debts.filter(d => d.clientName === clientName).some(d => {
+      const matchesAgeExclusion = !isAgeExcluded(d.age);
+      const matchesMinAmount = minAmountFilter ? d.balance >= 5000 : true;
+      return isRetained(d) && matchesAgeExclusion && matchesMinAmount;
+    });
+  };
+  const clientHasPartial = (clientName: string) => {
+    return debts.filter(d => d.clientName === clientName).some(d => {
+      const matchesAgeExclusion = !isAgeExcluded(d.age);
+      const matchesMinAmount = minAmountFilter ? d.balance >= 5000 : true;
+      return isPartial(d) && matchesAgeExclusion && matchesMinAmount;
+    });
+  };
 
   // Counts for tristate filters
   const stats = useMemo(() => {
-    const list = analysis?.clientBreakdown || [];
+    if (!analysis) return { contentieux: 0, retained: 0, partial: 0, nonContentieux: 0, nonRetained: 0, nonPartial: 0 };
+    
+    // The counts should also respect the Age and Amount filters to be consistent
+    const list = analysis.clientBreakdown || [];
     return {
       contentieux: list.filter(c => clientHasContentieux(c.clientName)).length,
       retained: list.filter(c => clientHasRetained(c.clientName)).length,
@@ -113,7 +134,7 @@ export default function ClientsPage() {
       nonRetained: list.filter(c => !clientHasRetained(c.clientName)).length,
       nonPartial: list.filter(c => !clientHasPartial(c.clientName)).length
     };
-  }, [analysis, debts]);
+  }, [analysis, debts, excludedAgeRanges, minAmountFilter]);
 
   // Filtered client list logic with line-level filtering
   const filteredClients = useMemo(() => {
