@@ -53,6 +53,32 @@ export default function ClientsPage() {
   const [retainedFilter, setRetainedFilter] = useState<'off' | 'include' | 'exclude'>('off');
   const [partialFilter, setPartialFilter] = useState<'off' | 'include' | 'exclude'>('off');
 
+  // Age-based exclusion filters
+  const [excludedAgeRanges, setExcludedAgeRanges] = useState<Set<string>>(new Set());
+
+  const ageRanges = [
+    { id: '0-15', label: '0-15j', min: 0, max: 15 },
+    { id: '16-30', label: '16-30j', min: 16, max: 30 },
+    { id: '31-60', label: '31-60j', min: 31, max: 60 },
+    { id: '61-100', label: '61-100j', min: 61, max: 100 },
+    { id: '101-364', label: '101-364j', min: 101, max: 364 },
+  ];
+
+  const toggleAgeExclusion = (rangeId: string) => {
+    const next = new Set(excludedAgeRanges);
+    if (next.has(rangeId)) next.delete(rangeId);
+    else next.add(rangeId);
+    setExcludedAgeRanges(next);
+  };
+
+  const isAgeExcluded = (age: number) => {
+    for (const rangeId of Array.from(excludedAgeRanges)) {
+      const range = ageRanges.find(r => r.id === rangeId);
+      if (range && age >= range.min && age <= range.max) return true;
+    }
+    return false;
+  };
+
   // Business logic for filters
   const isContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
   const isRetained = (debt: ClientDebt) => {
@@ -111,7 +137,7 @@ export default function ClientsPage() {
       // Get all debts for this client
       const allClientDebts = debts.filter(d => d.clientName === client.clientName);
       
-      // Filter the debts based on the 3 tristate filters
+      // Filter the debts based on the 3 tristate filters AND age exclusions
       const filteredDebts = allClientDebts.filter(debt => {
         const matchesContentieux =
           contentieuxFilter === 'off' ? true :
@@ -128,7 +154,9 @@ export default function ClientsPage() {
           partialFilter === 'include' ? isPartial(debt) :
           !isPartial(debt);
 
-        return matchesContentieux && matchesRetained && matchesPartial;
+        const matchesAgeExclusion = !isAgeExcluded(debt.age);
+
+        return matchesContentieux && matchesRetained && matchesPartial && matchesAgeExclusion;
       });
 
       // Recalculate totals for this client based on visible lines
@@ -303,7 +331,7 @@ export default function ClientsPage() {
               {partialFilter === 'exclude' ? 'Non ' : ''}Partiel ({partialFilter === 'exclude' ? stats.nonPartial : stats.partial}) {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
             </Badge>
 
-            {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off') && (
+            {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -312,11 +340,31 @@ export default function ClientsPage() {
                   setContentieuxFilter('off');
                   setRetainedFilter('off');
                   setPartialFilter('off');
+                  setExcludedAgeRanges(new Set());
                 }}
               >
                 <X className="h-3 w-3" /> Réinitialiser
               </Button>
             )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 mt-4 border-t border-slate-100 pt-4">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">Exclure par âge :</span>
+            {ageRanges.map((range) => {
+              const isExcluded = excludedAgeRanges.has(range.id);
+              return (
+                <Badge
+                  key={range.id}
+                  variant="outline"
+                  className={`cursor-pointer px-4 py-1.5 rounded-full text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 ${
+                    isExcluded ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                  onClick={() => toggleAgeExclusion(range.id)}
+                >
+                  {isExcluded ? '✗ ' : ''}{range.label}
+                </Badge>
+              );
+            })}
           </div>
         </header>
 

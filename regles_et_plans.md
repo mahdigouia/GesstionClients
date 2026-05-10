@@ -91,10 +91,21 @@ Pour garantir la fiabilité des rapports, les formules suivantes sont appliquée
 Si `Taux d'Impayé + Taux de Recouvrement` n'est pas égal à 100%, cela signifie que pour certaines lignes du document PDF, le `Montant Initial` n'est pas simplement égal à `Règlement + Solde` (par exemple en cas d'avoirs, de remises, ou de dettes déjà provisionnées dans le document source). L'application respecte les chiffres bruts tels qu'ils sont écrits dans le document.
 
 ## 7. Règle d'Unicité des Sources
+... (lignes existantes)
 
-Pour éviter les doublons et garantir l'exactitude des statistiques (notamment quand plusieurs utilisateurs importent les mêmes fichiers), l'application applique la règle suivante :
+## 8. Filtres d'Exclusion par Âge (Interface Clients)
 
-*   **Identifiant Unique** : Le **nom du fichier** (insensible à la casse, ex: `C01.pdf` = `c01.PDF`) sert d'identifiant unique pour une source de données.
-*   **Écrasement Automatique** : Tout nouvel import d'un fichier portant un nom déjà existant dans la base de données entraîne la suppression immédiate des anciennes données de ce fichier et leur remplacement par les nouvelles.
-*   **Conséquence** : Si vous importez deux fois le fichier "C01", seule la version la plus récente est conservée pour les calculs du Dashboard et de la Performance.
+Pour permettre une analyse focalisée sur les créances anciennes, l'application propose 5 filtres d'exclusion multisélectionnables. Lorsqu'un filtre est activé (badge rouge), toutes les factures dont l'âge est compris dans la plage sélectionnée sont masquées de l'affichage et exclues du calcul du solde client.
+
+| Plage d'Âge | Catégorie | Description |
+| :--- | :--- | :--- |
+| **0 - 15 jours** | Très Récent | Factures venant d'être émises, flux de trésorerie immédiat. |
+| **16 - 30 jours** | Récent | Factures en attente de premier cycle de règlement. |
+| **31 - 60 jours** | À Surveiller | Premier niveau de retard, nécessite une vigilance commerciale. |
+| **61 - 100 jours** | Retard Modéré | Retard confirmé, nécessite des relances actives. |
+| **101 - 364 jours** | Retard Important | Phase pré-contentieuse, risque élevé de non-recouvrement. |
+
+**Comportement** :
+*   **Multisélection** : On peut exclure plusieurs tranches simultanément (ex: exclure tout ce qui a moins de 60 jours).
+*   **Impact calculé** : Le solde total affiché par client est dynamiquement recalculé pour ne prendre en compte que les factures non exclues.
 
