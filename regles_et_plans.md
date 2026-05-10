@@ -109,3 +109,11 @@ Pour permettre une analyse focalisée sur les créances anciennes, l'application
 *   **Multisélection** : On peut exclure plusieurs tranches simultanément (ex: exclure tout ce qui a moins de 60 jours).
 *   **Impact calculé** : Le solde total affiché par client est dynamiquement recalculé pour ne prendre en compte que les factures non exclues.
 
+## 9. Filtres de Priorité par Montant
+
+Un filtre d'inclusion "Solde ≥ 5 000 TND" permet d'isoler les factures ayant un impact financier significatif sur la trésorerie.
+
+*   **Type** : Filtre d'inclusion (Vert).
+*   **Cible** : Solde restant de la facture.
+*   **Synergie** : Ce filtre peut être combiné avec les exclusions d'âge pour identifier les gros montants très anciens.
+

@@ -52,6 +52,7 @@ export default function ClientsPage() {
   const [contentieuxFilter, setContentieuxFilter] = useState<'off' | 'include' | 'exclude'>('off');
   const [retainedFilter, setRetainedFilter] = useState<'off' | 'include' | 'exclude'>('off');
   const [partialFilter, setPartialFilter] = useState<'off' | 'include' | 'exclude'>('off');
+  const [minAmountFilter, setMinAmountFilter] = useState<boolean>(false);
 
   // Age-based exclusion filters
   const [excludedAgeRanges, setExcludedAgeRanges] = useState<Set<string>>(new Set());
@@ -155,8 +156,9 @@ export default function ClientsPage() {
           !isPartial(debt);
 
         const matchesAgeExclusion = !isAgeExcluded(debt.age);
+        const matchesMinAmount = minAmountFilter ? debt.balance >= 5000 : true;
 
-        return matchesContentieux && matchesRetained && matchesPartial && matchesAgeExclusion;
+        return matchesContentieux && matchesRetained && matchesPartial && matchesAgeExclusion && matchesMinAmount;
       });
 
       // Recalculate totals for this client based on visible lines
@@ -331,7 +333,18 @@ export default function ClientsPage() {
               {partialFilter === 'exclude' ? 'Non ' : ''}Partiel ({partialFilter === 'exclude' ? stats.nonPartial : stats.partial}) {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
             </Badge>
 
-            {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0) && (
+            <Badge
+              variant="outline"
+              className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+                minAmountFilter ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+              onClick={() => setMinAmountFilter(!minAmountFilter)}
+            >
+              <Target className="h-3.5 w-3.5" />
+              Solde ≥ 5 000 TND {minAmountFilter ? '✓' : ''}
+            </Badge>
+
+            {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0 || minAmountFilter) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -341,6 +354,7 @@ export default function ClientsPage() {
                   setRetainedFilter('off');
                   setPartialFilter('off');
                   setExcludedAgeRanges(new Set());
+                  setMinAmountFilter(false);
                 }}
               >
                 <X className="h-3 w-3" /> Réinitialiser
