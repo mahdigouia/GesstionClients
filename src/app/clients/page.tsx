@@ -83,19 +83,33 @@ export default function ClientsPage() {
   };
 
   // Business logic for filters
-  const isContentieux = (d: ClientDebt) => Number(d.age || 0) > 365 && Number(d.balance || 0) > 0;
+  const isContentieux = (d: ClientDebt) => {
+    const age = typeof d.age === 'number' ? d.age : parseInt(String(d.age).replace(/[^0-9]/g, '')) || 0;
+    const balance = typeof d.balance === 'number' ? d.balance : parseFloat(String(d.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+    return age > 365 && balance > 0;
+  };
+
   const isRetained = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();
     if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-    if (debt.balance <= 0 || debt.amount <= 0) return false;
-    const ratio = (debt.balance / debt.amount) * 100;
+    
+    const balance = typeof debt.balance === 'number' ? debt.balance : parseFloat(String(debt.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+    const amount = typeof debt.amount === 'number' ? debt.amount : parseFloat(String(debt.amount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+    
+    if (balance <= 0 || amount <= 0) return false;
+    const ratio = (balance / amount) * 100;
     return ratio >= 0.5 && ratio <= 1.5;
   };
+
   const isPartial = (debt: ClientDebt) => {
     const upper = (debt.documentNumber || '').toUpperCase();
     if (!upper.startsWith('FT') && !upper.startsWith('FS')) return false;
-    if (debt.balance <= 0 || debt.amount <= 0) return false;
-    const ratio = (debt.balance / debt.amount) * 100;
+    
+    const balance = typeof debt.balance === 'number' ? debt.balance : parseFloat(String(debt.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+    const amount = typeof debt.amount === 'number' ? debt.amount : parseFloat(String(debt.amount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+    
+    if (balance <= 0 || amount <= 0) return false;
+    const ratio = (balance / amount) * 100;
     return ratio > 1.5 && ratio < 99;
   };
 
