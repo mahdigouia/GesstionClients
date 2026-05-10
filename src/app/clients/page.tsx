@@ -88,11 +88,12 @@ export default function ClientsPage() {
     };
   }, [analysis, debts]);
 
-  // Filtered client list logic
+  // Filtered client list logic with line-level filtering
   const filteredClients = useMemo(() => {
     if (!analysis) return [];
     let list = analysis.clientBreakdown || [];
     
+    // 1. Basic Filters (Commercial & Search)
     if (selectedCommercial !== 'all') {
       list = list.filter((c: any) => c.commercialName === selectedCommercial);
     }
@@ -105,24 +106,42 @@ export default function ClientsPage() {
       );
     }
 
-    return list.filter((client: any) => {
-      const matchesContentieux =
-        contentieuxFilter === 'off' ? true :
-        contentieuxFilter === 'include' ? clientHasContentieux(client.clientName) :
-        !clientHasContentieux(client.clientName);
+    // 2. Line-level status filtering
+    return list.map((client: any) => {
+      // Get all debts for this client
+      const allClientDebts = debts.filter(d => d.clientName === client.clientName);
+      
+      // Filter the debts based on the 3 tristate filters
+      const filteredDebts = allClientDebts.filter(debt => {
+        const matchesContentieux =
+          contentieuxFilter === 'off' ? true :
+          contentieuxFilter === 'include' ? isContentieux(debt) :
+          !isContentieux(debt);
 
-      const matchesRetained =
-        retainedFilter === 'off' ? true :
-        retainedFilter === 'include' ? clientHasRetained(client.clientName) :
-        !clientHasRetained(client.clientName);
+        const matchesRetained =
+          retainedFilter === 'off' ? true :
+          retainedFilter === 'include' ? isRetained(debt) :
+          !isRetained(debt);
 
-      const matchesPartial =
-        partialFilter === 'off' ? true :
-        partialFilter === 'include' ? clientHasPartial(client.clientName) :
-        !clientHasPartial(client.clientName);
+        const matchesPartial =
+          partialFilter === 'off' ? true :
+          partialFilter === 'include' ? isPartial(debt) :
+          !isPartial(debt);
 
-      return matchesContentieux && matchesRetained && matchesPartial;
-    });
+        return matchesContentieux && matchesRetained && matchesPartial;
+      });
+
+      // Recalculate totals for this client based on visible lines
+      const totalBalance = filteredDebts.reduce((sum, d) => sum + (d.balance || 0), 0);
+      const debtCount = filteredDebts.length;
+
+      return {
+        ...client,
+        filteredDebts,
+        totalBalance,
+        debtCount
+      };
+    }).filter(client => client.debtCount > 0); // Only show clients with at least one matching line
   }, [analysis, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter]);
 
   useEffect(() => {
@@ -305,9 +324,7 @@ export default function ClientsPage() {
           <div className="max-w-7xl mx-auto space-y-6">
             {filteredClients.map((client: any, idx: number) => {
               const isExpanded = expandedClients.has(client.clientName);
-              const clientDebts = debts
-                .filter(d => d.clientName === client.clientName)
-                .sort((a, b) => (a.extractIndex || 0) - (b.extractIndex || 0));
+              const clientDebts = client.filteredDebts.sort((a: any, b: any) => (a.extractIndex || 0) - (b.extractIndex || 0));
               
               return (
                 <Card key={idx} className="border-0 shadow-md bg-white overflow-hidden rounded-[32px] transition-all hover:shadow-xl">
