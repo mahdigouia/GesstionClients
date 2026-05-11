@@ -2,6 +2,7 @@
 
 import { useDebtContext } from '@/lib/DebtContext';
 import { Sidebar } from '@/components/Sidebar';
+import { AnalysisService } from '@/lib/analysis';
 import { BarChart3, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Shield, Activity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -121,10 +122,10 @@ export default function AnalysisPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-orange-50 rounded-lg"><Clock className="h-5 w-5 text-orange-600" /></div>
-                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-100 text-[10px]">DSO</Badge>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-100 text-[10px]" title="Days Sales Outstanding - Délai moyen de recouvrement">DSO</Badge>
                 </div>
                 <div className="text-2xl font-black text-slate-900">{analysis.averagePaymentDelay.toFixed(0)} <span className="text-sm font-medium">jours</span></div>
-                <p className="text-xs text-slate-500 mt-1">Délai moyen de règlement</p>
+                <p className="text-xs text-slate-500 mt-1">Délai moyen de règlement client</p>
               </CardContent>
             </Card>
 
@@ -296,7 +297,7 @@ export default function AnalysisPage() {
                               client.riskLevel === 'overdue' ? 'bg-amber-100 text-amber-700' :
                               'bg-emerald-100 text-emerald-700'
                             }`}>
-                              {client.riskLevel}
+                              {AnalysisService.getRiskLabel(client.riskLevel)}
                             </Badge>
                           </td>
                         </tr>
