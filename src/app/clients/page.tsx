@@ -420,10 +420,12 @@ export default function ClientsPage() {
               {partialFilter === 'exclude' ? 'Non ' : ''}Partiel ({partialFilter === 'exclude' ? stats.nonPartial : stats.partial}) {partialFilter === 'include' ? '✓' : partialFilter === 'exclude' ? '✗' : ''}
             </Badge>
 
+            <div className="h-6 w-px bg-slate-200 mx-2 hidden md:block" />
+
             <Badge
               variant="outline"
               className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                minAmountFilter ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                minAmountFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
               onClick={() => setMinAmountFilter(!minAmountFilter)}
             >
@@ -435,7 +437,7 @@ export default function ClientsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-slate-400 hover:text-slate-600 gap-1 h-8 text-[10px] uppercase font-black tracking-widest"
+                className="text-slate-400 hover:text-slate-600 gap-1 h-8 text-[10px] uppercase font-black tracking-widest ml-auto"
                 onClick={() => {
                   setContentieuxFilter('off');
                   setRetainedFilter('off');
@@ -450,7 +452,9 @@ export default function ClientsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 mt-4 border-t border-slate-100 pt-4">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">Exclure par âge :</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center gap-2">
+              <Filter className="h-3 w-3" /> Exclure par âge :
+            </span>
             {ageRanges.map((range) => {
               const isExcluded = excludedAgeRanges.has(range.id);
               return (
@@ -458,7 +462,7 @@ export default function ClientsPage() {
                   key={range.id}
                   variant="outline"
                   className={`cursor-pointer px-4 py-1.5 rounded-full text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 ${
-                    isExcluded ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                    isExcluded ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                   }`}
                   onClick={() => toggleAgeExclusion(range.id)}
                 >

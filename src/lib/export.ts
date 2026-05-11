@@ -116,25 +116,25 @@ export class ExportService {
     const addHeader = (pageNum: number) => {
       // 1. Logo
       try {
-        // Tentative de chargement du logo
-        pdf.addImage('/logo.png', 'PNG', margin, 15, 35, 15);
+        // Logo plus petit
+        pdf.addImage('/logo.png', 'PNG', margin, 10, 25, 10);
       } catch (e) {
-        pdf.setFontSize(14);
+        pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
-        pdf.text("MG GROUP", margin, 20);
+        pdf.text("MG GROUP", margin, 15);
       }
 
       // 2. Infos Rapport (Droite)
-      pdf.setFontSize(8);
+      pdf.setFontSize(7);
       pdf.setFont('helvetica', 'normal');
       pdf.setTextColor(100, 100, 100);
       const dateStr = `Généré le : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`;
-      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 15);
-      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 20);
+      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 12);
+      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 16);
 
       pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, 32, pageWidth - margin, 32);
-      return 38;
+      pdf.line(margin, 22, pageWidth - margin, 22);
+      return 28; // En-tête plus compact (au lieu de 38)
     };
 
     let pageNum = 1;
@@ -385,69 +385,105 @@ Source: ${debt.sourceFile}
 
   // Export de la liste des clients en Excel (Détaillé)
   static async exportClientsToExcel(clients: any[], activeFilters?: string): Promise<void> {
-    const workbook = XLSX.utils.book_new();
-    const allRows: any[] = [];
-
-    // Ajouter les filtres actifs si présents
-    if (activeFilters) {
-      allRows.push({ 'INFO': 'RAPPORT DE CRÉANCES' });
-      allRows.push({ 'INFO': `Filtres actifs : ${activeFilters}` });
-      allRows.push({ 'INFO': `Généré le : ${new Date().toLocaleDateString('fr-FR')}` });
-      allRows.push({}); // Ligne vide
-    }
+    const rows: any[] = [];
+    const columns = [
+      { header: 'N°', key: 'n', width: 40 },
+      { header: 'Code Client', key: 'code', width: 80 },
+      { header: 'Nom Client', key: 'name', width: 250 },
+      { header: 'Rep.', key: 'rep', width: 60 },
+      { header: 'N° Pièce', key: 'doc', width: 100 },
+      { header: 'Date', key: 'date', width: 90 },
+      { header: 'Échéance', key: 'due', width: 90 },
+      { header: 'Âge (j)', key: 'age', width: 60, type: 'number' },
+      { header: 'Montant (TND)', key: 'amount', width: 110, type: 'number' },
+      { header: 'Règlement (TND)', key: 'settlement', width: 110, type: 'number' },
+      { header: 'Solde (TND)', key: 'balance', width: 110, type: 'number' },
+      { header: 'Source', key: 'source', width: 120 }
+    ];
 
     let globalCounter = 1;
-
     clients.forEach(client => {
       const debts = client.filteredDebts || [];
       debts.forEach((debt: ClientDebt) => {
-        allRows.push({
-          'N°': globalCounter++,
-          'Code Client': client.clientCode,
-          'Nom Client': client.clientName,
-          'Rep.': debt.commercialCode || client.commercialCode || '?',
-          'N° Pièce': debt.documentNumber,
-          'Date': new Date(debt.documentDate).toLocaleDateString('fr-FR'),
-          'Échéance': new Date(debt.dueDate).toLocaleDateString('fr-FR'),
-          'Âge (jours)': debt.age,
-          'Montant (TND)': debt.amount,
-          'Règlement (TND)': debt.settlement,
-          'Solde (TND)': debt.balance,
-          'Source': client.sourceFile || debt.sourceFile
+        rows.push({
+          n: globalCounter++,
+          code: client.clientCode,
+          name: client.clientName,
+          rep: debt.commercialCode || client.commercialCode || '?',
+          doc: debt.documentNumber,
+          date: new Date(debt.documentDate).toLocaleDateString('fr-FR'),
+          due: new Date(debt.dueDate).toLocaleDateString('fr-FR'),
+          age: debt.age,
+          amount: debt.amount.toFixed(2),
+          settlement: (debt.settlement || 0).toFixed(2),
+          balance: debt.balance.toFixed(2),
+          source: client.sourceFile || debt.sourceFile
         });
       });
-      
-      // Optionnel: ajouter une ligne de total par client
-      if (debts.length > 1) {
-        allRows.push({
-          'Nom Client': `TOTAL ${client.clientName}`,
-          'Solde (TND)': client.totalBalance
-        });
-        allRows.push({}); // Ligne vide pour aérer
-      }
     });
-    
-    const sheet = XLSX.utils.json_to_sheet(allRows);
-    
-    // Ajuster la largeur des colonnes
-    const wscols = [
-      { wch: 5 },  // N°
-      { wch: 12 }, // Code
-      { wch: 30 }, // Nom
-      { wch: 8 },  // Rep
-      { wch: 15 }, // Pièce
-      { wch: 12 }, // Date
-      { wch: 12 }, // Échéance
-      { wch: 10 }, // Âge
-      { wch: 15 }, // Montant
-      { wch: 15 }, // Règlement
-      { wch: 15 }, // Solde
-      { wch: 15 }  // Source
-    ];
-    sheet['!cols'] = wscols;
 
-    XLSX.utils.book_append_sheet(workbook, sheet, 'Portefeuille Clients');
-    XLSX.writeFile(workbook, `portefeuille-clients-detail-${new Date().toISOString().split('T')[0]}.xlsx`);
+    this.saveStyledExcel(
+      rows, 
+      columns, 
+      `Portefeuille_Clients_Detaille_${new Date().toISOString().split('T')[0]}.xls`,
+      `PORTFOLIO CRÉANCES CLIENTS - ${new Date().toLocaleDateString('fr-FR')}`
+    );
+  }
+
+  // Helper pour générer un Excel stylisé via HTML (Supporté par Excel avec couleurs)
+  private static saveStyledExcel(data: any[], columns: any[], fileName: string, title?: string) {
+    const headerColor = "#2c3e50";
+    const headerTextColor = "#ffffff";
+    const evenRowColor = "#f8fafc";
+    
+    let html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <style>
+          .title { font-size: 16pt; font-weight: bold; color: ${headerColor}; font-family: sans-serif; }
+          .header { background-color: ${headerColor}; color: ${headerTextColor}; font-weight: bold; text-align: center; border: 0.5pt solid #000; font-family: sans-serif; }
+          .cell { border: 0.5pt solid #cbd5e1; font-family: sans-serif; font-size: 10pt; }
+          .number { text-align: right; }
+          .row-even { background-color: ${evenRowColor}; }
+          .critical { color: #b91c1c; font-weight: bold; }
+          .settled { color: #059669; }
+        </style>
+      </head>
+      <body>
+    `;
+
+    if (title) {
+      html += `<div class="title">${title}</div><br>`;
+    }
+
+    html += `<table border="1"><thead><tr>`;
+    columns.forEach(col => {
+      html += `<th class="header" style="width: ${col.width || 100}px">${col.header}</th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    data.forEach((row, idx) => {
+      const rowClass = idx % 2 === 0 ? 'row-even' : '';
+      html += `<tr class="${rowClass}">`;
+      columns.forEach(col => {
+        let val = row[col.key];
+        let cellClass = "cell";
+        if (col.type === 'number') cellClass += " number";
+        
+        // Style conditionnel pour le solde et règlement
+        if (col.key === 'balance' && parseFloat(val) > 0) cellClass += " critical";
+        if (col.key === 'settlement' && parseFloat(val) > 0) cellClass += " settled";
+
+        html += `<td class="${cellClass}">${val ?? ''}</td>`;
+      });
+      html += `</tr>`;
+    });
+
+    html += `</tbody></table></body></html>`;
+
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+    saveAs(blob, fileName);
   }
 
   // Export de la liste des clients en PDF (Détaillé & Embelli)
@@ -463,27 +499,34 @@ Source: ${debt.sourceFile}
     };
 
     const addHeader = (pageNum: number) => {
-      // Background gradient Header (Simulé avec un rectangle)
+      // Background Header réduit
       pdf.setFillColor(44, 62, 80);
-      pdf.rect(0, 0, pageWidth, 35, 'F');
+      pdf.rect(0, 0, pageWidth, 25, 'F'); // Réduit de 35 à 25
 
-      // Logo/Titre
+      // Logo à gauche
+      try {
+        pdf.addImage('/logo.png', 'PNG', margin, 5, 25, 10);
+      } catch (e) {
+        // Fallback si pas de logo
+      }
+
+      // Titre (décalé si logo présent ou non, ici on garde une marge fixe pour la propreté)
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(22);
+      pdf.setFontSize(18); // Réduit de 22
       pdf.setFont('helvetica', 'bold');
       pdf.text("PORTFOLIO CRÉANCES CLIENTS", margin, 18);
       
-      pdf.setFontSize(10);
+      pdf.setFontSize(9);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(`MG GROUP - Gestion de Trésorerie`, margin, 25);
+      pdf.text(`MG GROUP - Gestion de Trésorerie`, margin + 115, 18); // Aligné au milieu/droite du titre
 
       // Infos (Droite)
-      pdf.setFontSize(9);
+      pdf.setFontSize(8);
       const dateStr = `Généré le : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`;
-      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 15);
-      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 22);
+      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 12);
+      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 18);
 
-      return 45;
+      return 32; // Début du contenu plus haut
     };
 
     let pageNum = 1;
