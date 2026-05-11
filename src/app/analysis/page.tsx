@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { BarChart3, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Shield, Activity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Line, ComposedChart, Area } from 'recharts';
 
 const COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444', '#8b5cf6'];
