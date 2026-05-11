@@ -99,8 +99,8 @@ export default function AnalysisPage() {
             <div className="flex items-center gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <div className="text-right border-r border-slate-200 pr-6">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Solde Total</div>
-                <div className="text-lg font-black text-slate-900">{analysis.totalBalance.toLocaleString('fr-FR')} <span className="text-[10px] font-normal">TND</span></div>
-                <div className="text-[9px] text-slate-400 font-medium">H.C: {analysis.totalBalanceNoContentieux.toLocaleString('fr-FR')} TND</div>
+                <div className="text-lg font-black text-slate-900">{analysis.totalBalance?.toLocaleString('fr-FR') || '0'} <span className="text-[10px] font-normal">TND</span></div>
+                <div className="text-[9px] text-slate-400 font-medium">H.C: {analysis.totalBalanceNoContentieux?.toLocaleString('fr-FR') || '0'} TND</div>
               </div>
               <div className="text-right">
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Recouvrement</div>
@@ -120,9 +120,9 @@ export default function AnalysisPage() {
                   <div className="p-2 bg-blue-50 rounded-lg"><DollarSign className="h-5 w-5 text-blue-600" /></div>
                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 text-[10px]">MOYENNE</Badge>
                 </div>
-                <div className="text-2xl font-black text-slate-900">{analysis.averageDebtAmount.toLocaleString('fr-FR', {maximumFractionDigits: 0})} <span className="text-sm font-medium">TND</span></div>
-                <p className="text-[11px] font-bold text-blue-600">H.C: {analysis.averageDebtAmountNoContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
-                <p className="text-[10px] text-slate-400 mt-1 italic">Médiane: {analysis.medianDebtAmount.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
+                <div className="text-2xl font-black text-slate-900">{analysis.averageDebtAmount?.toLocaleString('fr-FR', {maximumFractionDigits: 0}) || '0'} <span className="text-sm font-medium">TND</span></div>
+                <p className="text-[11px] font-bold text-blue-600">H.C: {analysis.averageDebtAmountNoContentieux?.toLocaleString('fr-FR', {maximumFractionDigits: 0}) || '0'} TND</p>
+                <p className="text-[10px] text-slate-400 mt-1 italic">Médiane: {analysis.medianDebtAmount?.toLocaleString('fr-FR', {maximumFractionDigits: 0}) || '0'} TND</p>
               </CardContent>
             </Card>
 
@@ -186,7 +186,7 @@ export default function AnalysisPage() {
                 <div className="mt-8 flex items-end justify-between">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Solde Actuel</p>
-                    <p className="text-4xl font-black text-blue-400">{analysis.topRiskClients[0]?.totalBalance.toLocaleString('fr-FR')} <span className="text-lg">TND</span></p>
+                    <p className="text-4xl font-black text-blue-400">{analysis.topRiskClients[0]?.totalBalance?.toLocaleString('fr-FR') || '0'} <span className="text-lg">TND</span></p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risque</p>
@@ -211,7 +211,7 @@ export default function AnalysisPage() {
                 <div className="mt-8 flex items-end justify-between">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Solde Actuel</p>
-                    <p className="text-4xl font-black text-slate-900">{analysis.topRiskClients[1]?.totalBalance.toLocaleString('fr-FR')} <span className="text-lg">TND</span></p>
+                    <p className="text-4xl font-black text-slate-900">{analysis.topRiskClients[1]?.totalBalance?.toLocaleString('fr-FR') || '0'} <span className="text-lg">TND</span></p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risque</p>
@@ -284,7 +284,7 @@ export default function AnalysisPage() {
                           <div key={cidx} className="p-2 bg-slate-50 rounded-lg border border-slate-100 hover:border-blue-200 transition-colors cursor-pointer"
                                onClick={() => router.push(`/clients?search=${client.clientName}`)}>
                             <div className="text-[10px] font-bold text-slate-900 truncate" title={client.clientName}>{client.clientName}</div>
-                            <div className="text-[9px] font-black text-blue-600">{client.totalBalance.toLocaleString('fr-FR')} TND</div>
+                            <div className="text-[9px] font-black text-blue-600">{client.totalBalance?.toLocaleString('fr-FR') || '0'} TND</div>
                           </div>
                         ))}
                         {(!range.topClients || range.topClients.length === 0) && (
@@ -382,7 +382,7 @@ export default function AnalysisPage() {
                             </div>
                           </td>
                           <td className="py-4 text-right">
-                            <span className="text-sm font-black text-slate-900">{client.totalBalance.toLocaleString('fr-FR')} TND</span>
+                            <span className="text-sm font-black text-slate-900">{client.totalBalance?.toLocaleString('fr-FR') || '0'} TND</span>
                           </td>
                           <td className="py-4 text-center">
                             <Badge className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
@@ -431,7 +431,7 @@ export default function AnalysisPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-6 bg-white rounded-[24px] shadow-sm border border-slate-100">
                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Plus grosse créance</div>
-                  <div className="text-lg font-black text-slate-900">{analysis.maxDebtAmount.toLocaleString('fr-FR')} TND</div>
+                  <div className="text-lg font-black text-slate-900">{analysis.maxDebtAmount?.toLocaleString('fr-FR') || '0'} TND</div>
                 </div>
                 <div className="p-6 bg-white rounded-[24px] shadow-sm border border-slate-100">
                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nombre d'alertes</div>
