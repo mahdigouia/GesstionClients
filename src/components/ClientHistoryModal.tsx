@@ -67,7 +67,7 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[95vh] flex flex-col p-0 overflow-hidden border-0 shadow-2xl">
+      <DialogContent className="max-w-4xl w-[95vw] h-[90vh] md:h-[85vh] flex flex-col p-0 overflow-hidden border-0 shadow-2xl">
         <DialogHeader className="p-6 bg-gradient-to-r from-blue-700 to-indigo-800 text-white shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -103,8 +103,8 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col bg-gray-50 min-h-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
             <div className="px-6 py-2 bg-white border-b border-gray-100">
               <TabsList className="grid grid-cols-2 w-full max-w-[400px] bg-gray-100/50 p-1 rounded-xl">
                 <TabsTrigger value="invoices" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
@@ -118,7 +118,8 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
               </TabsList>
             </div>
 
-            <ScrollArea className="flex-1 p-4 md:p-6">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="p-4 md:p-6">
               <TabsContent value="invoices" className="mt-0 outline-none">
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   <Table>
@@ -175,9 +176,9 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
                 </div>
               </TabsContent>
 
-              <TabsContent value="journal" className="mt-0 outline-none">
                 <RecoveryTimeline actions={clientActions} />
               </TabsContent>
+              </div>
             </ScrollArea>
           </Tabs>
         </div>

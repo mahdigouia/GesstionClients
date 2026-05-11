@@ -88,6 +88,10 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
   // Main filtering logic - THE SINGLE SOURCE OF TRUTH
   const filteredDebts = useMemo(() => {
     let result = debts.filter(debt => {
+      // 0. Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
+      const isSpecial = (debt.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(debt.documentNumber || '');
+      if (isSpecial) return true;
+
       // 1. Tristate Filters - APPLY FIRST AS THEY ARE THE MOST STRICT
       if (filters.contentieuxFilter !== 'off') {
         const isC = checkContentieux(debt);

@@ -189,16 +189,19 @@ export default function ClientsPage() {
       
       // Filter the debts based on all active criteria
       const filteredDebts = allClientDebts.filter(debt => {
+        // 0. Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
+        const isSpecial = (debt.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(debt.documentNumber || '');
+        if (isSpecial) return true;
+
         // 1. Age exclusion logic - CRITICAL: Strict numeric conversion
         const rawAge = debt.age;
         const matchesAgeExclusion = !isAgeExcluded(rawAge);
         if (!matchesAgeExclusion) return false;
 
         // 2. Min amount logic - CRITICAL: Handle numeric conversion from string/number
-        const rawAmount = debt.amount;
-        const amount = typeof rawAmount === 'number' ? rawAmount : parseFloat(String(rawAmount).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+        const balance = typeof debt.balance === 'number' ? debt.balance : parseFloat(String(debt.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
         
-        const matchesMinAmount = minAmountFilter ? (amount >= 5000) : true;
+        const matchesMinAmount = minAmountFilter ? (balance >= 5000) : true;
         if (!matchesMinAmount) return false;
 
         // 3. Status filters (Tristate)
@@ -337,7 +340,18 @@ export default function ClientsPage() {
               <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
                 <Button 
                   variant="outline" 
-                  onClick={() => ExportService.exportClientsToExcel(filteredClients)}
+                  onClick={() => {
+                    const activeFilters = [
+                      searchTerm ? `Recherche: "${searchTerm}"` : '',
+                      selectedCommercial !== 'all' ? `Commercial: ${selectedCommercial}` : '',
+                      contentieuxFilter !== 'off' ? `${contentieuxFilter === 'include' ? '' : 'Non '}Contentieux` : '',
+                      retainedFilter !== 'off' ? `${retainedFilter === 'include' ? '' : 'Non '}Retenue` : '',
+                      partialFilter !== 'off' ? `${partialFilter === 'include' ? '' : 'Non '}Partiel` : '',
+                      minAmountFilter ? 'Solde ≥ 5000 TND' : '',
+                      excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
+                    ].filter(Boolean).join(' | ');
+                    ExportService.exportClientsToExcel(filteredClients, activeFilters || 'Aucun');
+                  }}
                   className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-11 px-5 font-bold"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -345,7 +359,18 @@ export default function ClientsPage() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => ExportService.exportClientsToPDF(filteredClients)}
+                  onClick={() => {
+                    const activeFilters = [
+                      searchTerm ? `Recherche: "${searchTerm}"` : '',
+                      selectedCommercial !== 'all' ? `Commercial: ${selectedCommercial}` : '',
+                      contentieuxFilter !== 'off' ? `${contentieuxFilter === 'include' ? '' : 'Non '}Contentieux` : '',
+                      retainedFilter !== 'off' ? `${retainedFilter === 'include' ? '' : 'Non '}Retenue` : '',
+                      partialFilter !== 'off' ? `${partialFilter === 'include' ? '' : 'Non '}Partiel` : '',
+                      minAmountFilter ? 'Solde ≥ 5000 TND' : '',
+                      excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
+                    ].filter(Boolean).join(' | ');
+                    ExportService.exportClientsToPDF(filteredClients, activeFilters || 'Aucun');
+                  }}
                   className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-11 px-5 font-bold"
                 >
                   <FileText className="h-4 w-4 mr-2" />
@@ -403,7 +428,7 @@ export default function ClientsPage() {
               onClick={() => setMinAmountFilter(!minAmountFilter)}
             >
               <Target className="h-3.5 w-3.5" />
-              Montant ≥ 5 000 TND {minAmountFilter ? '✓' : ''}
+              Solde ≥ 5 000 TND {minAmountFilter ? '✓' : ''}
             </Badge>
 
             {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0 || minAmountFilter) && (

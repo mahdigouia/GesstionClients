@@ -27,6 +27,10 @@ export default function InvoicesPage() {
   };
 
   const filteredDebts = debts.filter(debt => {
+    // Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
+    const isSpecial = (debt.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(debt.documentNumber || '');
+    if (isSpecial) return true;
+
     const matchesSearch = searchTerm === '' || 
       (debt.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (debt.documentNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||

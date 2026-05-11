@@ -100,9 +100,15 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
   ];
 
   const applyFilter = (filterId: string, data: ClientDebt[]): ClientDebt[] => {
-    if (filterId === 'all') return data;
-    if (filterId === 'retained') return data.filter(d => isRetained(d));
-    return data.filter(d => d.riskLevel === filterId);
+    return data.filter(d => {
+      // Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
+      const isSpecial = (d.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(d.documentNumber || '');
+      if (isSpecial) return true;
+
+      if (filterId === 'all') return true;
+      if (filterId === 'retained') return isRetained(d);
+      return d.riskLevel === filterId;
+    });
   };
 
   const handleFilterClick = (filterId: string) => {

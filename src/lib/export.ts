@@ -383,101 +383,240 @@ Source: ${debt.sourceFile}
     console.log(`Analyse sauvegardée: ${defaultFileName}`);
   }
 
-  // Export de la liste des clients en Excel
-  static async exportClientsToExcel(clients: any[]): Promise<void> {
+  // Export de la liste des clients en Excel (Détaillé)
+  static async exportClientsToExcel(clients: any[], activeFilters?: string): Promise<void> {
     const workbook = XLSX.utils.book_new();
-    const data = clients.map(c => ({
-      'Code Client': c.clientCode,
-      'Nom Client': c.clientName,
-      'Commercial': c.commercialName,
-      'Fichier Source': c.sourceFile,
-      'Nombre de Factures': c.debtCount,
-      'Solde Total (TND)': c.totalBalance,
-      'Délai Moyen (jours)': Math.round(c.averagePaymentDelay)
-    }));
+    const allRows: any[] = [];
+
+    // Ajouter les filtres actifs si présents
+    if (activeFilters) {
+      allRows.push({ 'INFO': 'RAPPORT DE CRÉANCES' });
+      allRows.push({ 'INFO': `Filtres actifs : ${activeFilters}` });
+      allRows.push({ 'INFO': `Généré le : ${new Date().toLocaleDateString('fr-FR')}` });
+      allRows.push({}); // Ligne vide
+    }
+
+    let globalCounter = 1;
+
+    clients.forEach(client => {
+      const debts = client.filteredDebts || [];
+      debts.forEach((debt: ClientDebt) => {
+        allRows.push({
+          'N°': globalCounter++,
+          'Code Client': client.clientCode,
+          'Nom Client': client.clientName,
+          'Rep.': debt.commercialCode || client.commercialCode || '?',
+          'N° Pièce': debt.documentNumber,
+          'Date': new Date(debt.documentDate).toLocaleDateString('fr-FR'),
+          'Échéance': new Date(debt.dueDate).toLocaleDateString('fr-FR'),
+          'Âge (jours)': debt.age,
+          'Montant (TND)': debt.amount,
+          'Règlement (TND)': debt.settlement,
+          'Solde (TND)': debt.balance,
+          'Source': client.sourceFile || debt.sourceFile
+        });
+      });
+      
+      // Optionnel: ajouter une ligne de total par client
+      if (debts.length > 1) {
+        allRows.push({
+          'Nom Client': `TOTAL ${client.clientName}`,
+          'Solde (TND)': client.totalBalance
+        });
+        allRows.push({}); // Ligne vide pour aérer
+      }
+    });
     
-    const sheet = XLSX.utils.json_to_sheet(data);
+    const sheet = XLSX.utils.json_to_sheet(allRows);
+    
+    // Ajuster la largeur des colonnes
+    const wscols = [
+      { wch: 5 },  // N°
+      { wch: 12 }, // Code
+      { wch: 30 }, // Nom
+      { wch: 8 },  // Rep
+      { wch: 15 }, // Pièce
+      { wch: 12 }, // Date
+      { wch: 12 }, // Échéance
+      { wch: 10 }, // Âge
+      { wch: 15 }, // Montant
+      { wch: 15 }, // Règlement
+      { wch: 15 }, // Solde
+      { wch: 15 }  // Source
+    ];
+    sheet['!cols'] = wscols;
+
     XLSX.utils.book_append_sheet(workbook, sheet, 'Portefeuille Clients');
-    XLSX.writeFile(workbook, `portefeuille-clients-${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(workbook, `portefeuille-clients-detail-${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
-  // Export de la liste des clients en PDF
-  static async exportClientsToPDF(clients: any[]): Promise<void> {
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = 210;
-    const margin = 15;
+  // Export de la liste des clients en PDF (Détaillé & Embelli)
+  static async exportClientsToPDF(clients: any[], activeFilters?: string): Promise<void> {
+    const pdf = new jsPDF('l', 'mm', 'a4'); // Mode paysage pour plus d'espace
+    const pageWidth = 297;
+    const pageHeight = 210;
+    const margin = 12;
     let currentY = 20;
 
     const formatCurrency = (val: number) => {
-      return val.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      return (val ?? 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     };
 
     const addHeader = (pageNum: number) => {
-      try { pdf.addImage('/logo.png', 'PNG', margin, 15, 35, 15); } catch (e) {}
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(`Généré le : ${new Date().toLocaleDateString('fr-FR')}`, pageWidth - margin - 40, 15);
-      pdf.text(`Page ${pageNum}`, pageWidth - margin - 40, 20);
-      pdf.line(margin, 32, pageWidth - margin, 32);
-      return 38;
+      // Background gradient Header (Simulé avec un rectangle)
+      pdf.setFillColor(44, 62, 80);
+      pdf.rect(0, 0, pageWidth, 35, 'F');
+
+      // Logo/Titre
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(22);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text("PORTFOLIO CRÉANCES CLIENTS", margin, 18);
+      
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`MG GROUP - Gestion de Trésorerie`, margin, 25);
+
+      // Infos (Droite)
+      pdf.setFontSize(9);
+      const dateStr = `Généré le : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`;
+      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 15);
+      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 22);
+
+      return 45;
     };
 
     let pageNum = 1;
     currentY = addHeader(pageNum);
 
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(44, 62, 80);
-    pdf.text("Portefeuille Clients", margin, currentY);
-    currentY += 12;
+    // Filtres Actifs
+    if (activeFilters) {
+      pdf.setFillColor(241, 245, 249);
+      pdf.roundedRect(margin, currentY - 5, pageWidth - (2 * margin), 10, 2, 2, 'F');
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Filtres actifs : `, margin + 5, currentY + 1.5);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(8);
+      pdf.text(activeFilters, margin + 30, currentY + 1.5);
+      currentY += 15;
+    }
 
+    // Définition des colonnes (Paysage)
     const cols = [
-      { h: 'Code', x: margin, w: 20 },
-      { h: 'Nom Client', x: margin + 20, w: 60 },
-      { h: 'Commercial', x: margin + 80, w: 30 },
-      { h: 'Source', x: margin + 110, w: 25 },
-      { h: 'Docs', x: margin + 135, w: 10 },
-      { h: 'Délai', x: margin + 145, w: 15 },
-      { h: 'Solde Total', x: margin + 160, w: 35, align: 'right' }
+      { h: 'N°', x: margin, w: 10 },
+      { h: 'Code', x: margin + 10, w: 20 },
+      { h: 'Client', x: margin + 30, w: 65 },
+      { h: 'Rep.', x: margin + 95, w: 12 },
+      { h: 'N° Pièce', x: margin + 107, w: 30 },
+      { h: 'Date', x: margin + 137, w: 25 },
+      { h: 'Échéance', x: margin + 162, w: 25 },
+      { h: 'Âge', x: margin + 187, w: 15, align: 'center' },
+      { h: 'Montant', x: margin + 202, w: 35, align: 'right' },
+      { h: 'Solde', x: margin + 237, w: 35, align: 'right' }
     ];
 
-    pdf.setFillColor(44, 62, 80);
-    pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 8, 'F');
-    pdf.setFontSize(9);
-    pdf.setTextColor(255, 255, 255);
-    cols.forEach(col => {
-      if (col.align === 'right') pdf.text(col.h, col.x + col.w, currentY, { align: 'right' });
-      else pdf.text(col.h, col.x, currentY);
-    });
+    // Header Tableau
+    const drawTableHeader = (y: number) => {
+      pdf.setFillColor(51, 65, 85);
+      pdf.rect(margin, y - 5, pageWidth - (2 * margin), 8, 'F');
+      pdf.setFontSize(9);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      cols.forEach(col => {
+        if (col.align === 'right') pdf.text(col.h, col.x + col.w, y, { align: 'right' });
+        else if (col.align === 'center') pdf.text(col.h, col.x + (col.w / 2), y, { align: 'center' });
+        else pdf.text(col.h, col.x, y);
+      });
+    };
+
+    drawTableHeader(currentY);
     currentY += 8;
 
+    let globalIndex = 1;
     pdf.setFontSize(8);
-    pdf.setTextColor(40, 40, 40);
     pdf.setFont('helvetica', 'normal');
 
-    clients.forEach((c, index) => {
-      if (currentY > 275) {
-        pdf.addPage();
-        currentY = addHeader(++pageNum);
-        currentY += 8; // Espace pour le header tableau (simplifié)
-      }
+    clients.forEach((client) => {
+      const debts = client.filteredDebts || [];
+      
+      debts.forEach((debt: ClientDebt, i: number) => {
+        // Saut de page
+        if (currentY > 185) {
+          pdf.addPage();
+          currentY = addHeader(++pageNum);
+          drawTableHeader(currentY);
+          currentY += 8;
+          pdf.setFontSize(8);
+          pdf.setFont('helvetica', 'normal');
+        }
 
-      if (index % 2 === 0) {
-        pdf.setFillColor(249, 250, 251);
-        pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
-      }
+        // Alternance de couleur
+        if (globalIndex % 2 === 0) {
+          pdf.setFillColor(248, 250, 252);
+          pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
+        }
 
-      pdf.text(c.clientCode || '?', margin, currentY);
-      pdf.text((c.clientName || 'Inconnu').substring(0, 35), margin + 20, currentY);
-      pdf.text((c.commercialName || '').substring(0, 18), margin + 80, currentY);
-      pdf.text((c.sourceFile || '').substring(0, 15), margin + 110, currentY);
-      pdf.text(String(c.debtCount), margin + 135, currentY);
-      pdf.text(`${Math.round(c.averagePaymentDelay)}j`, margin + 145, currentY);
-      pdf.text(formatCurrency(c.totalBalance), margin + 160 + 35, currentY, { align: 'right' });
-      currentY += 7;
+        pdf.setTextColor(30, 41, 59);
+        pdf.text(String(globalIndex), margin, currentY);
+        pdf.text(client.clientCode || '?', margin + 10, currentY);
+        pdf.text((client.clientName || '').substring(0, 40), margin + 30, currentY);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(debt.commercialCode || client.commercialCode || '?', margin + 95, currentY);
+        pdf.setFont('helvetica', 'normal');
+        
+        pdf.text(debt.documentNumber, margin + 107, currentY);
+        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 137, currentY);
+        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 162, currentY);
+        
+        // Âge avec couleur si critique
+        if (debt.age > 90) pdf.setTextColor(185, 28, 28);
+        else if (debt.age > 30) pdf.setTextColor(234, 88, 12);
+        pdf.text(`${debt.age} j`, margin + 187 + 7.5, currentY, { align: 'center' });
+        pdf.setTextColor(30, 41, 59);
+
+        pdf.text(formatCurrency(debt.amount), margin + 202 + 35, currentY, { align: 'right' });
+        
+        pdf.setFont('helvetica', 'bold');
+        if (debt.balance > 0) pdf.setTextColor(185, 28, 28);
+        pdf.text(formatCurrency(debt.balance), margin + 237 + 35, currentY, { align: 'right' });
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFont('helvetica', 'normal');
+
+        currentY += 7;
+        globalIndex++;
+      });
+
+      // Ligne de séparation légère entre clients si nécessaire
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(margin, currentY - 4, pageWidth - margin, currentY - 4);
     });
 
-    pdf.save(`portefeuille-clients-${new Date().toISOString().split('T')[0]}.pdf`);
+    // Total Général
+    if (currentY > 180) {
+      pdf.addPage();
+      currentY = addHeader(++pageNum);
+    }
+
+    const totalBalance = clients.reduce((sum, c) => sum + (c.totalBalance || 0), 0);
+    const totalAmount = clients.reduce((sum, c) => {
+      return sum + (c.filteredDebts || []).reduce((s: number, d: any) => s + (d.amount || 0), 0);
+    }, 0);
+
+    currentY += 5;
+    pdf.setFillColor(51, 65, 85);
+    pdf.rect(margin, currentY - 6, pageWidth - (2 * margin), 12, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(11);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text("TOTAL GÉNÉRAL", margin + 5, currentY + 1.5);
+    
+    pdf.text(formatCurrency(totalAmount), margin + 202 + 35, currentY + 1.5, { align: 'right' });
+    pdf.text(formatCurrency(totalBalance), margin + 237 + 35, currentY + 1.5, { align: 'right' });
+
+    pdf.save(`Rapport_Portefeuille_Detaille_${new Date().toISOString().split('T')[0]}.pdf`);
   }
 
   // Export Excel par Commercial avec résumé contentieux/non-contentieux
