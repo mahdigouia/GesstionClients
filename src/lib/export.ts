@@ -425,8 +425,8 @@ Source: ${debt.sourceFile}
     this.saveStyledExcel(
       rows, 
       columns, 
-      `Portefeuille_Clients_Detaille_${new Date().toISOString().split('T')[0]}.xls`,
-      `PORTFOLIO CRÉANCES CLIENTS - ${new Date().toLocaleDateString('fr-FR')}`
+      `Creances_Clients_Detaille_${new Date().toISOString().split('T')[0]}.xls`,
+      `CRÉANCES CLIENTS - ${new Date().toLocaleDateString('fr-FR')}`
     );
   }
 
@@ -510,15 +510,13 @@ Source: ${debt.sourceFile}
         // Fallback si pas de logo
       }
 
-      // Titre (décalé si logo présent ou non, ici on garde une marge fixe pour la propreté)
+      // Titre (un peu plus bas pour l'équilibre)
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(18); // Réduit de 22
+      pdf.setFontSize(20); 
       pdf.setFont('helvetica', 'bold');
-      pdf.text("PORTFOLIO CRÉANCES CLIENTS", margin, 18);
+      pdf.text("CRÉANCES CLIENTS", margin, 20); // Changé de 'PORTFOLIO CRÉANCES CLIENTS' et descendu à 20
       
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`MG GROUP - Gestion de Trésorerie`, margin + 115, 18); // Aligné au milieu/droite du titre
+      // Suppression de la mention MG GROUP - Gestion de Trésorerie
 
       // Infos (Droite)
       pdf.setFontSize(8);
