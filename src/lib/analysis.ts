@@ -43,6 +43,7 @@ export const AnalysisService = {
       const nonContentieuxDebts = processedDebts.filter(d => !d.isContentieux);
       const totalNonContentieuxAmount = nonContentieuxDebts.reduce((sum, d) => sum + d.amount, 0);
       const totalNonContentieuxPaid = nonContentieuxDebts.reduce((sum, d) => sum + d.settlement, 0);
+      const totalBalanceNoContentieux = nonContentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
       
       const unpaidRateNoContentieux = totalNonContentieuxAmount > 0 
         ? ((totalNonContentieuxAmount - totalNonContentieuxPaid) / totalNonContentieuxAmount) * 100 
@@ -97,7 +98,14 @@ export const AnalysisService = {
         ? debtsWithDelay.reduce((sum, d) => sum + (d.paymentDays || 0), 0) / debtsWithDelay.length 
         : processedDebts.reduce((sum, d) => sum + d.age, 0) / (processedDebts.length || 1);
 
+      // DSO No Contentieux
+      const ncWithDelay = nonContentieuxDebts.filter(d => (d.paymentDays || 0) > 0);
+      const averagePaymentDelayNoContentieux = ncWithDelay.length > 0
+        ? ncWithDelay.reduce((sum, d) => sum + (d.paymentDays || 0), 0) / ncWithDelay.length
+        : nonContentieuxDebts.reduce((sum, d) => sum + d.age, 0) / (nonContentieuxDebts.length || 1);
+
       const projectedMonthlyCashflow = totalBalance * (recoveryRate / 100);
+      const projectedMonthlyCashflowNoContentieux = totalBalanceNoContentieux * (recoveryRateNoContentieux / 100);
 
       // Analyse par client
       const clientMap = new Map<string, any>();
@@ -168,6 +176,7 @@ export const AnalysisService = {
         totalDebts,
         totalPaid,
         totalBalance,
+        totalBalanceNoContentieux,
         recoveryRate,
         recoveryRateNoContentieux,
         unpaidRateNoContentieux,
@@ -181,7 +190,9 @@ export const AnalysisService = {
           .slice(0, 10),
         alerts: generateAlerts(processedDebts),
         averageDebtAmount: totalDebts / (processedDebts.length || 1),
+        averageDebtAmountNoContentieux: totalNonContentieuxAmount / (nonContentieuxDebts.length || 1),
         averagePaymentDelay,
+        averagePaymentDelayNoContentieux,
         medianDebtAmount,
         maxDebtAmount,
         minDebtAmount,
@@ -189,6 +200,7 @@ export const AnalysisService = {
         partiallyPaidPercentage,
         unpaidPercentage,
         projectedMonthlyCashflow,
+        projectedMonthlyCashflowNoContentieux,
         riskDistribution,
         processedDebts
       };

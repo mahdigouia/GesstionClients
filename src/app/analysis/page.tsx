@@ -3,7 +3,7 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisService } from '@/lib/analysis';
-import { BarChart3, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Shield, Activity } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Shield, Activity, Crown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -93,19 +93,21 @@ export default function AnalysisPage() {
             
             <div className="flex items-center gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <div className="text-right border-r border-slate-200 pr-6">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Solde Total</div>
-                <div className="text-xl font-black text-slate-900">{analysis.totalBalance.toLocaleString('fr-FR')} <span className="text-xs font-normal">TND</span></div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Solde Total</div>
+                <div className="text-lg font-black text-slate-900">{analysis.totalBalance.toLocaleString('fr-FR')} <span className="text-[10px] font-normal">TND</span></div>
+                <div className="text-[9px] text-slate-400 font-medium">H.C: {analysis.totalBalanceNoContentieux.toLocaleString('fr-FR')} TND</div>
               </div>
               <div className="text-right">
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Recouvrement</div>
-                <div className="text-xl font-black text-emerald-600">{analysis.recoveryRate.toFixed(1)}%</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Recouvrement</div>
+                <div className="text-lg font-black text-emerald-600">{analysis.recoveryRate.toFixed(1)}%</div>
+                <div className="text-[9px] text-emerald-600 font-bold">H.C: {analysis.recoveryRateNoContentieux.toFixed(1)}%</div>
               </div>
             </div>
           </div>
         </header>
 
         <main className="p-8 space-y-8 max-w-7xl mx-auto">
-          {/* Métriques Clés */}
+          {/* Métriques Clés avec Dualité */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-0 shadow-sm rounded-[24px] overflow-hidden">
               <CardContent className="p-6">
@@ -114,7 +116,8 @@ export default function AnalysisPage() {
                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100 text-[10px]">MOYENNE</Badge>
                 </div>
                 <div className="text-2xl font-black text-slate-900">{analysis.averageDebtAmount.toLocaleString('fr-FR', {maximumFractionDigits: 0})} <span className="text-sm font-medium">TND</span></div>
-                <p className="text-xs text-slate-500 mt-1 italic">Médiane: {analysis.medianDebtAmount.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
+                <p className="text-[11px] font-bold text-blue-600">H.C: {analysis.averageDebtAmountNoContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
+                <p className="text-[10px] text-slate-400 mt-1 italic">Médiane: {analysis.medianDebtAmount.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
               </CardContent>
             </Card>
 
@@ -122,10 +125,11 @@ export default function AnalysisPage() {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-orange-50 rounded-lg"><Clock className="h-5 w-5 text-orange-600" /></div>
-                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-100 text-[10px]" title="Days Sales Outstanding - Délai moyen de recouvrement">DSO</Badge>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-100 text-[10px]" title="Délai Moyen de Règlement">DMP</Badge>
                 </div>
                 <div className="text-2xl font-black text-slate-900">{analysis.averagePaymentDelay.toFixed(0)} <span className="text-sm font-medium">jours</span></div>
-                <p className="text-xs text-slate-500 mt-1">Délai moyen de règlement client</p>
+                <p className="text-[11px] font-bold text-orange-600">H.C: {analysis.averagePaymentDelayNoContentieux.toFixed(0)} jours</p>
+                <p className="text-[10px] text-slate-400 mt-1">Délai de règlement global</p>
               </CardContent>
             </Card>
 
@@ -136,7 +140,8 @@ export default function AnalysisPage() {
                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100 text-[10px]">PRÉVISION</Badge>
                 </div>
                 <div className="text-2xl font-black text-emerald-600">{analysis.projectedMonthlyCashflow.toLocaleString('fr-FR', {maximumFractionDigits: 0})} <span className="text-sm font-medium">TND</span></div>
-                <p className="text-xs text-slate-500 mt-1">Cashflow mensuel estimé</p>
+                <p className="text-[11px] font-bold text-emerald-600">H.C: {analysis.projectedMonthlyCashflowNoContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
+                <p className="text-[10px] text-slate-400 mt-1">Cashflow mensuel estimé</p>
               </CardContent>
             </Card>
 
@@ -154,6 +159,55 @@ export default function AnalysisPage() {
                   <div className="bg-emerald-500" style={{width: `${analysis.fullyPaidPercentage}%`}} />
                   <div className="bg-amber-500" style={{width: `${analysis.partiallyPaidPercentage}%`}} />
                   <div className="bg-rose-500" style={{width: `${analysis.unpaidPercentage}%`}} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Top 2 Exposition Individuelle */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-[32px] overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl" />
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <Badge className="bg-blue-600 text-white border-0 font-black">#1 PLUS GROSSE CRÉANCE</Badge>
+                  <Crown className="h-6 w-6 text-yellow-400" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black truncate">{analysis.topRiskClients[0]?.clientName}</h3>
+                  <p className="text-slate-400 font-medium">{analysis.topRiskClients[0]?.clientCode}</p>
+                </div>
+                <div className="mt-8 flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Solde Actuel</p>
+                    <p className="text-4xl font-black text-blue-400">{analysis.topRiskClients[0]?.totalBalance.toLocaleString('fr-FR')} <span className="text-lg">TND</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risque</p>
+                    <Badge variant="outline" className="bg-rose-500/20 text-rose-400 border-rose-500/30">CRITIQUE</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-xl bg-white rounded-[32px] overflow-hidden border border-slate-100 relative">
+              <CardContent className="p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <Badge variant="outline" className="border-slate-200 text-slate-500 font-black">#2 PLUS GROSSE CRÉANCE</Badge>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-2xl font-black text-slate-900 truncate">{analysis.topRiskClients[1]?.clientName}</h3>
+                  <p className="text-slate-400 font-medium">{analysis.topRiskClients[1]?.clientCode}</p>
+                </div>
+                <div className="mt-8 flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Solde Actuel</p>
+                    <p className="text-4xl font-black text-slate-900">{analysis.topRiskClients[1]?.totalBalance.toLocaleString('fr-FR')} <span className="text-lg">TND</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risque</p>
+                    <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">ÉLEVÉ</Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>

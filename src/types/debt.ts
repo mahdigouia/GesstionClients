@@ -70,7 +70,10 @@ export interface AnalysisResult {
   alerts: Alert[];
   // Métriques avancées
   averageDebtAmount: number;
+  averageDebtAmountNoContentieux: number;
   averagePaymentDelay: number;
+  averagePaymentDelayNoContentieux: number;
+  totalBalanceNoContentieux: number;
   medianDebtAmount: number;
   maxDebtAmount: number;
   minDebtAmount: number;
@@ -78,6 +81,7 @@ export interface AnalysisResult {
   partiallyPaidPercentage: number;
   unpaidPercentage: number;
   projectedMonthlyCashflow: number;
+  projectedMonthlyCashflowNoContentieux: number;
   riskDistribution: {
     healthy: number;
     monitoring: number;
