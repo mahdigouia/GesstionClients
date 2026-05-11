@@ -27,6 +27,22 @@ interface DebtContextType {
   markAllNotificationsAsRead: () => void;
   history: HistoryPoint[];
   clearHistory: () => void;
+  settings: AppSettings;
+  updateSettings: (newSettings: Partial<AppSettings>) => void;
+}
+
+export interface AppSettings {
+  contentiousAgeDays: number;
+  retentionMin: number;
+  retentionMax: number;
+}
+
+export interface AuditLog {
+  id: string;
+  user: string;
+  action: string;
+  details: string;
+  timestamp: any;
 }
 
 export interface HistoryPoint {
@@ -49,6 +65,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string | null>(null);
   const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [settings, setSettings] = useState<AppSettings>({ contentiousAgeDays: 365, retentionMin: 0.5, retentionMax: 1.5 });
   const [firestoreReady, setFirestoreReady] = useState(false);
   const { user } = useAuth();
 
@@ -67,9 +84,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           setLastUpdatedBy(data.updatedBy || null);
           setReadAlertIds(data.readAlertIds || []);
           setHistory(data.history || []);
+          if (data.settings) setSettings(data.settings);
           
           if (firestoreDebts.length > 0) {
-            const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts);
+            const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts, data.settings || settings);
             setAnalysis(newAnalysis);
             // Si l'analyse a produit des créances traitées (avec isContentieux corrigé), les utiliser
             if (newAnalysis.processedDebts) {
@@ -109,6 +127,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       if (savedAnalysis) {
         setAnalysis(JSON.parse(savedAnalysis));
       }
+      const savedSettings = localStorage.getItem('gc_settings');
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      }
     } catch (e) {
       console.warn('Erreur chargement données sauvegardées:', e);
     }
@@ -132,6 +154,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         history: updateHistory(newDebts, history)
       });
       console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances et ${newActions.length} actions dans Firestore par ${user?.email}`);
+      
+      // Journalisation pour l'utilisateur spécifique
+      if (user?.email === 'moslem.gouia@gmail.com') {
+        logAction('Sync Firestore', `Mise à jour de ${newDebts.length} créances`);
+      }
     } catch (error) {
       console.warn('[DebtContext] Erreur sauvegarde Firestore:', error);
     }
@@ -148,6 +175,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     const updatedActions = [newAction, ...recoveryActions];
     setRecoveryActions(updatedActions);
     saveToFirestore(debts, updatedActions);
+    
+    if (user?.email === 'moslem.gouia@gmail.com') {
+      logAction('Action de recouvrement', `Ajout d'une action pour le client ${actionData.clientName}`);
+    }
   };
 
   const setDebts = (newDebts: ClientDebt[]) => {
@@ -184,6 +215,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       
       // Sauvegarder la version finale fusionnée
       saveToFirestore(updatedDebts);
+
+      if (user?.email === 'moslem.gouia@gmail.com') {
+        logAction('Import de masse', `Ajout de ${newDebts.length} nouvelles créances`);
+      }
       
       // Analyse locale
       if (updatedDebts.length > 0) {
@@ -262,6 +297,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         debtCount: 0,
         history: []
       });
+      if (user?.email === 'moslem.gouia@gmail.com') {
+        logAction('Suppression Totale', `L'utilisateur a vidé toutes les données du système`);
+      }
     } catch (error) {
       console.warn('[DebtContext] Erreur suppression Firestore:', error);
     }
@@ -299,12 +337,46 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const clearHistory = async () => {
-    setHistory([]);
+    }
+  };
+
+  const updateSettings = async (newSettings: Partial<AppSettings>) => {
+    const updated = { ...settings, ...newSettings };
+    setSettings(updated);
+    localStorage.setItem('gc_settings', JSON.stringify(updated));
+
+    // Déclencher une nouvelle analyse avec les nouveaux paramètres
+    if (debts.length > 0) {
+      const newAnalysis = AnalysisService.analyzeDebts(debts, updated);
+      setAnalysis(newAnalysis);
+      if (newAnalysis.processedDebts) {
+        setDebtsState(newAnalysis.processedDebts);
+      }
+    }
+
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
-      await setDoc(docRef, { history: [] }, { merge: true });
+      await setDoc(docRef, { settings: updated }, { merge: true });
+      
+      if (user?.email === 'moslem.gouia@gmail.com') {
+        logAction('Mise à jour paramètres', `Contentieux: ${updated.contentiousAgeDays}j, Retenus: ${updated.retentionMin}%-${updated.retentionMax}%`);
+      }
     } catch (error) {
-      console.warn('[DebtContext] Erreur suppression historique:', error);
+      console.warn('[DebtContext] Erreur sauvegarde paramètres:', error);
+    }
+  };
+
+  const logAction = async (action: string, details: string) => {
+    try {
+      const logRef = doc(db, 'audit_logs', `${Date.now()}_${user?.email?.split('@')[0]}`);
+      await setDoc(logRef, {
+        user: user?.email || 'inconnu',
+        action,
+        details,
+        timestamp: serverTimestamp()
+      });
+    } catch (e) {
+      console.error('Erreur logging:', e);
     }
   };
 
@@ -323,7 +395,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       readAlertIds,
       markAllNotificationsAsRead,
       history,
-      clearHistory
+      clearHistory,
+      settings,
+      updateSettings
     }}>
       {children}
     </DebtContext.Provider>

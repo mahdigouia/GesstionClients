@@ -17,20 +17,20 @@ L'application identifie le type de document grâce au préfixe du Numéro de Pi�
 | **FT** | Facture de Vente | Facture standard. Son statut de paiement est finement analysé selon le pourcentage du règlement par rapport au montant initial (voir section 2). |
 | **Autre** | Document Générique | Par défaut, tout autre document avec un solde > 0 est considéré comme `Non payé`. |
 
-## 2. Statut de Paiement (Paiement Partiel, Retenues...)
+## 2. Statut de Paiement (Paiement Partiel, Retenus...)
 
 Pour les factures standard (**FT**), l'application analyse le ratio entre le *Solde restant* et le *Montant total* pour affiner le statut de paiement :
 
 1.  **Soldé (`paid`)** : Solde ≤ 0.
 2.  **Impayé total (`unpaid`)** : Règlement = 0.
-3.  **Retenu non réglé (`retained`)** : Le ratio (Solde / Montant) est compris entre **0.5% et 1.5%**. Cela indique souvent une petite retenue de garantie, un timbre, ou une erreur d'arrondi plutôt qu'un réel impayé problématique.
+3. **Retenus non réglé (`retained`)** : Le ratio (Solde / Montant) est compris entre **0.5% et 1.5%**. Cela indique souvent une petite retenus, un timbre, ou une erreur d'arrondi plutôt qu'un réel impayé problématique.
 4.  **Paiement partiel (`partial`)** : Le ratio (Solde / Montant) est strictement supérieur à 1.5% et inférieur à 99%. Le client a effectué un versement significatif mais n'a pas tout réglé.
 
 ### Filtres de Statut de Paiement (UI)
 
 L'interface utilisateur propose des filtres dédiés pour identifier rapidement les factures selon leur statut de paiement :
 
-*   **🛡️ Filtre "Retenue 0.5%-1.5%"** : Affiche uniquement les factures **FT** et **FS** dont le ratio Solde/Montant est compris entre 0.5% et 1.5%. Ces factures représentent des retenues de garantie, timbres, ou erreurs d'arrondi. Ce filtre fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
+*   **🛡️ Filtre "Retenus 0.5%-1.5%"** : Affiche uniquement les factures **FT** et **FS** dont le ratio Solde/Montant est compris entre 0.5% et 1.5%. Ces factures représentent des retenus, timbres, ou erreurs d'arrondi. Ce filtre fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
 *   **💳 Filtre "Paiement partiel 1.5%-99%"** : Affiche uniquement les factures **FT** et **FS** avec un ratio Solde/Montant entre 1.5% et 99%. Ce filtre identifie les factures partiellement payées ou en cours de règlement. Il fonctionne **indépendamment de la valeur du règlement** (peut être 0 ou > 0).
 
 **Important** : Ces deux filtres s'appliquent uniquement aux factures de type **FT** (Facture de Vente) et **FS** (Facture de Service), car seules celles-ci peuvent avoir des statuts de paiement intermédiaires. Les avoirs (AV/AVT/AVS/FRS/FRT) sont toujours considérés comme "Payés".

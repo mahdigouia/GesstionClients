@@ -17,6 +17,7 @@ import { ClientDebt } from '@/types/debt';
 import { useState } from 'react';
 import { AutocompleteSearch } from './AutocompleteSearch';
 import { QuickClientProfile } from './QuickClientProfile';
+import { useDebtContext } from '@/lib/DebtContext';
 
 interface QuickFiltersProps {
   debts: ClientDebt[];
@@ -28,6 +29,7 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const { settings } = useDebtContext();
 
   const clientDebts = selectedClient 
     ? debts.filter(d => d.clientName === selectedClient)
@@ -39,7 +41,8 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
     if (debt.balance <= 0) return false;
     if (debt.amount <= 0) return false;
     const ratio = (debt.balance / debt.amount) * 100;
-    return ratio >= 0.5 && ratio <= 1.5;
+    // Utiliser l'intervalle dynamique de retenue
+    return ratio >= (settings.retentionMin || 0.5) && ratio <= (settings.retentionMax || 1.5);
   };
 
   const quickStats = [
@@ -90,7 +93,7 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
     },
     { 
       id: 'retained', 
-      label: 'Retenue (0.5%-1.5%)', 
+      label: `Retenus (${settings.retentionMin}%-${settings.retentionMax}%)`, 
       count: debts.filter(d => isRetained(d)).length,
       icon: Shield,
       color: 'bg-purple-500',

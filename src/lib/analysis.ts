@@ -22,16 +22,31 @@ function generateAlerts(debts: ClientDebt[]): Alert[] {
 }
 
 export const AnalysisService = {
-  analyzeDebts(debts: ClientDebt[]): AnalysisResult {
+  analyzeDebts(debts: ClientDebt[], config?: { contentiousAgeDays: number, retentionMin: number, retentionMax: number }): AnalysisResult {
+    const contentiousThreshold = config?.contentiousAgeDays || 365;
+    const minRet = config?.retentionMin !== undefined ? config.retentionMin : 0.5;
+    const maxRet = config?.retentionMax !== undefined ? config.retentionMax : 1.5;
+
     try {
-      const processedDebts = debts.map(d => ({
-        ...d,
-        amount: Number(d.amount || 0),
-        settlement: Number(d.settlement || 0),
-        balance: Number(d.balance || 0),
-        age: Number(d.age || 0),
-        isContentieux: Number(d.age || 0) > 365
-      }));
+      const processedDebts = debts.map(d => {
+        const amount = Number(d.amount || 0);
+        const balance = Number(d.balance || 0);
+        const age = Number(d.age || 0);
+        
+        // Calcul de la retenue : si le solde est dans l'intervalle défini
+        const ratio = amount > 0 ? (balance / amount) * 100 : 0;
+        const isRetention = ratio >= minRet && ratio <= maxRet;
+
+        return {
+          ...d,
+          amount,
+          settlement: Number(d.settlement || 0),
+          balance,
+          age,
+          isContentieux: age > contentiousThreshold,
+          isRetention
+        };
+      });
 
       const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
       const totalPaid = processedDebts.reduce((sum, debt) => sum + debt.settlement, 0);
