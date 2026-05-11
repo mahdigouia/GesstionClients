@@ -144,8 +144,8 @@ export default function AnalysisPage() {
                   <div className="p-2 bg-emerald-50 rounded-lg"><TrendingUp className="h-5 w-5 text-emerald-600" /></div>
                   <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100 text-[10px]">PRÉVISION</Badge>
                 </div>
-                <div className="text-2xl font-black text-emerald-600">{analysis.projectedMonthlyCashflow.toLocaleString('fr-FR', {maximumFractionDigits: 0})} <span className="text-sm font-medium">TND</span></div>
-                <p className="text-[11px] font-bold text-emerald-600">H.C: {analysis.projectedMonthlyCashflowNoContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND</p>
+                <div className="text-2xl font-black text-emerald-600">{analysis.projectedMonthlyCashflow?.toLocaleString('fr-FR', {maximumFractionDigits: 0}) || '0'} <span className="text-sm font-medium">TND</span></div>
+                <p className="text-[11px] font-bold text-emerald-600">H.C: {analysis.projectedMonthlyCashflowNoContentieux?.toLocaleString('fr-FR', {maximumFractionDigits: 0}) || '0'} TND</p>
                 <p className="text-[10px] text-slate-400 mt-1">Cashflow mensuel estimé</p>
               </CardContent>
             </Card>
@@ -268,7 +268,7 @@ export default function AnalysisPage() {
                     <Tooltip 
                       cursor={{fill: '#f8fafc', radius: 8}}
                       contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px'}}
-                      formatter={(value: any) => [`${value.toLocaleString('fr-FR')} TND`, 'Volume']}
+                      formatter={(value: any) => [`${value?.toLocaleString('fr-FR') || '0'} TND`, 'Volume']}
                     />
                     <Bar dataKey="amount" fill="url(#modernBarGradient)" radius={[8, 8, 0, 0]} barSize={40} filter="url(#shadow)" />
                     <Line type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} />
