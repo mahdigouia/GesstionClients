@@ -276,7 +276,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
           {!effectiveCollapsed && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-600">© 2026</span>
-              <span className="text-[8px] text-slate-400">Mg</span>
+              <span className="text-[8px] text-slate-400 font-bold tracking-widest">MDS</span>
             </div>
           )}
         </div>

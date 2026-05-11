@@ -52,7 +52,54 @@ export const AnalysisService = {
         ? (totalNonContentieuxPaid / totalNonContentieuxAmount) * 100
         : 0;
 
-      // Analyse par client simplifiée pour stabilité
+      // Stats de montant
+      const amounts = processedDebts.map(d => d.amount).sort((a, b) => a - b);
+      const maxDebtAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
+      const minDebtAmount = amounts.length > 0 ? Math.min(...amounts) : 0;
+      const medianDebtAmount = amounts.length > 0 ? amounts[Math.floor(amounts.length / 2)] : 0;
+
+      // Statut de paiement
+      const fullyPaidCount = processedDebts.filter(d => d.balance <= 0 && d.amount > 0).length;
+      const partiallyPaidCount = processedDebts.filter(d => d.balance > 0 && d.settlement > 0).length;
+      const unpaidCount = processedDebts.filter(d => d.settlement <= 0 && d.amount > 0).length;
+      const totalCount = processedDebts.filter(d => d.amount > 0).length || 1;
+
+      const fullyPaidPercentage = (fullyPaidCount / totalCount) * 100;
+      const partiallyPaidPercentage = (partiallyPaidCount / totalCount) * 100;
+      const unpaidPercentage = (unpaidCount / totalCount) * 100;
+
+      // Distribution des risques
+      const riskDistribution = { healthy: 0, monitoring: 0, overdue: 0, critical: 0 };
+      processedDebts.forEach(d => {
+        if (d.riskLevel in riskDistribution) {
+          riskDistribution[d.riskLevel as keyof typeof riskDistribution]++;
+        }
+      });
+
+      // Tranches de montant
+      const amountBrackets = [
+        { range: '0 - 1k', min: 0, max: 1000, amount: 0 },
+        { range: '1k - 5k', min: 1001, max: 5000, amount: 0 },
+        { range: '5k - 20k', min: 5001, max: 20000, amount: 0 },
+        { range: '> 20k', min: 20001, max: Infinity, amount: 0 }
+      ];
+
+      processedDebts.forEach(d => {
+        const bracket = amountBrackets.find(b => d.amount >= b.min && d.amount <= b.max);
+        if (bracket) bracket.amount += d.amount;
+      });
+
+      const amountRanges = amountBrackets.map(b => ({ range: b.range, amount: b.amount }));
+
+      // Délai moyen et prévision
+      const debtsWithDelay = processedDebts.filter(d => (d.paymentDays || 0) > 0);
+      const averagePaymentDelay = debtsWithDelay.length > 0 
+        ? debtsWithDelay.reduce((sum, d) => sum + (d.paymentDays || 0), 0) / debtsWithDelay.length 
+        : processedDebts.reduce((sum, d) => sum + d.age, 0) / (processedDebts.length || 1);
+
+      const projectedMonthlyCashflow = totalBalance * (recoveryRate / 100);
+
+      // Analyse par client
       const clientMap = new Map<string, any>();
       processedDebts.forEach(debt => {
         if (!clientMap.has(debt.clientName)) {
@@ -76,29 +123,24 @@ export const AnalysisService = {
         client.totalPaid += debt.settlement;
         client.debtCount++;
         
-        // Track the earliest extract index for this client
         if (debt.extractIndex !== undefined && debt.extractIndex < client.minExtractIndex) {
           client.minExtractIndex = debt.extractIndex;
         }
 
-        // Mise à jour du commercial et source si non renseignés
         if (client.commercialName === 'Non assigné' && debt.commercialName) client.commercialName = debt.commercialName;
-        if (client.commercialCode === '?' && debt.commercialCode) client.commercialCode = debt.commercialCode;
-        if (client.sourceFile === '?' && debt.sourceFile) client.sourceFile = debt.sourceFile;
         
-        if (debt.riskLevel === 'critical' || client.riskLevel === 'critical') client.riskLevel = 'critical';
+        // Risque client max
+        const riskPriority = { healthy: 0, monitoring: 1, overdue: 2, critical: 3 };
+        const currentRisk = riskPriority[debt.riskLevel as keyof typeof riskPriority] || 0;
+        const clientRisk = riskPriority[client.riskLevel as keyof typeof riskPriority] || 0;
+        if (currentRisk > clientRisk) {
+          client.riskLevel = debt.riskLevel;
+        }
       });
 
       const clientBreakdown = Array.from(clientMap.values())
         .map(c => ({ ...c, averagePaymentDelay: 0 }))
-        .sort((a, b) => {
-          // Primary sort by source file (alphabetical)
-          const sourceComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
-          if (sourceComp !== 0) return sourceComp;
-          
-          // Secondary sort by first appearance in file
-          return (a.minExtractIndex || 0) - (b.minExtractIndex || 0);
-        });
+        .sort((a, b) => b.totalBalance - a.totalBalance); // Trier par solde pour l'analyse
 
       // Aging
       const agingRanges = [
@@ -132,19 +174,22 @@ export const AnalysisService = {
         globalUnpaidRate,
         clientBreakdown,
         agingBreakdown,
-        amountRanges: [],
-        topRiskClients: processedDebts.filter(d => d.balance > 0).slice(0, 10),
+        amountRanges,
+        topRiskClients: Array.from(clientMap.values())
+          .filter(c => c.totalBalance > 0)
+          .sort((a, b) => b.totalBalance - a.totalBalance)
+          .slice(0, 10),
         alerts: generateAlerts(processedDebts),
         averageDebtAmount: totalDebts / (processedDebts.length || 1),
-        averagePaymentDelay: 0,
-        medianDebtAmount: 0,
-        maxDebtAmount: 0,
-        minDebtAmount: 0,
-        fullyPaidPercentage: 0,
-        partiallyPaidPercentage: 0,
-        unpaidPercentage: 0,
-        projectedMonthlyCashflow: 0,
-        riskDistribution: { healthy: 0, monitoring: 0, overdue: 0, critical: 0 },
+        averagePaymentDelay,
+        medianDebtAmount,
+        maxDebtAmount,
+        minDebtAmount,
+        fullyPaidPercentage,
+        partiallyPaidPercentage,
+        unpaidPercentage,
+        projectedMonthlyCashflow,
+        riskDistribution,
         processedDebts
       };
     } catch (error) {

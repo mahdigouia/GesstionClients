@@ -121,7 +121,7 @@ export class ExportService {
       } catch (e) {
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'bold');
-        pdf.text("MG GROUP", margin, 15);
+        pdf.text("MDS GROUP", margin, 15);
       }
 
       // 2. Infos Rapport (Droite)
