@@ -337,6 +337,12 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const clearHistory = async () => {
+    setHistory([]);
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
+      await setDoc(docRef, { history: [] }, { merge: true });
+    } catch (error) {
+      console.warn('[DebtContext] Erreur suppression historique:', error);
     }
   };
 

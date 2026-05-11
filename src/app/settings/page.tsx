@@ -333,8 +333,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-        </main>
-      </div>
-    </div>
-  );
-}
