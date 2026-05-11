@@ -59,6 +59,10 @@ export interface AnalysisResult {
     count: number;
     amount: number;
     percentage: number;
+    topClients?: {
+      clientName: string;
+      totalBalance: number;
+    }[];
   }[];
   amountRanges: {
     range: string;
@@ -66,7 +70,7 @@ export interface AnalysisResult {
     amount: number;
     percentage: number;
   }[];
-  topRiskClients: ClientDebt[];
+  topRiskClients: any[];
   alerts: Alert[];
   // Métriques avancées
   averageDebtAmount: number;

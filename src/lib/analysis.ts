@@ -55,9 +55,8 @@ export const AnalysisService = {
 
       // Stats de montant
       const amounts = processedDebts.map(d => d.amount).sort((a, b) => a - b);
-      const maxDebtAmount = amounts.length > 0 ? Math.max(...amounts) : 0;
-      const minDebtAmount = amounts.length > 0 ? Math.min(...amounts) : 0;
       const medianDebtAmount = amounts.length > 0 ? amounts[Math.floor(amounts.length / 2)] : 0;
+      const minDebtAmount = amounts.length > 0 ? Math.min(...amounts) : 0;
 
       // Statut de paiement
       const fullyPaidCount = processedDebts.filter(d => d.balance <= 0 && d.amount > 0).length;
@@ -152,16 +151,21 @@ export const AnalysisService = {
 
       // Aging
       const agingRanges = [
-        { range: '0-30 jours', min: 0, max: 30, amount: 0 },
-        { range: '31-90 jours', min: 31, max: 90, amount: 0 },
-        { range: '91-365 jours', min: 91, max: 365, amount: 0 },
-        { range: '>365 jours', min: 366, max: Infinity, amount: 0 }
+        { range: '0-15 jours', min: 0, max: 15, amount: 0, clients: new Map<string, number>() },
+        { range: '16-30 jours', min: 16, max: 30, amount: 0, clients: new Map<string, number>() },
+        { range: '31-90 jours', min: 31, max: 90, amount: 0, clients: new Map<string, number>() },
+        { range: '91-365 jours', min: 91, max: 365, amount: 0, clients: new Map<string, number>() },
+        { range: '>365 jours', min: 366, max: Infinity, amount: 0, clients: new Map<string, number>() }
       ];
 
       processedDebts.forEach(debt => {
         if (debt.balance > 0) {
           const range = agingRanges.find(r => debt.age >= r.min && debt.age <= r.max);
-          if (range) range.amount += debt.balance;
+          if (range) {
+            range.amount += debt.balance;
+            const current = range.clients.get(debt.clientName) || 0;
+            range.clients.set(debt.clientName, current + debt.balance);
+          }
         }
       });
 
@@ -169,7 +173,11 @@ export const AnalysisService = {
         range: range.range,
         count: 0,
         amount: range.amount,
-        percentage: totalBalance > 0 ? (range.amount / totalBalance) * 100 : 0
+        percentage: totalBalance > 0 ? (range.amount / totalBalance) * 100 : 0,
+        topClients: Array.from(range.clients.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2)
+          .map(([clientName, totalBalance]) => ({ clientName, totalBalance }))
       }));
 
       return {
@@ -194,7 +202,7 @@ export const AnalysisService = {
         averagePaymentDelay,
         averagePaymentDelayNoContentieux,
         medianDebtAmount,
-        maxDebtAmount,
+        maxDebtAmount: Math.max(...Array.from(clientMap.values()).map(c => c.totalBalance), 0),
         minDebtAmount,
         fullyPaidPercentage,
         partiallyPaidPercentage,

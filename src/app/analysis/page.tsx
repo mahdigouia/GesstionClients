@@ -8,11 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Line, ComposedChart, Area } from 'recharts';
+import { useState } from 'react';
+import { FilteredResultsModal } from '@/components/FilteredResultsModal';
+import { useRouter } from 'next/navigation';
 
 const COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444', '#8b5cf6'];
 
 export default function AnalysisPage() {
   const { debts, analysis } = useDebtContext();
+  const router = useRouter();
+  const [selectedRiskFilter, setSelectedRiskFilter] = useState<string | null>(null);
 
   if (!analysis) {
     return (
@@ -166,12 +171,13 @@ export default function AnalysisPage() {
 
           {/* Top 2 Exposition Individuelle */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="border-0 shadow-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-[32px] overflow-hidden relative">
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-[32px] overflow-hidden relative cursor-pointer hover:scale-[1.01] transition-transform"
+                  onClick={() => router.push(`/clients?search=${analysis.topRiskClients[0]?.clientName}`)}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl" />
               <CardContent className="p-8">
                 <div className="flex items-center justify-between mb-6">
                   <Badge className="bg-blue-600 text-white border-0 font-black">#1 PLUS GROSSE CRÉANCE</Badge>
-                  <Crown className="h-6 w-6 text-yellow-400" />
+                  <AlertTriangle className="h-6 w-6 text-rose-500" />
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-2xl font-black truncate">{analysis.topRiskClients[0]?.clientName}</h3>
@@ -184,13 +190,16 @@ export default function AnalysisPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risque</p>
-                    <Badge variant="outline" className="bg-rose-500/20 text-rose-400 border-rose-500/30">CRITIQUE</Badge>
+                    <Badge variant="outline" className="bg-rose-500/20 text-rose-400 border-rose-500/30">
+                      {AnalysisService.getRiskLabel(analysis.topRiskClients[0]?.riskLevel)}
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-xl bg-white rounded-[32px] overflow-hidden border border-slate-100 relative">
+            <Card className="border-0 shadow-xl bg-white rounded-[32px] overflow-hidden border border-slate-100 relative cursor-pointer hover:scale-[1.01] transition-transform"
+                  onClick={() => router.push(`/clients?search=${analysis.topRiskClients[1]?.clientName}`)}>
               <CardContent className="p-8">
                 <div className="flex items-center justify-between mb-6">
                   <Badge variant="outline" className="border-slate-200 text-slate-500 font-black">#2 PLUS GROSSE CRÉANCE</Badge>
@@ -206,7 +215,9 @@ export default function AnalysisPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risque</p>
-                    <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">ÉLEVÉ</Badge>
+                    <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
+                      {AnalysisService.getRiskLabel(analysis.topRiskClients[1]?.riskLevel)}
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -228,8 +239,8 @@ export default function AnalysisPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="px-0 relative z-10">
-                <ResponsiveContainer width="100%" height={320}>
+              <CardContent className="px-0 relative z-10 pb-0">
+                <ResponsiveContainer width="100%" height={280}>
                   <ComposedChart data={analysis.agingBreakdown}>
                     <defs>
                       <linearGradient id="modernBarGradient" x1="0" y1="0" x2="0" y2="1">
@@ -245,7 +256,7 @@ export default function AnalysisPage() {
                       dataKey="range" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 600}} 
+                      tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 600}} 
                       dy={10}
                     />
                     <YAxis 
@@ -259,10 +270,30 @@ export default function AnalysisPage() {
                       contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px'}}
                       formatter={(value: any) => [`${value.toLocaleString('fr-FR')} TND`, 'Volume']}
                     />
-                    <Bar dataKey="amount" fill="url(#modernBarGradient)" radius={[8, 8, 0, 0]} barSize={45} filter="url(#shadow)" />
+                    <Bar dataKey="amount" fill="url(#modernBarGradient)" radius={[8, 8, 0, 0]} barSize={40} filter="url(#shadow)" />
                     <Line type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} />
                   </ComposedChart>
                 </ResponsiveContainer>
+
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-5 gap-4 border-t border-slate-50 pt-6">
+                  {analysis.agingBreakdown.map((range, idx) => (
+                    <div key={idx} className="space-y-3">
+                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{range.range}</div>
+                      <div className="space-y-2">
+                        {range.topClients?.map((client, cidx) => (
+                          <div key={cidx} className="p-2 bg-slate-50 rounded-lg border border-slate-100 hover:border-blue-200 transition-colors cursor-pointer"
+                               onClick={() => router.push(`/clients?search=${client.clientName}`)}>
+                            <div className="text-[10px] font-bold text-slate-900 truncate" title={client.clientName}>{client.clientName}</div>
+                            <div className="text-[9px] font-black text-blue-600">{client.totalBalance.toLocaleString('fr-FR')} TND</div>
+                          </div>
+                        ))}
+                        {(!range.topClients || range.topClients.length === 0) && (
+                          <div className="text-[9px] text-slate-300 italic">Aucun client</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
@@ -274,7 +305,7 @@ export default function AnalysisPage() {
                 <p className="text-xs text-slate-400 font-medium">Santé globale du portefeuille</p>
               </CardHeader>
               <CardContent className="px-0 flex flex-col items-center relative z-10">
-                <div className="relative w-full h-[220px]">
+                <div className="relative w-full h-[220px] cursor-pointer">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -286,9 +317,13 @@ export default function AnalysisPage() {
                         paddingAngle={10}
                         dataKey="value"
                         stroke="none"
+                        onClick={(data) => {
+                          const levelMap: any = { 'Sain': 'healthy', 'À surveiller': 'monitoring', 'En retard': 'overdue', 'Critique': 'critical' };
+                          setSelectedRiskFilter(levelMap[data.name]);
+                        }}
                       >
                         {riskData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell key={`cell-${index}`} fill={entry.color} className="outline-none" />
                         ))}
                       </Pie>
                       <Tooltip />
@@ -302,10 +337,14 @@ export default function AnalysisPage() {
                 
                 <div className="w-full mt-8 space-y-2">
                   {riskData.map((item, i) => (
-                    <div key={i} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div key={i} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group"
+                         onClick={() => {
+                           const levelMap: any = { 'Sain': 'healthy', 'À surveiller': 'monitoring', 'En retard': 'overdue', 'Critique': 'critical' };
+                           setSelectedRiskFilter(levelMap[item.name]);
+                         }}>
                       <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{backgroundColor: item.color}} />
-                        <span className="text-xs font-bold text-slate-600">{item.name}</span>
+                        <div className="w-2.5 h-2.5 rounded-full shadow-sm group-hover:scale-125 transition-transform" style={{backgroundColor: item.color}} />
+                        <span className="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition-colors">{item.name}</span>
                       </div>
                       <span className="text-xs font-black text-slate-900">{item.value} <span className="text-[9px] text-slate-300 font-normal ml-1">Factures</span></span>
                     </div>
@@ -403,6 +442,13 @@ export default function AnalysisPage() {
           </div>
         </main>
       </div>
+
+      <FilteredResultsModal
+        isOpen={!!selectedRiskFilter}
+        onClose={() => setSelectedRiskFilter(null)}
+        title={`Détail Risque: ${AnalysisService.getRiskLabel(selectedRiskFilter || '')}`}
+        debts={debts.filter(d => d.riskLevel === selectedRiskFilter)}
+      />
     </div>
   );
 }
