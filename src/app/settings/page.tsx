@@ -24,13 +24,19 @@ export default function SettingsPage() {
   const [localSettings, setLocalSettings] = useState(settings);
   const [logs, setLogs] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [clickCount, setClickCount] = useState(0);
+
+  const adminEmails = ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'];
+  const isAdmin = adminEmails.includes(user?.email || '');
+  const isSuperAdmin = user?.email === 'moslem.gouia@gmail.com';
 
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
 
   useEffect(() => {
-    if (user?.email === 'moslem.gouia@gmail.com') {
+    if (isAdmin) {
       const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(15));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const logsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -38,7 +44,19 @@ export default function SettingsPage() {
       });
       return () => unsubscribe();
     }
-  }, [user]);
+  }, [user, isAdmin]);
+
+  const handleVersionClick = () => {
+    if (!isAdmin) return;
+    const newCount = clickCount + 1;
+    if (newCount >= 5) {
+      setShowAdvanced(true);
+      setClickCount(0);
+      alert("Mode Configuration Avancée activé !");
+    } else {
+      setClickCount(newCount);
+    }
+  };
 
   const handleUpdateSettings = async () => {
     setIsSaving(true);
@@ -158,79 +176,81 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Configuration Dynamique */}
-          <Card className="border-0 shadow-lg bg-white overflow-hidden">
-            <CardHeader className="bg-slate-50 border-b border-slate-100">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Settings className="h-5 w-5 text-blue-600" />
-                Seuils de Calcul (Business Logic)
-              </CardTitle>
-              <CardDescription>Ajustez les règles d'analyse de votre portefeuille</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contentieux" className="text-sm font-bold text-slate-700">Âge de Contentieux (jours)</Label>
-                    <div className="flex items-center gap-3">
-                      <Input 
-                        id="contentieux"
-                        type="number" 
-                        value={localSettings.contentiousAgeDays}
-                        onChange={(e) => setLocalSettings({...localSettings, contentiousAgeDays: parseInt(e.target.value)})}
-                        className="font-bold text-lg h-12 border-slate-200 focus:ring-blue-500"
-                      />
-                      <span className="text-slate-400 font-medium">jours</span>
+          {/* Configuration Dynamique (Hidden behind Secret Click + Admin) */}
+          {isAdmin && showAdvanced && (
+            <Card className="border-0 shadow-lg bg-white overflow-hidden border-l-4 border-l-blue-600 animate-in fade-in slide-in-from-top-4 duration-500">
+              <CardHeader className="bg-slate-50 border-b border-slate-100">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-blue-600" />
+                  Seuils de Calcul (Business Logic)
+                </CardTitle>
+                <CardDescription>Ajustez les règles d'analyse de votre portefeuille</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contentieux" className="text-sm font-bold text-slate-700">Âge de Contentieux (jours)</Label>
+                      <div className="flex items-center gap-3">
+                        <Input 
+                          id="contentieux"
+                          type="number" 
+                          value={localSettings.contentiousAgeDays}
+                          onChange={(e) => setLocalSettings({...localSettings, contentiousAgeDays: parseInt(e.target.value)})}
+                          className="font-bold text-lg h-12 border-slate-200 focus:ring-blue-500"
+                        />
+                        <span className="text-slate-400 font-medium">jours</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium italic">Par défaut: 365 jours. Détermine l'indicateur H.C (Hors Contentieux).</p>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-medium italic">Par défaut: 365 jours. Détermine l'indicateur H.C (Hors Contentieux).</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold text-slate-700">Intervalle des "Retenus" (%)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="number" 
+                          step="0.1"
+                          value={localSettings.retentionMin}
+                          onChange={(e) => setLocalSettings({...localSettings, retentionMin: parseFloat(e.target.value)})}
+                          className="font-bold text-lg h-12 border-slate-200 focus:ring-blue-500 w-24"
+                        />
+                        <span className="text-slate-400 font-bold">à</span>
+                        <Input 
+                          type="number" 
+                          step="0.1"
+                          value={localSettings.retentionMax}
+                          onChange={(e) => setLocalSettings({...localSettings, retentionMax: parseFloat(e.target.value)})}
+                          className="font-bold text-lg h-12 border-slate-200 focus:ring-blue-500 w-24"
+                        />
+                        <span className="text-slate-400 font-medium">%</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium italic">Actuellement configuré sur [{localSettings.retentionMin}% - {localSettings.retentionMax}%].</p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-bold text-slate-700">Intervalle des "Retenus" (%)</Label>
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        type="number" 
-                        step="0.1"
-                        value={localSettings.retentionMin}
-                        onChange={(e) => setLocalSettings({...localSettings, retentionMin: parseFloat(e.target.value)})}
-                        className="font-bold text-lg h-12 border-slate-200 focus:ring-blue-500 w-24"
-                      />
-                      <span className="text-slate-400 font-bold">à</span>
-                      <Input 
-                        type="number" 
-                        step="0.1"
-                        value={localSettings.retentionMax}
-                        onChange={(e) => setLocalSettings({...localSettings, retentionMax: parseFloat(e.target.value)})}
-                        className="font-bold text-lg h-12 border-slate-200 focus:ring-blue-500 w-24"
-                      />
-                      <span className="text-slate-400 font-medium">%</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-medium italic">Actuellement configuré sur [{localSettings.retentionMin}% - {localSettings.retentionMax}%].</p>
-                  </div>
-                </div>
-              </div>
+                <Button 
+                  onClick={handleUpdateSettings} 
+                  disabled={isSaving}
+                  className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 px-8 rounded-xl transition-all"
+                >
+                  {isSaving ? 'Mise à jour...' : 'Appliquer les nouveaux seuils'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-              <Button 
-                onClick={handleUpdateSettings} 
-                disabled={isSaving}
-                className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 px-8 rounded-xl transition-all"
-              >
-                {isSaving ? 'Mise à jour...' : 'Appliquer les nouveaux seuils'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Journal d'historisation (Admin Only) */}
-          {user?.email === 'moslem.gouia@gmail.com' && (
+          {/* Journal d'historisation (Super Admin Only) */}
+          {isSuperAdmin && (
             <Card className="border-0 shadow-xl bg-slate-900 text-white overflow-hidden">
               <CardHeader className="border-b border-white/10 bg-white/5">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
                   <FileClock className="h-5 w-5 text-emerald-400" />
-                  Journal d'Audit (Administrateur)
+                  Journal d'Audit (Super Administrateur)
                 </CardTitle>
-                <CardDescription className="text-slate-400">Activités récentes pour {user.email}</CardDescription>
+                <CardDescription className="text-slate-400">Activités récentes (moslem.gouia@gmail.com uniquement)</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="max-h-[400px] overflow-y-auto">
@@ -239,7 +259,10 @@ export default function SettingsPage() {
                       {logs.map((log) => (
                         <div key={log.id} className="p-4 hover:bg-white/5 transition-colors">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{log.action}</span>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{log.action}</span>
+                              <span className="text-[9px] text-slate-500 font-bold">{log.user}</span>
+                            </div>
                             <span className="text-[10px] text-slate-500 font-medium">
                               {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleString('fr-FR') : 'Date inconnue'}
                             </span>
@@ -271,7 +294,12 @@ export default function SettingsPage() {
                 <div className="text-gray-500">Application</div>
                 <div className="font-medium">GesstionClients</div>
                 <div className="text-gray-500">Version</div>
-                <div className="font-medium">2.0</div>
+                <div 
+                  className={`font-black cursor-pointer select-none transition-colors ${isAdmin ? 'hover:text-blue-600' : ''}`}
+                  onClick={handleVersionClick}
+                >
+                  2.0 {isAdmin && !showAdvanced && <span className="text-[10px] font-normal text-slate-300 ml-1">(Click 5x)</span>}
+                </div>
                 <div className="text-gray-500">Devise</div>
                 <div className="font-medium">Dinars Tunisiens (TND)</div>
                 <div className="text-gray-500">Stockage</div>
