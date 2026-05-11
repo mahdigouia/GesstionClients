@@ -176,6 +176,7 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
                 </div>
               </TabsContent>
 
+              <TabsContent value="journal" className="mt-0 outline-none">
                 <RecoveryTimeline actions={clientActions} />
               </TabsContent>
               </div>
