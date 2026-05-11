@@ -255,7 +255,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-gray-100">
-              {analysis.topRiskClients.slice(0, 6).map((client) => (
+              {analysis.topRiskClients?.slice(0, 6).map((client) => (
                 <div 
                   key={client.id} 
                   className="flex items-center justify-between p-4 hover:bg-red-50/50 transition-colors cursor-pointer group"
@@ -270,14 +270,14 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
                   <div className="text-right flex items-center gap-4">
                     <div>
                       <div className="font-bold text-lg text-slate-900">
-                        {client.balance.toLocaleString('fr-FR')} <span className="text-[10px]">TND</span>
+                        {client.balance?.toLocaleString('fr-FR') || '0'} <span className="text-[10px]">TND</span>
                       </div>
                       <Badge 
                         variant="outline" 
                         className="text-[9px] h-4 py-0 font-bold border-0"
                         style={{ 
-                          backgroundColor: riskColors[client.riskLevel] + '20',
-                          color: riskColors[client.riskLevel]
+                          backgroundColor: riskColors[client.riskLevel as keyof typeof riskColors] + '20',
+                          color: riskColors[client.riskLevel as keyof typeof riskColors]
                         }}
                       >
                         {AnalysisService.getRiskLabel(client.riskLevel)}
