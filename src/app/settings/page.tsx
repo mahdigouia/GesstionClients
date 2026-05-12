@@ -14,7 +14,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { History, FileClock } from 'lucide-react';
+import { History, FileClock, FileCode, Eye } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function SettingsPage() {
   const { debts, analysis, clearAll, clearHistory, settings, updateSettings } = useDebtContext();
@@ -26,6 +34,9 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [clickCount, setClickCount] = useState(0);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [rulesContent, setRulesContent] = useState('');
+  const [isLoadingRules, setIsLoadingRules] = useState(false);
 
   const adminEmails = ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'];
   const isAdmin = adminEmails.includes(user?.email || '');
@@ -116,6 +127,29 @@ export default function SettingsPage() {
     } catch (err) {
       console.error('Logout error:', err);
     }
+  };
+
+  const handleViewRules = async () => {
+    setIsLoadingRules(true);
+    try {
+      const response = await fetch('/api/rules');
+      if (response.ok) {
+        const text = await response.text();
+        setRulesContent(text);
+        setShowRulesModal(true);
+      } else {
+        alert('Impossible de charger les règles.');
+      }
+    } catch (err) {
+      console.error('Error fetching rules:', err);
+      alert('Erreur lors du chargement.');
+    } finally {
+      setIsLoadingRules(false);
+    }
+  };
+
+  const handleDownloadRules = () => {
+    window.open('/api/rules', '_blank');
   };
 
   return (
@@ -308,6 +342,55 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
+          {/* Règles & Plans */}
+          <Card className="border-0 shadow-lg bg-white overflow-hidden border-l-4 border-l-emerald-600">
+            <CardHeader className="bg-emerald-50/50 border-b border-emerald-100">
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <FileCode className="h-5 w-5 text-emerald-600" />
+                Règles Métier & Plan d'Analyse
+              </CardTitle>
+              <CardDescription>Consultez la documentation technique et les règles de calcul de l'application</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <FileText className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800">regles_et_plans.md</h4>
+                    <p className="text-xs text-slate-500">Dernière version à jour</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    onClick={handleViewRules} 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={isLoadingRules}
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-10 px-4 rounded-xl font-bold"
+                  >
+                    {isLoadingRules ? (
+                      <div className="h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-2" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    Consulter
+                  </Button>
+                  <Button 
+                    onClick={handleDownloadRules} 
+                    variant="outline" 
+                    size="sm"
+                    className="bg-emerald-600 text-white border-0 hover:bg-emerald-700 h-10 px-4 rounded-xl font-bold"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Télécharger
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Gestion des données */}
           <Card>
             <CardHeader>
@@ -358,6 +441,44 @@ export default function SettingsPage() {
           </Card>
         </main>
       </div>
+
+      <RulesModal 
+        isOpen={showRulesModal} 
+        onClose={() => setShowRulesModal(false)} 
+        content={rulesContent} 
+      />
     </div>
+  );
+}
+
+function RulesModal({ isOpen, onClose, content }: { isOpen: boolean, onClose: () => void, content: string }) {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[85vh] p-0 overflow-hidden bg-white rounded-[32px] border-0 shadow-2xl">
+        <DialogHeader className="p-8 bg-slate-900 text-white">
+          <div className="flex items-center gap-3 mb-2">
+            <FileCode className="h-6 w-6 text-emerald-400" />
+            <DialogTitle className="text-2xl font-black tracking-tight">Règles Métier & Plan d'Analyse</DialogTitle>
+          </div>
+          <DialogDescription className="text-slate-400 font-medium">
+            Documentation complète des algorithmes et règles de gestion de GesstionClients
+          </DialogDescription>
+        </DialogHeader>
+        
+        <ScrollArea className="p-8 h-[calc(85vh-160px)]">
+          <div className="prose prose-slate max-w-none">
+            <pre className="whitespace-pre-wrap font-mono text-sm text-slate-700 bg-slate-50 p-6 rounded-2xl border border-slate-100 leading-relaxed">
+              {content}
+            </pre>
+          </div>
+        </ScrollArea>
+        
+        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
+          <Button onClick={onClose} className="bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-8 font-bold">
+            Fermer la consultation
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

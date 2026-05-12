@@ -247,13 +247,6 @@ export default function Home() {
 
               {/* Notifications */}
               <NotificationPopover />
-
-              {/* Save - Icon only */}
-              {debts.length > 0 && (
-                <Button onClick={handleSaveAnalysis} variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-gray-50" title="Sauvegarder">
-                  <Save className="h-4 w-4 text-gray-600" />
-                </Button>
-              )}
             </div>
           </div>
         </header>
@@ -351,10 +344,6 @@ export default function Home() {
                           <TrendingUp className="h-4 w-4" />
                           <span>Vue d'ensemble</span>
                         </TabsTrigger>
-                        <TabsTrigger value="aging" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Analyse</span>
-                        </TabsTrigger>
                         <TabsTrigger value="contacts" className="rounded-xl font-bold px-4 md:px-6 py-2 data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-md transition-all whitespace-nowrap text-[11px] md:text-sm flex items-center gap-2">
                           <PhoneCall className="h-4 w-4" />
                           <span>Contacts</span>
@@ -384,70 +373,6 @@ export default function Home() {
                     <Dashboard analysis={analysis} onClientClick={handleShowClientHistory} />
                   </TabsContent>
 
-                  <TabsContent value="aging" className="space-y-6">
-                    {/* Glassmorphism Card */}
-                    <Card className="overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-white to-slate-50">
-                      <CardContent className="p-8">
-                        <div className="flex items-center gap-3 mb-8">
-                          <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg">
-                            <BarChart3 className="h-6 w-6 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="text-2xl font-bold text-slate-800">Répartition par Ancienneté</h3>
-                            <p className="text-slate-500">Analyse détaillée des créances selon leur âge</p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {analysis.agingBreakdown?.map((range: any, index: number) => (
-                            <div key={index} className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02]">
-                              {/* Gradient background */}
-                              <div className={`
-                                absolute inset-0 opacity-10
-                                ${index === 0 ? 'bg-gradient-to-r from-emerald-500 to-green-600' :
-                                  index === 1 ? 'bg-gradient-to-r from-amber-500 to-yellow-600' :
-                                  index === 2 ? 'bg-gradient-to-r from-orange-500 to-red-500' :
-                                  'bg-gradient-to-r from-red-600 to-rose-600'}
-                              `} />
-                              
-                              <div className="relative p-6 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <div className={`
-                                    w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg
-                                    ${index === 0 ? 'bg-gradient-to-br from-emerald-500 to-green-600' :
-                                      index === 1 ? 'bg-gradient-to-br from-amber-500 to-yellow-600' :
-                                      index === 2 ? 'bg-gradient-to-br from-orange-500 to-red-500' :
-                                      'bg-gradient-to-br from-red-600 to-rose-600'}
-                                  `}>
-                                    <span className="text-white font-bold text-lg">{range.count}</span>
-                                  </div>
-                                  <div>
-                                    <span className="block text-sm font-bold text-slate-700">{range.range}</span>
-                                    <span className="text-xs text-slate-500">{range.count} créances</span>
-                                  </div>
-                                </div>
-                                
-                                <div className="text-right">
-                                  <div className="text-2xl font-bold text-slate-800">{range.amount.toLocaleString('fr-FR')} <span className="text-sm font-normal text-slate-500">TND</span></div>
-                                  <div className={`
-                                    inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold
-                                    ${index === 0 ? 'bg-emerald-100 text-emerald-700' :
-                                      index === 1 ? 'bg-amber-100 text-amber-700' :
-                                      index === 2 ? 'bg-orange-100 text-orange-700' :
-                                      'bg-red-100 text-red-700'}
-                                  `}>
-                                    {range.percentage.toFixed(1)}%
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </TabsContent>
-
-                  
                   <TabsContent value="contacts" className="space-y-6">
                     <ContactDirectory />
                   </TabsContent>
