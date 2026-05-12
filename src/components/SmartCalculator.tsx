@@ -17,7 +17,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Coins,
-  Info
+  Info,
+  ShieldAlert,
+  BarChart3,
+  Flame,
+  ArrowDownCircle
 } from 'lucide-react';
 import { 
   Popover, 
@@ -32,15 +36,14 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Progress } from '@/components/ui/progress';
 
 export function SmartCalculator() {
-  const { debts, analysis, settings } = useDebtContext();
+  const { debts, analysis } = useDebtContext();
   const [isOpen, setIsOpen] = useState(false);
   
   // States for simulators
   const [simulatedAmount, setSimulatedAmount] = useState<string>('');
-  const [retentionPercent, setRetentionPercent] = useState<string>('1.5');
-  const [retentionBase, setRetentionBase] = useState<string>('');
   const [clientSearch, setClientSearch] = useState<string>('');
   
   // State for specific client selection
@@ -65,19 +68,45 @@ export function SmartCalculator() {
     };
   }, [analysis, simulatedAmount]);
 
-  // 2. Retention Logic
-  const retentionResult = useMemo(() => {
-    if (!retentionBase || isNaN(parseFloat(retentionBase)) || isNaN(parseFloat(retentionPercent))) return null;
-    return parseFloat(retentionBase) * (parseFloat(retentionPercent) / 100);
-  }, [retentionBase, retentionPercent]);
-
-  // 3. Client Search Logic
+  // 2. Client Search Logic
   const filteredClients = useMemo(() => {
     if (!analysis?.clientBreakdown || clientSearch.length < 2) return [];
     return analysis.clientBreakdown
       .filter(c => c.clientName.toLowerCase().includes(clientSearch.toLowerCase()))
+      .sort((a, b) => b.totalBalance - a.totalBalance)
       .slice(0, 5);
   }, [analysis, clientSearch]);
+
+  // 3. Concentration & Risk Analysis
+  const riskAnalysis = useMemo(() => {
+    if (!analysis) return null;
+    
+    // Top 3 clients concentration
+    const top3Balance = analysis.clientBreakdown
+      .sort((a, b) => b.totalBalance - a.totalBalance)
+      .slice(0, 3)
+      .reduce((sum, c) => sum + c.totalBalance, 0);
+      
+    const globalConcentration = (top3Balance / analysis.totalBalance) * 100;
+    
+    // Selected client analysis
+    let clientConcentration = 0;
+    let worstCaseRate = analysis.recoveryRate;
+    
+    if (selectedClient) {
+      clientConcentration = (selectedClient.totalBalance / analysis.totalBalance) * 100;
+      // If this client balance is considered "lost" (debt remains but payment 0 forever)
+      // The maximum achievable recovery rate decreases
+      worstCaseRate = (analysis.totalPaid / (analysis.totalDebts)) * 100; 
+    }
+    
+    return {
+      globalConcentration,
+      clientConcentration,
+      worstCaseRate,
+      top3Balance
+    };
+  }, [analysis, selectedClient]);
 
   // 4. Selected Client Impact Logic (Capped at 100%)
   const clientSimulationResult = useMemo(() => {
@@ -90,30 +119,23 @@ export function SmartCalculator() {
     const cappedRate = Math.min(100, rawNewRate);
     const improvement = cappedRate - analysis.recoveryRate;
     
-    // Client specific retention ratio
-    const currentRatio = (selectedClient.totalBalance / selectedClient.totalAmount) * 100;
-    
     return {
       newGlobalRate: cappedRate,
       globalImprovement: improvement > 0 ? improvement : 0,
       remainingClientBalance: Math.max(0, selectedClient.totalBalance - amount),
-      paymentPercentage: (amount / selectedClient.totalBalance) * 100,
-      currentRatio
+      paymentPercentage: (amount / selectedClient.totalBalance) * 100
     };
   }, [analysis, selectedClient, clientSimAmount]);
 
   const handleSelectClient = (client: any) => {
     setSelectedClient(client);
-    setClientSimAmount(client.totalBalance); // Default to full recovery
+    setClientSimAmount(client.totalBalance);
     setClientSearch('');
-    // Auto-fill retention base with client's total amount
-    setRetentionBase(client.totalAmount.toString());
   };
 
   const resetClientSim = () => {
     setSelectedClient(null);
     setClientSimAmount(0);
-    setRetentionBase('');
   };
 
   const formatCurrency = (val: number) => {
@@ -142,7 +164,7 @@ export function SmartCalculator() {
               </div>
               <div>
                 <h3 className="font-bold text-xl tracking-tight">Calculatrice Intelligente</h3>
-                <p className="text-blue-100 text-[10px] uppercase font-medium tracking-wider">Simulations & Analyse d'Impact</p>
+                <p className="text-blue-100 text-[10px] uppercase font-medium tracking-wider">Simulations & Analyse de Risque</p>
               </div>
             </div>
             <Button 
@@ -188,7 +210,7 @@ export function SmartCalculator() {
                   Retour
                 </Button>
                 <Badge className="bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-50">
-                  Simulation Client
+                  Simulation Risque Client
                 </Badge>
               </div>
 
@@ -203,10 +225,10 @@ export function SmartCalculator() {
                     <span className="text-sm font-bold text-slate-700">{formatCurrency(selectedClient.totalBalance)}</span>
                   </div>
                   <div className="flex flex-col border-l border-slate-200 pl-4">
-                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Ratio de Dette</span>
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Poids Stratégique</span>
                     <div className="flex items-center gap-1">
-                      <span className="text-sm font-bold text-indigo-600">
-                        {((selectedClient.totalBalance / selectedClient.totalAmount) * 100).toFixed(2)}%
+                      <span className={`text-sm font-bold ${riskAnalysis?.clientConcentration! > 15 ? 'text-red-600' : 'text-indigo-600'}`}>
+                        {riskAnalysis?.clientConcentration.toFixed(2)}%
                       </span>
                       <TooltipProvider>
                         <Tooltip>
@@ -214,7 +236,7 @@ export function SmartCalculator() {
                             <Info className="h-3 w-3 text-slate-400" />
                           </TooltipTrigger>
                           <TooltipContent className="text-[10px] max-w-[200px]">
-                            Pourcentage du solde impayé par rapport au montant total facturé à ce client.
+                            Part de ce client dans votre balance totale impayée.
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -223,22 +245,28 @@ export function SmartCalculator() {
                 </div>
                 
                 <div className="flex gap-2">
-                   <Badge variant="outline" className="text-[10px] bg-white border-slate-200">
-                    {selectedClient.debtCount} factures
-                  </Badge>
                   <Badge className={`text-[10px] border-none ${
                     selectedClient.riskLevel === 'critical' ? 'bg-red-100 text-red-700' : 
                     selectedClient.riskLevel === 'overdue' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
                   }`}>
-                    Risque {selectedClient.riskLevel}
+                    {selectedClient.riskLevel.toUpperCase()}
                   </Badge>
+                  {riskAnalysis?.clientConcentration! > 10 && (
+                    <Badge className="bg-red-50 text-red-600 border-red-100 text-[10px] animate-pulse">
+                      HAUTE DÉPENDANCE
+                    </Badge>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-tight">Recouvrement simulé</label>
-                  <span className="text-sm font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+              {/* Simulation de Recouvrement pour ce client */}
+              <div className="space-y-4 p-4 border border-slate-100 rounded-2xl bg-white shadow-sm">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-slate-700 uppercase tracking-tight flex items-center gap-2">
+                    <Coins className="h-4 w-4 text-green-500" />
+                    Encaissement Prévisionnel
+                  </label>
+                  <span className="text-sm font-black text-indigo-600">
                     {formatCurrency(clientSimAmount)}
                   </span>
                 </div>
@@ -248,60 +276,79 @@ export function SmartCalculator() {
                   max={selectedClient.totalBalance} 
                   step={selectedClient.totalBalance / 100}
                   onValueChange={(val) => setClientSimAmount(val[0])}
-                  className="py-4"
                 />
                 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setClientSimAmount(selectedClient.totalBalance / 2)}
-                    className="text-[10px] h-8 rounded-lg"
-                  >
-                    Moitié (50%)
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setClientSimAmount(selectedClient.totalBalance)}
-                    className="text-[10px] h-8 rounded-lg"
-                  >
-                    Totalité (100%)
-                  </Button>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <Button variant="outline" size="sm" onClick={() => setClientSimAmount(selectedClient.totalBalance / 2)} className="text-[10px] h-8">50%</Button>
+                  <Button variant="outline" size="sm" onClick={() => setClientSimAmount(selectedClient.totalBalance)} className="text-[10px] h-8">100%</Button>
+                </div>
+
+                {clientSimulationResult && (
+                  <div className="mt-4 p-3 bg-indigo-50 rounded-xl border border-indigo-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] text-indigo-600 font-bold uppercase">Impact Global</p>
+                      <p className="text-xl font-black text-indigo-700">+{clientSimulationResult.globalImprovement.toFixed(2)} pts</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500">Nouveau Taux</p>
+                      <p className="text-sm font-bold text-slate-700">{clientSimulationResult.newGlobalRate.toFixed(2)}%</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Analyse de Risque Maximum */}
+              <div className="p-4 bg-red-50 rounded-2xl border border-red-100 space-y-3">
+                <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase">
+                  <ShieldAlert className="h-4 w-4" />
+                  Scénario Catastrophe (Défaut)
+                </div>
+                <p className="text-[10px] text-red-600 leading-tight">
+                  Si ce client devenait totalement irrécouvrable aujourd'hui, vous perdriez 
+                  <span className="font-bold"> {formatCurrency(selectedClient.totalBalance)} </span> 
+                  directement de votre trésorerie prévisionnelle.
+                </p>
+                <div className="flex items-center justify-between pt-2 border-t border-red-200/50">
+                  <span className="text-[10px] text-red-700">Exposition au risque:</span>
+                  <span className="text-xs font-black text-red-700">{riskAnalysis?.clientConcentration.toFixed(2)}% de la balance</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* SEARCH & CONCENTRATION VIEW */
+            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
+              
+              {/* Analyse de Concentration Globale */}
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                 <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                    <BarChart3 className="h-4 w-4 text-indigo-500" />
+                    Concentration du Risque
+                  </div>
+                  <Badge variant="outline" className="bg-white text-[10px]">Top 3 Clients</Badge>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase">
+                    <span>Dépendance Stratégique</span>
+                    <span>{riskAnalysis?.globalConcentration.toFixed(1)}%</span>
+                  </div>
+                  <Progress 
+                    value={riskAnalysis?.globalConcentration} 
+                    className="h-2 bg-slate-200" 
+                    indicatorClassName={riskAnalysis?.globalConcentration! > 30 ? 'bg-red-500' : 'bg-indigo-600'}
+                  />
+                  <p className="text-[9px] text-slate-400 italic">
+                    Le top 3 des clients détient {formatCurrency(riskAnalysis?.top3Balance!)} de votre balance impayée.
+                  </p>
                 </div>
               </div>
 
-              {clientSimulationResult && (
-                <div className="p-4 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200 relative overflow-hidden">
-                  <div className="absolute right-2 bottom-2 opacity-20">
-                    <Activity className="h-12 w-12" />
-                  </div>
-                  <h5 className="text-[10px] font-bold uppercase tracking-widest mb-3 text-indigo-100 flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3" />
-                    Impact Prévisionnel Global
-                  </h5>
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-3xl font-black">{clientSimulationResult.newGlobalRate.toFixed(2)}%</span>
-                    <span className="text-xs font-bold text-indigo-200">Nouveau Taux</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-white/20 text-white border-none text-[10px] h-6 flex items-center gap-1">
-                      <Plus className="h-3 w-3" />
-                      {clientSimulationResult.globalImprovement.toFixed(2)} pts
-                    </Badge>
-                    <span className="text-[10px] text-indigo-100">d'amélioration globale</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* SEARCH & GLOBAL VIEW */
-            <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-              {/* Client Selection Search */}
+              {/* Search Client */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-sm px-1">
                   <Search className="h-4 w-4 text-indigo-500" />
-                  <h4>Analyser un Client Précis</h4>
+                  <h4>Analyser l'Exposition d'un Client</h4>
                 </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -311,20 +358,10 @@ export function SmartCalculator() {
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                   />
-                  {clientSearch && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute right-1 top-1 h-8 w-8 hover:bg-transparent text-slate-400"
-                      onClick={() => setClientSearch('')}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
                 
                 {filteredClients.length > 0 && (
-                  <div className="space-y-2 mt-2 max-h-[160px] overflow-y-auto p-1 scrollbar-hide border border-slate-50 rounded-xl">
+                  <div className="space-y-2 mt-2 max-h-[180px] overflow-y-auto p-1 scrollbar-hide">
                     {filteredClients.map((client, idx) => (
                       <div 
                         key={idx} 
@@ -335,10 +372,15 @@ export function SmartCalculator() {
                           <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-700 transition-colors truncate max-w-[200px]">
                             {client.clientName}
                           </span>
-                          <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-indigo-500 transition-all group-hover:translate-x-1" />
+                          <div className="flex items-center gap-2">
+                             <span className="text-[10px] font-bold text-indigo-600">
+                                {((client.totalBalance / analysis!.totalBalance) * 100).toFixed(1)}%
+                             </span>
+                             <ArrowRight className="h-3 w-3 text-slate-300 group-hover:text-indigo-500 transition-all group-hover:translate-x-1" />
+                          </div>
                         </div>
                         <div className="flex justify-between items-center mt-2">
-                          <span className="text-[10px] text-slate-500">Solde: <span className="font-semibold">{formatCurrency(client.totalBalance)}</span></span>
+                          <span className="text-[10px] text-slate-500">Exposition: <span className="font-semibold">{formatCurrency(client.totalBalance)}</span></span>
                           <Badge className={`text-[8px] h-4 py-0 ${
                             client.riskLevel === 'critical' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-600'
                           }`}>
@@ -353,16 +395,16 @@ export function SmartCalculator() {
 
               <Separator className="bg-slate-100" />
 
-              {/* Quick Multi-Simulator */}
+              {/* Simulation Libre */}
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-sm px-1">
                   <TrendingUp className="h-4 w-4 text-blue-500" />
-                  <h4>Simulation Libre</h4>
+                  <h4>Simulateur de Trésorerie Rapide</h4>
                 </div>
                 <div className="relative">
                   <Wallet className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Montant libre à encaisser (TND)"
+                    placeholder="Montant à encaisser (TND)"
                     className="pl-9 bg-slate-50 border-slate-200 focus:ring-blue-500 rounded-xl"
                     value={simulatedAmount}
                     onChange={(e) => setSimulatedAmount(e.target.value)}
@@ -372,26 +414,18 @@ export function SmartCalculator() {
                 {simulationResult && (
                   <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100 shadow-sm overflow-hidden">
                     <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="text-xs font-bold text-slate-700">Scénario de recouvrement</span>
-                      </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <p className="text-[10px] text-slate-500 uppercase font-bold">Nouveau Taux</p>
                           <p className="text-lg font-black text-blue-700">{simulationResult.newRate.toFixed(2)}%</p>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 text-right">
                           <p className="text-[10px] text-slate-500 uppercase font-bold">Amélioration</p>
-                          <div className="flex items-center gap-1 text-green-600 font-black">
+                          <div className="flex items-center justify-end gap-1 text-green-600 font-black">
                             <Plus className="h-3 w-3" />
                             {simulationResult.improvement.toFixed(2)} pts
                           </div>
                         </div>
-                      </div>
-                      <div className="pt-2 border-t border-blue-200/50 flex justify-between items-center">
-                        <span className="text-[10px] text-slate-500">Nouveau Solde Global:</span>
-                        <span className="text-xs font-bold text-slate-700">{formatCurrency(simulationResult.newBalance)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -399,93 +433,15 @@ export function SmartCalculator() {
               </div>
             </div>
           )}
-
-          <Separator className="bg-slate-100" />
-
-          {/* Tool: Retenues - ALWAYS VISIBLE OR ENHANCED */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
-                <ShieldCheck className="h-4 w-4 text-amber-500" />
-                <h4>Outil: Retenues</h4>
-              </div>
-              {analysis && (
-                <Badge className="bg-amber-100 text-amber-700 border-none text-[9px] h-5">
-                  Total system: {formatCurrency(analysis.totalRetainedAmount)}
-                </Badge>
-              )}
-            </div>
-            
-            <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-4">
-              {selectedClient && (
-                <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-sm space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Ratio Actuel Client</span>
-                    <Badge className={`text-[10px] h-5 ${
-                      (selectedClient.totalBalance / selectedClient.totalAmount * 100) <= 1.5 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      {((selectedClient.totalBalance / selectedClient.totalAmount) * 100).toFixed(2)}%
-                    </Badge>
-                  </div>
-                  <p className="text-[10px] text-slate-600 leading-tight">
-                    Le ratio actuel est de {((selectedClient.totalBalance / selectedClient.totalAmount) * 100).toFixed(2)}%. 
-                    Les retenues standards sont généralement entre {settings.retentionMin}% et {settings.retentionMax}%.
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase px-1">
-                  <span>Base de calcul</span>
-                  <span>Taux (%)</span>
-                </div>
-                <div className="flex gap-2">
-                  <div className="relative flex-[2]">
-                    <Wallet className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Montant total"
-                      className="pl-9 bg-white border-amber-200 focus:ring-amber-500 rounded-xl h-10 text-sm"
-                      value={retentionBase}
-                      onChange={(e) => setRetentionBase(e.target.value)}
-                      type="number"
-                    />
-                  </div>
-                  <div className="relative flex-1">
-                    <Percent className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="%"
-                      className="pl-9 bg-white border-amber-200 focus:ring-amber-500 rounded-xl h-10 text-sm"
-                      value={retentionPercent}
-                      onChange={(e) => setRetentionPercent(e.target.value)}
-                      type="number"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {retentionResult !== null && (
-                <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-amber-200 shadow-md animate-in zoom-in-95 duration-200">
-                  <span className="text-xs font-bold text-slate-600 tracking-tight">Retenue calculée:</span>
-                  <span className="text-lg font-black text-amber-700">{formatCurrency(retentionResult)}</span>
-                </div>
-              )}
-              
-              <p className="text-[9px] text-slate-400 italic text-center px-4">
-                Utilisez cet outil pour vérifier si le solde restant d'un client correspond à une retenue standard.
-              </p>
-            </div>
-          </div>
         </div>
 
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
           <p className="text-[10px] text-slate-400 italic">
-            Données synchronisées • {debts.length} lignes
+            Risque calculé sur {debts.length} lignes
           </p>
-          <div className="flex items-center gap-1 text-slate-400">
-             <Coins className="h-3 w-3" />
-             <span className="text-[9px]">Analyse prévisionnelle active</span>
+          <div className="flex items-center gap-1 text-red-400">
+             <Flame className="h-3 w-3 animate-pulse" />
+             <span className="text-[9px] font-bold">Analyse d'Exposition Active</span>
           </div>
         </div>
       </PopoverContent>
