@@ -36,6 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { FilteredResultsModal } from '@/components/FilteredResultsModal';
 import { NotificationPopover } from '@/components/NotificationPopover';
+import { SmartCalculator } from '@/components/SmartCalculator';
 import { ClientHistoryModal } from '@/components/ClientHistoryModal';
 import { useToast } from '@/hooks/use-toast';
 import { ContactDirectory } from '@/components/ContactDirectory';
@@ -244,6 +245,9 @@ export default function Home() {
                   </Button>
                 </div>
               )}
+
+              {/* Smart Calculator */}
+              <SmartCalculator />
 
               {/* Notifications */}
               <NotificationPopover />
