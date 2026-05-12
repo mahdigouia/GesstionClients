@@ -106,6 +106,42 @@ export const AnalysisService = {
       });
 
       const amountRanges = amountBrackets.map(b => ({ range: b.range, amount: b.amount }));
+ 
+      // Analyse par commercial
+      const commercialMap = new Map<string, any>();
+      processedDebts.forEach(debt => {
+        const commCode = debt.commercialCode || 'N/A';
+        const commName = debt.commercialName || 'Non assigné';
+        
+        if (!commercialMap.has(commCode)) {
+          commercialMap.set(commCode, {
+            code: commCode,
+            name: commName,
+            totalAmount: 0,
+            totalBalance: 0,
+            totalPaid: 0,
+            debtCount: 0,
+            clients: new Set<string>()
+          });
+        }
+        const comm = commercialMap.get(commCode);
+        comm.totalAmount += debt.amount;
+        comm.totalBalance += debt.balance;
+        comm.totalPaid += debt.settlement;
+        comm.debtCount++;
+        comm.clients.add(debt.clientName);
+      });
+
+      const commercialBreakdown = Array.from(commercialMap.values()).map(c => ({
+        code: c.code,
+        name: c.name,
+        totalAmount: c.totalAmount,
+        totalBalance: c.totalBalance,
+        totalPaid: c.totalPaid,
+        recoveryRate: c.totalAmount > 0 ? (c.totalPaid / c.totalAmount) * 100 : 0,
+        debtCount: c.debtCount,
+        clientCount: c.clients.size
+      })).sort((a, b) => b.totalBalance - a.totalBalance);
 
       // Délai moyen et prévision
       const debtsWithDelay = processedDebts.filter(d => (d.paymentDays || 0) > 0);
@@ -210,6 +246,7 @@ export const AnalysisService = {
         unpaidRateNoContentieux,
         globalUnpaidRate,
         clientBreakdown,
+        commercialBreakdown,
         agingBreakdown,
         amountRanges,
         topRiskClients: Array.from(clientMap.values())

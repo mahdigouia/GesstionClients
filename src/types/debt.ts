@@ -8,6 +8,17 @@ export interface RecoveryAction {
   promiseDate?: string;
 }
 
+export interface CommercialStats {
+  code: string;
+  name: string;
+  totalAmount: number;
+  totalBalance: number;
+  totalPaid: number;
+  recoveryRate: number;
+  debtCount: number;
+  clientCount: number;
+}
+
 export interface ClientDebt {
   id: string;
   clientCode: string;
@@ -94,6 +105,7 @@ export interface AnalysisResult {
     critical: number;
   };
   totalRetainedAmount: number;
+  commercialBreakdown?: CommercialStats[];
   processedDebts?: ClientDebt[];
 }
 

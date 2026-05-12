@@ -39,6 +39,7 @@ import { AnalysisResult } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { useState } from 'react';
 import { DebtEvolutionChart } from './DebtEvolutionChart';
+import { CommercialAnalysis } from './CommercialAnalysis';
 import { useDebtContext } from '@/lib/DebtContext';
 
 interface DashboardProps {
@@ -180,6 +181,9 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
 
       {/* Historique d'Évolution (Pro) */}
       <DebtEvolutionChart history={history} />
+
+      {/* Analyse par Commercial (Nouveau) */}
+      <CommercialAnalysis analysis={analysis} history={history} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Potential Liquidity Opportunities */}

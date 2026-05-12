@@ -57,6 +57,7 @@ export interface HistoryPoint {
   totalPaid: number;
   recoveryRate: number;
   debtCount: number;
+  commercialStats?: any[];
 }
 
 const DebtContext = createContext<DebtContextType | undefined>(undefined);
@@ -332,7 +333,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       totalBalance: currentAnalysis.totalBalance,
       totalPaid: currentAnalysis.totalPaid,
       recoveryRate: currentAnalysis.recoveryRate,
-      debtCount: currentDebts.length
+      debtCount: currentDebts.length,
+      commercialStats: currentAnalysis.commercialBreakdown
     };
     
     const lastPoint = currentHistory[currentHistory.length - 1];
