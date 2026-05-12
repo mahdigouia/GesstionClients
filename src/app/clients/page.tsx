@@ -185,20 +185,21 @@ export default function ClientsPage() {
       
       // Filter the debts based on all active criteria
       const filteredDebts = allClientDebts.filter(debt => {
-        // 0. Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
-        // Match DebtTable behavior: these skip all other filters
+        // Special invoice flag - used to bypass STATUS filters only
         const isSpecial = (debt.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(debt.documentNumber || '');
-        if (isSpecial) return true;
 
-        // 1. Commercial filter - CRITICAL: Match DebtTable behavior
+        // 1. Commercial filter - ALWAYS ENFORCED (even for special invoices)
         if (selectedCommercial !== 'all' && debt.commercialName !== selectedCommercial) return false;
 
-        // 2. Age exclusion logic - CRITICAL: Strict numeric conversion
+        // --- Special invoices bypass STATUS and AMOUNT filters below ---
+        if (isSpecial) return true;
+
+        // 2. Age exclusion logic
         const rawAge = debt.age;
         const matchesAgeExclusion = !isAgeExcluded(rawAge);
         if (!matchesAgeExclusion) return false;
 
-        // 3. Min amount logic - CRITICAL: Handle numeric conversion from string/number
+        // 3. Min amount logic
         const balance = typeof debt.balance === 'number' ? debt.balance : parseFloat(String(debt.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
         
         const matchesMinAmount = minAmountFilter ? (balance >= 5000) : true;
