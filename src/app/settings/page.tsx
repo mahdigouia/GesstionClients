@@ -3,7 +3,7 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -342,54 +342,56 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Règles & Plans */}
-          <Card className="border-0 shadow-lg bg-white overflow-hidden border-l-4 border-l-emerald-600">
-            <CardHeader className="bg-emerald-50/50 border-b border-emerald-100">
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <FileCode className="h-5 w-5 text-emerald-600" />
-                Règles Métier & Plan d'Analyse
-              </CardTitle>
-              <CardDescription>Consultez la documentation technique et les règles de calcul de l'application</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-emerald-600" />
+          {/* Règles & Plans (Hidden behind Secret Click + Admin) */}
+          {isAdmin && showAdvanced && (
+            <Card className="border-0 shadow-lg bg-white overflow-hidden border-l-4 border-l-emerald-600 animate-in fade-in slide-in-from-top-4 duration-500">
+              <CardHeader className="bg-emerald-50/50 border-b border-emerald-100">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <FileCode className="h-5 w-5 text-emerald-600" />
+                  Règles Métier & Plan d'Analyse
+                </CardTitle>
+                <CardDescription>Consultez la documentation technique et les règles de calcul de l'application</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <FileText className="h-5 w-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800">regles_et_plans.md</h4>
+                      <p className="text-xs text-slate-500">Dernière version à jour</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800">regles_et_plans.md</h4>
-                    <p className="text-xs text-slate-500">Dernière version à jour</p>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={handleViewRules} 
+                      variant="outline" 
+                      size="sm" 
+                      disabled={isLoadingRules}
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-10 px-4 rounded-xl font-bold"
+                    >
+                      {isLoadingRules ? (
+                        <div className="h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-2" />
+                      ) : (
+                        <Eye className="h-4 w-4 mr-2" />
+                      )}
+                      Consulter
+                    </Button>
+                    <Button 
+                      onClick={handleDownloadRules} 
+                      variant="outline" 
+                      size="sm"
+                      className="bg-emerald-600 text-white border-0 hover:bg-emerald-700 h-10 px-4 rounded-xl font-bold"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Télécharger
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    onClick={handleViewRules} 
-                    variant="outline" 
-                    size="sm" 
-                    disabled={isLoadingRules}
-                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-10 px-4 rounded-xl font-bold"
-                  >
-                    {isLoadingRules ? (
-                      <div className="h-4 w-4 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mr-2" />
-                    ) : (
-                      <Eye className="h-4 w-4 mr-2" />
-                    )}
-                    Consulter
-                  </Button>
-                  <Button 
-                    onClick={handleDownloadRules} 
-                    variant="outline" 
-                    size="sm"
-                    className="bg-emerald-600 text-white border-0 hover:bg-emerald-700 h-10 px-4 rounded-xl font-bold"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Télécharger
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Gestion des données */}
           <Card>
