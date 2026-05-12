@@ -21,6 +21,12 @@ interface DebtContextType {
     removed: number, 
     totalChange: number 
   };
+  updateDebtsFromFiles: (filesData: { filename: string, debts: ClientDebt[] }[]) => {
+    updated: number,
+    new: number,
+    removed: number,
+    totalChange: number
+  };
   clearAll: () => void;
   lastUpdatedBy: string | null;
   readAlertIds: string[];
@@ -233,53 +239,65 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const updateDebtsFromFile = (filename: string, newDebts: ClientDebt[]) => {
-    const normName = filename.toLowerCase();
+  const updateDebtsFromFiles = (filesData: { filename: string, debts: ClientDebt[] }[]) => {
     const today = new Date().toISOString();
     
-    // Filter existing debts by normalized filename
-    const existingDebtsForFile = debts.filter(d => (d.sourceFile || '').toLowerCase() === normName);
-    const otherDebts = debts.filter(d => (d.sourceFile || '').toLowerCase() !== normName);
+    // We'll work on a copy of the debts
+    let currentTotalDebts = [...debts];
     
-    const debtsWithDate = newDebts.map(d => ({ 
-      ...d, 
-      sourceFile: filename, // Keep original casing for display
-      lastImportDate: today,
-      isRecentlyUpdated: true
-    }));
+    let totalUpdated = 0;
+    let totalNew = 0;
+    let totalRemoved = 0;
+    let totalBalanceChange = 0;
 
-    const otherDebtsReset = otherDebts.map(d => ({ ...d, isRecentlyUpdated: false }));
+    filesData.forEach(({ filename, debts: newDebtsForFile }) => {
+      const normName = filename.toLowerCase();
+      
+      // Filter existing debts for THIS specific file
+      const existingDebtsForFile = currentTotalDebts.filter(d => (d.sourceFile || '').toLowerCase() === normName);
+      const otherDebts = currentTotalDebts.filter(d => (d.sourceFile || '').toLowerCase() !== normName);
+      
+      const debtsWithDate = newDebtsForFile.map(d => ({ 
+        ...d, 
+        sourceFile: filename,
+        lastImportDate: today,
+        isRecentlyUpdated: true
+      }));
 
-    // Stats for the user
-    let updatedCount = 0;
-    let newCount = 0;
-    let totalChange = 0;
-
-    debtsWithDate.forEach(newDebt => {
-      const existing = existingDebtsForFile.find(d => d.documentNumber === newDebt.documentNumber);
-      if (existing) {
-        if (existing.balance !== newDebt.balance) {
-          updatedCount++;
-          totalChange += (newDebt.balance - existing.balance);
+      // Calculate stats for this file
+      debtsWithDate.forEach(newDebt => {
+        const existing = existingDebtsForFile.find(d => d.documentNumber === newDebt.documentNumber);
+        if (existing) {
+          if (existing.balance !== newDebt.balance) {
+            totalUpdated++;
+            totalBalanceChange += (newDebt.balance - existing.balance);
+          }
+        } else {
+          totalNew++;
+          totalBalanceChange += newDebt.balance;
         }
-      } else {
-        newCount++;
-        totalChange += newDebt.balance;
-      }
+      });
+
+      totalRemoved += Math.max(0, existingDebtsForFile.length - (newDebtsForFile.length - (debtsWithDate.filter(nd => !existingDebtsForFile.some(ed => ed.documentNumber === nd.documentNumber)).length)));
+      
+      // Re-assemble currentTotalDebts for the next iteration
+      const otherDebtsReset = otherDebts.map(d => ({ ...d, isRecentlyUpdated: false }));
+      currentTotalDebts = [...otherDebtsReset, ...debtsWithDate];
     });
 
-    const removedCount = Math.max(0, existingDebtsForFile.length - (newDebts.length - newCount));
-
-    // Update state
-    const updatedTotalDebts = [...otherDebtsReset, ...debtsWithDate];
-    setDebts(updatedTotalDebts);
+    // Final update
+    setDebts(currentTotalDebts);
 
     return {
-      updated: updatedCount,
-      new: newCount,
-      removed: removedCount,
-      totalChange
+      updated: totalUpdated,
+      new: totalNew,
+      removed: totalRemoved,
+      totalChange: totalBalanceChange
     };
+  };
+
+  const updateDebtsFromFile = (filename: string, newDebts: ClientDebt[]) => {
+    return updateDebtsFromFiles([{ filename, debts: newDebts }]);
   };
 
   const clearAll = async () => {
@@ -395,6 +413,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       setAnalysis, 
       addDebts, 
       updateDebtsFromFile, 
+      updateDebtsFromFiles,
       addRecoveryAction,
       clearAll, 
       lastUpdatedBy,

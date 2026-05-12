@@ -109,11 +109,28 @@ Pour permettre une analyse focalisée sur les créances anciennes, l'application
 *   **Multisélection** : On peut exclure plusieurs tranches simultanément (ex: exclure tout ce qui a moins de 60 jours).
 *   **Impact calculé** : Le solde total affiché par client est dynamiquement recalculé pour ne prendre en compte que les factures non exclues.
 
-## 9. Filtres de Priorité par Montant
-
-Un filtre d'inclusion "Solde ≥ 5 000 TND" permet d'isoler les factures ayant un impact financier significatif sur la trésorerie.
-
-*   **Type** : Filtre d'inclusion (Vert).
-*   **Cible** : Solde restant de la facture.
 *   **Synergie** : Ce filtre peut être combiné avec les exclusions d'âge pour identifier les gros montants très anciens.
+
+## 10. Gestion des Imports (Multi-fichiers)
+
+L'application permet l'importation simultanée de plusieurs documents PDF. La gestion des données suit une logique de **fusion intelligente par source** :
+
+*   **Batch processing** : Lorsqu'un utilisateur sélectionne plusieurs fichiers, l'application extrait les données de chaque fichier individuellement, puis effectue une mise à jour groupée de l'état global.
+*   **Règle de remplacement par fichier** : L'importation d'un fichier nommé `C01.pdf` remplacera toutes les données précédemment stockées associées à ce même nom de fichier `C01.pdf`. Cela permet de mettre à jour un état de recouvrement sans dupliquer les factures si on importe une version plus récente du même document.
+*   **Persistance** : Les données sont synchronisées en temps réel sur **Firebase Firestore** (collection `shared_data/current_debts`) et sauvegardées localement dans le `localStorage` du navigateur comme secours.
+
+## 11. Règles d'Ordre d'Affichage (Sorting)
+
+Pour garantir une expérience cohérente avec les documents originaux, l'ordre d'affichage suit des règles strictes :
+
+### A. Ordre Document (Défaut)
+L'ordre par défaut ("Ordre Document") respecte la séquence d'extraction :
+1.  **Groupement par Fichier Source** : Les créances sont regroupées par document (ordre alphabétique des noms de fichiers).
+2.  **Index d'Extraction** : À l'intérieur de chaque fichier, l'ordre exact du PDF original est préservé via la propriété `extractIndex`.
+
+### B. Onglet "Clients"
+Les clients sont listés selon leur **ordre d'apparition** dans les documents sources. Un client qui apparaît en haut de la première page du premier PDF sera toujours en haut de la liste des clients, même si des filtres sont appliqués.
+
+### C. Tris Personnalisés (Global)
+Contrairement à l'ordre par défaut, lorsqu'un utilisateur choisit un critère de tri spécifique (Nom, Montant, Solde, Âge), le groupement par fichier est **supprimé**. Le tri devient **global** sur l'ensemble de la base de données pour permettre, par exemple, de voir les plus gros montants de tous les fichiers confondus en haut de liste.
 

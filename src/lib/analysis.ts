@@ -162,7 +162,11 @@ export const AnalysisService = {
 
       const clientBreakdown = Array.from(clientMap.values())
         .map(c => ({ ...c, averagePaymentDelay: 0 }))
-        .sort((a, b) => b.totalBalance - a.totalBalance); // Trier par solde pour l'analyse
+        .sort((a, b) => {
+          const fileComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+          if (fileComp !== 0) return fileComp;
+          return (a.minExtractIndex || 0) - (b.minExtractIndex || 0);
+        });
 
       // Aging
       const agingRanges = [

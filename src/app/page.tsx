@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/select';
 
 export default function Home() {
-  const { debts, analysis, addDebts, updateDebtsFromFile, setDebts, setAnalysis, addRecoveryAction } = useDebtContext();
+  const { debts, analysis, addDebts, updateDebtsFromFile, updateDebtsFromFiles, setDebts, setAnalysis, addRecoveryAction } = useDebtContext();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -104,7 +104,7 @@ export default function Home() {
       setWaitingMessage(null);
       setProgress(50);
       
-      let filesProcessed = 0;
+      const allExtractedData: { filename: string, debts: ClientDebt[] }[] = [];
       
       // Traiter chaque fichier un par un avec fusion intelligente
       for (let i = 0; i < files.length; i++) {
@@ -117,23 +117,8 @@ export default function Home() {
         const result = await OCRService.extractDebtsFromPDF(file);
         
         if (result.success && result.debts.length > 0) {
-          // Fusion intelligente (remplace les anciennes données de ce fichier)
-          const stats = updateDebtsFromFile(file.name, result.debts);
+          allExtractedData.push({ filename: file.name, debts: result.debts });
           filesProcessed++;
-          
-          // Notification détaillée pour l'utilisateur
-          if (stats.new > 0 || stats.updated > 0 || stats.removed > 0) {
-            toast({
-              title: `Mise à jour : ${file.name}`,
-              description: `${stats.new} nouvelles factures, ${stats.updated} mises à jour, ${stats.removed} soldées.`,
-              variant: "default",
-            });
-          } else {
-            toast({
-              title: `Fichier ${file.name}`,
-              description: "Aucun changement détecté par rapport à l'import précédent.",
-            });
-          }
         } else if (result.error) {
           console.error(`[Import] Erreur pour ${file.name}:`, result.error);
         }
@@ -142,6 +127,16 @@ export default function Home() {
       if (filesProcessed === 0) {
         throw new Error('Aucune donnée valide n\'a pu être extraite des fichiers.');
       }
+
+      // Mise à jour groupée de toutes les données
+      const stats = updateDebtsFromFiles(allExtractedData);
+      
+      // Notification globale
+      toast({
+        title: `Import terminé : ${filesProcessed} fichiers`,
+        description: `${stats.new} nouvelles factures, ${stats.updated} mises à jour, ${stats.removed} soldées.`,
+        variant: "default",
+      });
       
       // Étape finale
       setProgress(100);

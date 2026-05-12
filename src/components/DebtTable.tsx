@@ -146,19 +146,33 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
       return true;
     });
 
-    // Sorting - Primary: Source File, Secondary: User Choice
+    // Sorting Logic
     result.sort((a, b) => {
-      const sourceComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
-      if (sourceComp !== 0) return sourceComp;
+      // 1. If sorting by extraction, ALWAYS group by file first
+      if (filters.sortBy === 'extraction') {
+        const sourceComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+        if (sourceComp !== 0) return sourceComp;
+        
+        const indexComp = (a.extractIndex || 0) - (b.extractIndex || 0);
+        return filters.sortOrder === 'asc' ? indexComp : -indexComp;
+      }
 
+      // 2. If sorting by anything else, perform GLOBAL sort (don't group by file)
       let comparison = 0;
       switch (filters.sortBy) {
         case 'name': comparison = (a.clientName || '').localeCompare(b.clientName || ''); break;
         case 'amount': comparison = Number(a.amount || 0) - Number(b.amount || 0); break;
         case 'age': comparison = Number(a.age || 0) - Number(b.age || 0); break;
         case 'balance': comparison = Number(a.balance || 0) - Number(b.balance || 0); break;
-        case 'extraction': comparison = Number(a.extractIndex || 0) - Number(b.extractIndex || 0); break;
       }
+      
+      // Secondary sort to maintain stability if primary values are equal
+      if (comparison === 0) {
+        const sourceComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+        if (sourceComp !== 0) return sourceComp;
+        return (a.extractIndex || 0) - (b.extractIndex || 0);
+      }
+
       return filters.sortOrder === 'asc' ? comparison : -comparison;
     });
 
