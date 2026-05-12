@@ -51,6 +51,7 @@ export const AnalysisService = {
       const totalDebts = processedDebts.reduce((sum, debt) => sum + debt.amount, 0);
       const totalPaid = processedDebts.reduce((sum, debt) => sum + debt.settlement, 0);
       const totalBalance = processedDebts.reduce((sum, debt) => sum + debt.balance, 0);
+      const totalRetainedAmount = processedDebts.filter(d => d.isRetention).reduce((sum, d) => sum + d.balance, 0);
       
       const recoveryRate = totalDebts > 0 ? (totalPaid / totalDebts) * 100 : 0;
       const globalUnpaidRate = totalDebts > 0 ? (totalBalance / totalDebts) * 100 : 0;
@@ -229,6 +230,7 @@ export const AnalysisService = {
         projectedMonthlyCashflow,
         projectedMonthlyCashflowNoContentieux,
         riskDistribution,
+        totalRetainedAmount,
         processedDebts
       };
     } catch (error) {

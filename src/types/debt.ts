@@ -93,6 +93,7 @@ export interface AnalysisResult {
     overdue: number;
     critical: number;
   };
+  totalRetainedAmount: number;
   processedDebts?: ClientDebt[];
 }
 
