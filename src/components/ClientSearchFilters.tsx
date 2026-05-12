@@ -85,10 +85,28 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
       retainedFilter: 'off',
       partialFilter: 'off',
       contentieuxFilter: 'off',
+      minAmountFilter: false,
+      excludedAgeRanges: [],
       sortBy: 'extraction',
       sortOrder: 'asc'
     });
   };
+
+  const toggleAgeExclusion = (rangeId: string) => {
+    const current = filters.excludedAgeRanges || [];
+    const next = current.includes(rangeId)
+      ? current.filter((id: string) => id !== rangeId)
+      : [...current, rangeId];
+    updateFilter('excludedAgeRanges', next);
+  };
+
+  const ageRanges = [
+    { id: '0-15', label: '0-15j' },
+    { id: '16-30', label: '16-30j' },
+    { id: '31-60', label: '31-60j' },
+    { id: '61-100', label: '61-100j' },
+    { id: '101-364', label: '101-364j' },
+  ];
 
   // Pre-calculate counts for labels
   const contentieuxCount = useMemo(() => 
@@ -122,7 +140,9 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
   const activeFiltersCount = [
     filters.clientCode, filters.phone, filters.documentNumber, filters.commercial,
     filters.docType, filters.minAmount, filters.maxAmount, filters.minAge, filters.maxAge,
-    filters.riskLevels.length > 0 ? 'yes' : ''
+    filters.riskLevels.length > 0 ? 'yes' : '',
+    filters.minAmountFilter ? 'yes' : '',
+    filters.excludedAgeRanges?.length > 0 ? 'yes' : ''
   ].filter(Boolean).length;
 
   return (
@@ -194,6 +214,40 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
               <><XCircle className="h-4 w-4" /> Hors Partiel ({debts.length - partialCount})</>
             )}
           </Badge>
+
+          <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block" />
+
+          {/* Min Amount Shortcut */}
+          <Badge
+            variant={filters.minAmountFilter ? 'default' : 'outline'}
+            className={`cursor-pointer h-8 gap-2 px-3 text-xs font-bold transition-all ${
+              filters.minAmountFilter ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+            onClick={() => updateFilter('minAmountFilter', !filters.minAmountFilter)}
+          >
+            🎯 Solde ≥ 5 000 TND {filters.minAmountFilter ? '✓' : ''}
+          </Badge>
+
+          <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block" />
+
+          {/* Age Exclusion Badges */}
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1 hidden lg:inline">Exclure par âge:</span>
+          <div className="flex flex-wrap gap-1">
+            {ageRanges.map(range => (
+              <Badge
+                key={range.id}
+                variant="outline"
+                className={`cursor-pointer h-7 px-2 text-[10px] font-bold transition-all ${
+                  (filters.excludedAgeRanges || []).includes(range.id) 
+                    ? 'bg-amber-100 text-amber-700 border-amber-200' 
+                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                }`}
+                onClick={() => toggleAgeExclusion(range.id)}
+              >
+                {(filters.excludedAgeRanges || []).includes(range.id) ? '✗ ' : ''}{range.label}
+              </Badge>
+            ))}
+          </div>
         </div>
 
         {/* Advanced Toggle */}

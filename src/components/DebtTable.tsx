@@ -46,6 +46,8 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
     contentieuxFilter: 'off' as 'off' | 'include' | 'exclude',
     retainedFilter: 'off' as 'off' | 'include' | 'exclude',
     partialFilter: 'off' as 'off' | 'include' | 'exclude',
+    minAmountFilter: false,
+    excludedAgeRanges: [] as string[],
   });
 
   const [selectedClient, setSelectedClient] = useState<string>('');
@@ -84,6 +86,22 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
     const ratio = (b / a) * 100;
     return ratio > 1.5 && ratio < 99;
   }, []);
+
+  const ageRanges = [
+    { id: '0-15', min: 0, max: 15 },
+    { id: '16-30', min: 16, max: 30 },
+    { id: '31-60', min: 31, max: 60 },
+    { id: '61-100', min: 61, max: 100 },
+    { id: '101-364', min: 101, max: 364 },
+  ];
+
+  const isAgeExcluded = useCallback((age: number) => {
+    if (!filters.excludedAgeRanges || filters.excludedAgeRanges.length === 0) return false;
+    return filters.excludedAgeRanges.some(id => {
+      const range = ageRanges.find(r => r.id === id);
+      return range && age >= range.min && age <= range.max;
+    });
+  }, [filters.excludedAgeRanges]);
 
   // Main filtering logic - THE SINGLE SOURCE OF TRUTH
   const filteredDebts = useMemo(() => {
@@ -135,6 +153,11 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
       // 5. Numeric Filters
       const balance = parseNumeric(debt.balance);
       const age = parseNumeric(debt.age);
+      
+      // Shortcut filters from Clients view
+      if (filters.minAmountFilter && balance < 5000) return false;
+      if (isAgeExcluded(age)) return false;
+
       if (filters.minAmount && balance < parseFloat(filters.minAmount)) return false;
       if (filters.maxAmount && balance > parseFloat(filters.maxAmount)) return false;
       if (filters.minAge && age < parseInt(filters.minAge)) return false;

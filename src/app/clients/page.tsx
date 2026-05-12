@@ -169,11 +169,7 @@ export default function ClientsPage() {
     if (!analysis) return [];
     let list = analysis.clientBreakdown || [];
     
-    // 1. Basic Filters (Commercial & Search)
-    if (selectedCommercial !== 'all') {
-      list = list.filter((c: any) => c.commercialName === selectedCommercial);
-    }
-    
+    // 1. Basic Filters (Search)
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       list = list.filter((c: any) => 
@@ -190,21 +186,25 @@ export default function ClientsPage() {
       // Filter the debts based on all active criteria
       const filteredDebts = allClientDebts.filter(debt => {
         // 0. Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
+        // Match DebtTable behavior: these skip all other filters
         const isSpecial = (debt.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(debt.documentNumber || '');
         if (isSpecial) return true;
 
-        // 1. Age exclusion logic - CRITICAL: Strict numeric conversion
+        // 1. Commercial filter - CRITICAL: Match DebtTable behavior
+        if (selectedCommercial !== 'all' && debt.commercialName !== selectedCommercial) return false;
+
+        // 2. Age exclusion logic - CRITICAL: Strict numeric conversion
         const rawAge = debt.age;
         const matchesAgeExclusion = !isAgeExcluded(rawAge);
         if (!matchesAgeExclusion) return false;
 
-        // 2. Min amount logic - CRITICAL: Handle numeric conversion from string/number
+        // 3. Min amount logic - CRITICAL: Handle numeric conversion from string/number
         const balance = typeof debt.balance === 'number' ? debt.balance : parseFloat(String(debt.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
         
         const matchesMinAmount = minAmountFilter ? (balance >= 5000) : true;
         if (!matchesMinAmount) return false;
 
-        // 3. Status filters (Tristate)
+        // 4. Status filters (Tristate)
         const matchesContentieux =
           contentieuxFilter === 'off' ? true :
           contentieuxFilter === 'include' ? isContentieux(debt) :
