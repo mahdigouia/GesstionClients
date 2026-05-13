@@ -473,6 +473,10 @@ Source: ${debt.sourceFile}
     });
     html += `</tr></thead><tbody>`;
 
+    data.forEach((row, idx) => {
+      const rowClass = idx % 2 === 0 ? 'row-even' : '';
+      html += `<tr class="${rowClass}">`;
+      columns.forEach(col => {
         let val = row[col.key];
         let cellClass = "cell";
         let inlineStyle = "";
