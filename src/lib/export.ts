@@ -400,13 +400,10 @@ Source: ${debt.sourceFile}
       { header: 'Solde (TND)', key: 'balance', width: 110, type: 'number', bold: true },
       { header: 'Remarque', key: 'remark', width: 200 }
     ];
-
     let globalCounter = 1;
     clients.forEach(client => {
-      const debts = client.filteredDebts || [];
-      const rowCount = debts.length;
-      
-      debts.forEach((debt: ClientDebt, index: number) => {
+      const rowCount = client.filteredDebts.length;
+      client.filteredDebts.forEach((debt: ClientDebt, index: number) => {
         rows.push({
           n: globalCounter++,
           code: client.clientCode,
@@ -419,7 +416,9 @@ Source: ${debt.sourceFile}
           amount: debt.amount.toFixed(3),
           settlement: (debt.settlement || 0).toFixed(3),
           balance: debt.balance.toFixed(3),
-          remark: ''
+          remark: '',
+          isFirstInGroup: index === 0,
+          groupSize: rowCount
         });
       });
     });
@@ -477,6 +476,11 @@ Source: ${debt.sourceFile}
       const rowClass = idx % 2 === 0 ? 'row-even' : '';
       html += `<tr class="${rowClass}">`;
       columns.forEach(col => {
+        // Fusionner uniquement la colonne Remarque
+        if (col.key === 'remark' && !row.isFirstInGroup) {
+          return;
+        }
+
         let val = row[col.key];
         let cellClass = "cell";
         let inlineStyle = "";
@@ -497,7 +501,8 @@ Source: ${debt.sourceFile}
           inlineStyle += " color: #b91c1c; font-weight: bold;";
         }
 
-        html += `<td class="${cellClass}" style="${inlineStyle}">${val ?? ''}</td>`;
+        const rowspanAttr = (col.key === 'remark' && row.isFirstInGroup && row.groupSize > 1) ? ` rowspan="${row.groupSize}"` : '';
+        html += `<td class="${cellClass}" style="${inlineStyle}"${rowspanAttr}>${val ?? ''}</td>`;
       });
       html += `</tr>`;
     });
@@ -520,53 +525,48 @@ Source: ${debt.sourceFile}
       return (val ?? 0).toFixed(3).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     };
 
+    // Calculer les totaux à l'avance pour le header
+    let totalInvoices = 0;
+    clients.forEach(c => totalInvoices += (c.filteredDebts || []).length);
+    const totalClientsCount = clients.length;
+
     const addHeader = (pageNum: number) => {
       // Background Header réduit
-      pdf.setFillColor(44, 62, 80);
-      pdf.rect(0, 0, pageWidth, 25, 'F');
-
-      // Logo à gauche
-      try {
-        pdf.addImage('/logo.png', 'PNG', margin, 5, 25, 10);
-      } catch (e) {}
-
-      // Titre
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(20); 
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(margin, margin, pageWidth - (margin * 2), 25, 'F');
+      
+      // Logo (Placeholder simple)
+      pdf.setFontSize(24);
       pdf.setFont('helvetica', 'bold');
-      pdf.text("CRÉANCES CLIENTS", margin, 20);
+      pdf.setTextColor(30, 41, 59);
+      pdf.text("MDS", margin + 5, margin + 12);
+      pdf.setFontSize(8);
+      pdf.text("G R O U P", margin + 5, margin + 15);
+      
+      pdf.setFontSize(18);
+      pdf.text("CRÉANCES CLIENTS", margin + 45, margin + 12);
       
       // Légende
-      pdf.setFontSize(6);
-      pdf.setFont('helvetica', 'italic');
-      pdf.text("Âge : 0-15j Vert | 16-30j Bleu | 31-45j Jaune | 46-60j Orange | 61j+ Rouge", margin + 80, 20);
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("Âge : 0-15j Vert | 16-30j Bleu | 31-45j Jaune | 46-60j Orange | 61j+ Rouge", margin + pageWidth - margin - 10, margin + 12, { align: 'right' });
+      
+      // Meta info
+      pdf.setFontSize(7);
+      pdf.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, margin + pageWidth - margin - 10, margin + 6, { align: 'right' });
+      pdf.text(`Page ${pageNum}`, margin + pageWidth - margin - 10, margin + 10, { align: 'right' });
 
-      // Infos (Droite)
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      const dateStr = `Généré le : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`;
-      pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 12);
-      pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 18);
+      // Filtres et Statistiques
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 116, 139);
+      const statsText = `Filtres actifs : ${activeFilters || 'Aucun'}  |  Clients : ${totalClientsCount}  |  Lignes : ${totalInvoices}`;
+      pdf.text(statsText, margin + 5, margin + 22);
 
-      return 32;
+      return margin + 30;
     };
 
     let pageNum = 1;
     currentY = addHeader(pageNum);
-
-    // Filtres Actifs
-    if (activeFilters) {
-      pdf.setFillColor(241, 245, 249);
-      pdf.roundedRect(margin, currentY - 5, pageWidth - (2 * margin), 10, 2, 2, 'F');
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(`Filtres actifs : `, margin + 5, currentY + 1.5);
-      pdf.setFont('helvetica', 'italic');
-      pdf.setFontSize(8);
-      pdf.text(activeFilters, margin + 30, currentY + 1.5);
-      currentY += 15;
-    }
 
     // Définition des colonnes (Paysage)
     const cols = [
@@ -604,7 +604,6 @@ Source: ${debt.sourceFile}
 
     clients.forEach((client) => {
       const debts = client.filteredDebts || [];
-      const totalClientHeight = debts.length * 7;
       
       debts.forEach((debt: ClientDebt, i: number) => {
         if (currentY > 185) {
@@ -656,7 +655,10 @@ Source: ${debt.sourceFile}
         
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
-        pdf.text("", margin + 238 + 17.5, currentY, { align: 'center' }); // Remarque vide
+        // Remarque fusionnée visuellement (affichée une seule fois par groupe)
+        if (i === 0) {
+          pdf.text("", margin + 238 + 17.5, currentY, { align: 'center' }); // Valeur remarque (ici vide)
+        }
 
         currentY += 7;
         globalIndex++;
@@ -679,6 +681,8 @@ Source: ${debt.sourceFile}
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
     pdf.text("TOTAL GÉNÉRAL", margin + 5, currentY + 1.5);
+    
+    pdf.setTextColor(255, 255, 255);
     pdf.text(formatCurrency(totalAmount), margin + 178 + 15, currentY + 1.5, { align: 'center' });
     pdf.text(formatCurrency(totalBalance), margin + 208 + 15, currentY + 1.5, { align: 'center' });
 
