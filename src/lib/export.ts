@@ -388,9 +388,9 @@ Source: ${debt.sourceFile}
     const rows: any[] = [];
     const columns = [
       { header: 'N°', key: 'n', width: 40 },
-      { header: 'Code Client', key: 'code', width: 80, merge: true },
-      { header: 'Nom Client', key: 'name', width: 250, merge: true },
-      { header: 'Rep.', key: 'rep', width: 60, merge: true },
+      { header: 'Code Client', key: 'code', width: 80 },
+      { header: 'Nom Client', key: 'name', width: 250 },
+      { header: 'Rep. (Source)', key: 'rep', width: 80 },
       { header: 'N° Pièce', key: 'doc', width: 100 },
       { header: 'Date', key: 'date', width: 90 },
       { header: 'Échéance', key: 'due', width: 90 },
@@ -398,8 +398,7 @@ Source: ${debt.sourceFile}
       { header: 'Montant (TND)', key: 'amount', width: 110, type: 'number' },
       { header: 'Règlement (TND)', key: 'settlement', width: 110, type: 'number' },
       { header: 'Solde (TND)', key: 'balance', width: 110, type: 'number', bold: true },
-      { header: 'Source', key: 'source', width: 120 },
-      { header: 'Remarque', key: 'remark', width: 150, merge: true }
+      { header: 'Remarque', key: 'remark', width: 200 }
     ];
 
     let globalCounter = 1;
@@ -420,10 +419,7 @@ Source: ${debt.sourceFile}
           amount: debt.amount.toFixed(3),
           settlement: (debt.settlement || 0).toFixed(3),
           balance: debt.balance.toFixed(3),
-          source: (client.sourceFile || debt.sourceFile || '').replace(/\.pdf$/i, ''),
-          remark: '', // Colonne vide demandée
-          isFirstInGroup: index === 0,
-          groupSize: rowCount
+          remark: ''
         });
       });
     });
@@ -477,34 +473,27 @@ Source: ${debt.sourceFile}
     });
     html += `</tr></thead><tbody>`;
 
-    data.forEach((row, idx) => {
-      const rowClass = idx % 2 === 0 ? 'row-even' : '';
-      html += `<tr class="${rowClass}">`;
-      columns.forEach(col => {
-        // Gérer le rowspan pour les colonnes fusionnées
-        if (col.merge && !row.isFirstInGroup) {
-          return; // Skip this cell if it's merged and not the first in group
-        }
-
         let val = row[col.key];
         let cellClass = "cell";
+        let inlineStyle = "";
         if (col.bold) cellClass += " bold";
         
-        // Coloration par âge
+        // Coloration par âge via styles en ligne (plus fiable pour Excel)
         if (col.key === 'age') {
           const age = parseInt(val);
-          if (age <= 15) cellClass += " age-0-15";
-          else if (age <= 30) cellClass += " age-16-30";
-          else if (age <= 45) cellClass += " age-31-45";
-          else if (age <= 60) cellClass += " age-46-60";
-          else cellClass += " age-61-plus";
+          if (age <= 15) inlineStyle = "color: #059669; font-weight: bold;";
+          else if (age <= 30) inlineStyle = "color: #2563eb; font-weight: bold;";
+          else if (age <= 45) inlineStyle = "color: #d97706; font-weight: bold;";
+          else if (age <= 60) inlineStyle = "color: #ea580c; font-weight: bold;";
+          else inlineStyle = "color: #dc2626; font-weight: bold;";
         }
 
-        // Style conditionnel pour le solde (Gardé en plus du gras si besoin)
-        if (col.key === 'balance' && parseFloat(val) > 0) cellClass += " critical";
+        // Style conditionnel pour le solde
+        if (col.key === 'balance' && parseFloat(val) > 0) {
+          inlineStyle += " color: #b91c1c; font-weight: bold;";
+        }
 
-        const rowspanAttr = (col.merge && row.isFirstInGroup && row.groupSize > 1) ? ` rowspan="${row.groupSize}"` : '';
-        html += `<td class="${cellClass}"${rowspanAttr}>${val ?? ''}</td>`;
+        html += `<td class="${cellClass}" style="${inlineStyle}">${val ?? ''}</td>`;
       });
       html += `</tr>`;
     });
@@ -577,18 +566,17 @@ Source: ${debt.sourceFile}
 
     // Définition des colonnes (Paysage)
     const cols = [
-      { h: 'N°', x: margin, w: 10, align: 'center' },
-      { h: 'Code', x: margin + 10, w: 20, align: 'center' },
-      { h: 'Client', x: margin + 30, w: 55, align: 'center' },
-      { h: 'Rep.', x: margin + 85, w: 12, align: 'center' },
-      { h: 'N° Pièce', x: margin + 97, w: 28, align: 'center' },
-      { h: 'Date', x: margin + 125, w: 22, align: 'center' },
-      { h: 'Échéance', x: margin + 147, w: 22, align: 'center' },
-      { h: 'Âge', x: margin + 169, w: 15, align: 'center' },
-      { h: 'Montant', x: margin + 184, w: 32, align: 'center' },
-      { h: 'Solde', x: margin + 216, w: 32, align: 'center' },
-      { h: 'Source', x: margin + 248, w: 22, align: 'center' },
-      { h: 'Remarque', x: margin + 270, w: 15, align: 'center' }
+      { h: 'N°', x: margin, w: 8, align: 'center' },
+      { h: 'Code', x: margin + 8, w: 18, align: 'center' },
+      { h: 'Client', x: margin + 26, w: 52, align: 'center' },
+      { h: 'Rep.', x: margin + 78, w: 14, align: 'center' },
+      { h: 'N° Pièce', x: margin + 92, w: 30, align: 'center' },
+      { h: 'Date', x: margin + 122, w: 22, align: 'center' },
+      { h: 'Échéance', x: margin + 144, w: 22, align: 'center' },
+      { h: 'Âge', x: margin + 166, w: 12, align: 'center' },
+      { h: 'Montant', x: margin + 178, w: 30, align: 'center' },
+      { h: 'Solde', x: margin + 208, w: 30, align: 'center' },
+      { h: 'Remarque', x: margin + 238, w: 35, align: 'center' }
     ];
 
     // Header Tableau
@@ -631,19 +619,18 @@ Source: ${debt.sourceFile}
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
         
-        // Valeurs communes (fusionnées visuellement)
-        if (i === 0) {
-          pdf.text(client.clientCode || '?', margin + 10 + 10, currentY, { align: 'center' });
-          pdf.text((client.clientName || '').substring(0, 32), margin + 30 + 27.5, currentY, { align: 'center' });
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(debt.commercialCode || client.commercialCode || '?', margin + 85 + 6, currentY, { align: 'center' });
-          pdf.setFont('helvetica', 'normal');
-        }
+        // Répétition des informations client sur chaque ligne pour éviter le vide
+        pdf.text(client.clientCode || '?', margin + 8 + 9, currentY, { align: 'center' });
+        pdf.text((client.clientName || '').substring(0, 32), margin + 26 + 26, currentY, { align: 'center' });
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(debt.commercialCode || client.commercialCode || '?', margin + 78 + 7, currentY, { align: 'center' });
+        pdf.setFont('helvetica', 'normal');
 
-        pdf.text(String(globalIndex), margin + 5, currentY, { align: 'center' });
-        pdf.text(debt.documentNumber, margin + 97 + 14, currentY, { align: 'center' });
-        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 125 + 11, currentY, { align: 'center' });
-        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 147 + 11, currentY, { align: 'center' });
+        pdf.text(String(globalIndex), margin + 4, currentY, { align: 'center' });
+        pdf.text(debt.documentNumber, margin + 92 + 15, currentY, { align: 'center' });
+        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 122 + 11, currentY, { align: 'center' });
+        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 144 + 11, currentY, { align: 'center' });
         
         // Âge avec couleur
         pdf.setFont('helvetica', 'bold');
@@ -653,20 +640,19 @@ Source: ${debt.sourceFile}
         else if (age <= 45) pdf.setTextColor(217, 119, 6);
         else if (age <= 60) pdf.setTextColor(234, 88, 12);
         else pdf.setTextColor(220, 38, 38);
-        pdf.text(`${age} j`, margin + 169 + 7.5, currentY, { align: 'center' });
+        pdf.text(`${age} j`, margin + 166 + 6, currentY, { align: 'center' });
         
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
-        pdf.text(formatCurrency(debt.amount), margin + 184 + 16, currentY, { align: 'center' });
+        pdf.text(formatCurrency(debt.amount), margin + 178 + 15, currentY, { align: 'center' });
         
         pdf.setFont('helvetica', 'bold');
         if (debt.balance > 0) pdf.setTextColor(185, 28, 28);
-        pdf.text(formatCurrency(debt.balance), margin + 216 + 16, currentY, { align: 'center' });
+        pdf.text(formatCurrency(debt.balance), margin + 208 + 15, currentY, { align: 'center' });
         
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
-        const sourceClean = (client.sourceFile || debt.sourceFile || '').replace(/\.pdf$/i, '');
-        pdf.text(sourceClean.substring(0, 12), margin + 248 + 11, currentY, { align: 'center' });
+        pdf.text("", margin + 238 + 17.5, currentY, { align: 'center' }); // Remarque vide
 
         currentY += 7;
         globalIndex++;
@@ -689,8 +675,8 @@ Source: ${debt.sourceFile}
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
     pdf.text("TOTAL GÉNÉRAL", margin + 5, currentY + 1.5);
-    pdf.text(formatCurrency(totalAmount), margin + 184 + 16, currentY + 1.5, { align: 'center' });
-    pdf.text(formatCurrency(totalBalance), margin + 216 + 16, currentY + 1.5, { align: 'center' });
+    pdf.text(formatCurrency(totalAmount), margin + 178 + 15, currentY + 1.5, { align: 'center' });
+    pdf.text(formatCurrency(totalBalance), margin + 208 + 15, currentY + 1.5, { align: 'center' });
 
     pdf.save(`Rapport_Portefeuille_Detaille_${new Date().toISOString().split('T')[0]}.pdf`);
   }
