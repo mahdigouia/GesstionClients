@@ -238,7 +238,11 @@ export default function ClientsPage() {
         debtCount
       };
     }).filter(client => client.debtCount > 0)
-      .sort((a, b) => (a.clientCode || '').localeCompare(b.clientCode || '', undefined, { numeric: true }));
+      .sort((a, b) => {
+        const fileComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+        if (fileComp !== 0) return fileComp;
+        return (a.clientCode || '').localeCompare(b.clientCode || '', undefined, { numeric: true });
+      });
   }, [analysis, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter, excludedAgeRanges, minAmountFilter]);
 
   useEffect(() => {

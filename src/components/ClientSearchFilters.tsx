@@ -248,7 +248,23 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
               </Badge>
             ))}
           </div>
+
+          <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block" />
+
+          {/* Commercial Selector Shortcut */}
+          <div className="flex items-center gap-2 bg-slate-100/50 border border-slate-200 rounded-lg px-2 h-8 group hover:bg-slate-100 transition-colors">
+            <Building2 className="h-3.5 w-3.5 text-slate-500" />
+            <select
+              className="bg-transparent border-none text-[10px] font-black text-slate-700 focus:ring-0 appearance-none pr-4 cursor-pointer uppercase tracking-wider"
+              value={filters.commercial}
+              onChange={(e) => updateFilter('commercial', e.target.value)}
+            >
+              <option value="">Commerciaux (Tous)</option>
+              {commercials.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
         </div>
+
 
         {/* Advanced Toggle */}
         <div className="flex gap-2">
@@ -275,7 +291,7 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
         {/* Advanced Filters Panel */}
         {showAdvanced && (
           <div className="border-t pt-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -302,17 +318,6 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
                   onChange={(e) => updateFilter('documentNumber', e.target.value)}
                   className="pl-10"
                 />
-              </div>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <select
-                  className="w-full h-10 pl-10 pr-4 rounded-md border border-input bg-background text-sm appearance-none"
-                  value={filters.commercial}
-                  onChange={(e) => updateFilter('commercial', e.target.value)}
-                >
-                  <option value="">Tous les commerciaux</option>
-                  {commercials.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
               </div>
             </div>
 

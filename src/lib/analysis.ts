@@ -199,7 +199,11 @@ export const AnalysisService = {
 
       const clientBreakdown = Array.from(clientMap.values())
         .map(c => ({ ...c, averagePaymentDelay: 0 }))
-        .sort((a, b) => (a.clientCode || '').localeCompare(b.clientCode || '', undefined, { numeric: true }));
+        .sort((a, b) => {
+          const fileComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+          if (fileComp !== 0) return fileComp;
+          return (a.clientCode || '').localeCompare(b.clientCode || '', undefined, { numeric: true });
+        });
 
       // Aging
       const agingRanges = [
