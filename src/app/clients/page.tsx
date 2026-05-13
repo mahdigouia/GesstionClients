@@ -237,7 +237,8 @@ export default function ClientsPage() {
         totalBalance,
         debtCount
       };
-    }).filter(client => client.debtCount > 0); // Only show clients with at least one matching line
+    }).filter(client => client.debtCount > 0)
+      .sort((a, b) => (a.clientCode || '').localeCompare(b.clientCode || '', undefined, { numeric: true }));
   }, [analysis, debts, selectedCommercial, searchTerm, contentieuxFilter, retainedFilter, partialFilter, excludedAgeRanges, minAmountFilter]);
 
   useEffect(() => {
