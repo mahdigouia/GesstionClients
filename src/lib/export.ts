@@ -388,23 +388,26 @@ Source: ${debt.sourceFile}
     const rows: any[] = [];
     const columns = [
       { header: 'N°', key: 'n', width: 40 },
-      { header: 'Code Client', key: 'code', width: 80 },
-      { header: 'Nom Client', key: 'name', width: 250 },
-      { header: 'Rep.', key: 'rep', width: 60 },
+      { header: 'Code Client', key: 'code', width: 80, merge: true },
+      { header: 'Nom Client', key: 'name', width: 250, merge: true },
+      { header: 'Rep.', key: 'rep', width: 60, merge: true },
       { header: 'N° Pièce', key: 'doc', width: 100 },
       { header: 'Date', key: 'date', width: 90 },
       { header: 'Échéance', key: 'due', width: 90 },
-      { header: 'Âge (j)', key: 'age', width: 60, type: 'number' },
+      { header: 'Âge (j)', key: 'age', width: 60, type: 'number', bold: true },
       { header: 'Montant (TND)', key: 'amount', width: 110, type: 'number' },
       { header: 'Règlement (TND)', key: 'settlement', width: 110, type: 'number' },
-      { header: 'Solde (TND)', key: 'balance', width: 110, type: 'number' },
-      { header: 'Source', key: 'source', width: 120 }
+      { header: 'Solde (TND)', key: 'balance', width: 110, type: 'number', bold: true },
+      { header: 'Source', key: 'source', width: 120 },
+      { header: 'Remarque', key: 'remark', width: 150, merge: true }
     ];
 
     let globalCounter = 1;
     clients.forEach(client => {
       const debts = client.filteredDebts || [];
-      debts.forEach((debt: ClientDebt) => {
+      const rowCount = debts.length;
+      
+      debts.forEach((debt: ClientDebt, index: number) => {
         rows.push({
           n: globalCounter++,
           code: client.clientCode,
@@ -414,10 +417,13 @@ Source: ${debt.sourceFile}
           date: new Date(debt.documentDate).toLocaleDateString('fr-FR'),
           due: new Date(debt.dueDate).toLocaleDateString('fr-FR'),
           age: debt.age,
-          amount: debt.amount.toFixed(2),
-          settlement: (debt.settlement || 0).toFixed(2),
-          balance: debt.balance.toFixed(2),
-          source: client.sourceFile || debt.sourceFile
+          amount: debt.amount.toFixed(3),
+          settlement: (debt.settlement || 0).toFixed(3),
+          balance: debt.balance.toFixed(3),
+          source: (client.sourceFile || debt.sourceFile || '').replace(/\.pdf$/i, ''),
+          remark: '', // Colonne vide demandée
+          isFirstInGroup: index === 0,
+          groupSize: rowCount
         });
       });
     });
@@ -442,19 +448,27 @@ Source: ${debt.sourceFile}
         <meta charset="utf-8">
         <style>
           .title { font-size: 16pt; font-weight: bold; color: ${headerColor}; font-family: sans-serif; }
+          .legend { font-size: 8pt; color: #64748b; font-style: italic; margin-bottom: 10px; }
           .header { background-color: ${headerColor}; color: ${headerTextColor}; font-weight: bold; text-align: center; border: 0.5pt solid #000; font-family: sans-serif; }
-          .cell { border: 0.5pt solid #cbd5e1; font-family: sans-serif; font-size: 10pt; }
-          .number { text-align: right; }
+          .cell { border: 0.5pt solid #cbd5e1; font-family: sans-serif; font-size: 10pt; text-align: center; vertical-align: middle; }
+          .number { text-align: center; }
+          .bold { font-weight: bold; }
           .row-even { background-color: ${evenRowColor}; }
           .critical { color: #b91c1c; font-weight: bold; }
           .settled { color: #059669; }
+          .age-0-15 { color: #059669; font-weight: bold; }
+          .age-16-30 { color: #2563eb; font-weight: bold; }
+          .age-31-45 { color: #d97706; font-weight: bold; }
+          .age-46-60 { color: #ea580c; font-weight: bold; }
+          .age-61-plus { color: #dc2626; font-weight: bold; }
         </style>
       </head>
       <body>
     `;
 
     if (title) {
-      html += `<div class="title">${title}</div><br>`;
+      html += `<div class="title">${title}</div>`;
+      html += `<div class="legend">Légende Âge : 0-15j Vert | 16-30j Bleu | 31-45j Jaune | 46-60j Orange | 61j+ Rouge</div><br>`;
     }
 
     html += `<table border="1"><thead><tr>`;
@@ -467,15 +481,30 @@ Source: ${debt.sourceFile}
       const rowClass = idx % 2 === 0 ? 'row-even' : '';
       html += `<tr class="${rowClass}">`;
       columns.forEach(col => {
+        // Gérer le rowspan pour les colonnes fusionnées
+        if (col.merge && !row.isFirstInGroup) {
+          return; // Skip this cell if it's merged and not the first in group
+        }
+
         let val = row[col.key];
         let cellClass = "cell";
-        if (col.type === 'number') cellClass += " number";
+        if (col.bold) cellClass += " bold";
         
-        // Style conditionnel pour le solde et règlement
-        if (col.key === 'balance' && parseFloat(val) > 0) cellClass += " critical";
-        if (col.key === 'settlement' && parseFloat(val) > 0) cellClass += " settled";
+        // Coloration par âge
+        if (col.key === 'age') {
+          const age = parseInt(val);
+          if (age <= 15) cellClass += " age-0-15";
+          else if (age <= 30) cellClass += " age-16-30";
+          else if (age <= 45) cellClass += " age-31-45";
+          else if (age <= 60) cellClass += " age-46-60";
+          else cellClass += " age-61-plus";
+        }
 
-        html += `<td class="${cellClass}">${val ?? ''}</td>`;
+        // Style conditionnel pour le solde (Gardé en plus du gras si besoin)
+        if (col.key === 'balance' && parseFloat(val) > 0) cellClass += " critical";
+
+        const rowspanAttr = (col.merge && row.isFirstInGroup && row.groupSize > 1) ? ` rowspan="${row.groupSize}"` : '';
+        html += `<td class="${cellClass}"${rowspanAttr}>${val ?? ''}</td>`;
       });
       html += `</tr>`;
     });
@@ -495,36 +524,38 @@ Source: ${debt.sourceFile}
     let currentY = 20;
 
     const formatCurrency = (val: number) => {
-      return (val ?? 0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      return (val ?? 0).toFixed(3).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ");
     };
 
     const addHeader = (pageNum: number) => {
       // Background Header réduit
       pdf.setFillColor(44, 62, 80);
-      pdf.rect(0, 0, pageWidth, 25, 'F'); // Réduit de 35 à 25
+      pdf.rect(0, 0, pageWidth, 25, 'F');
 
       // Logo à gauche
       try {
         pdf.addImage('/logo.png', 'PNG', margin, 5, 25, 10);
-      } catch (e) {
-        // Fallback si pas de logo
-      }
+      } catch (e) {}
 
-      // Titre (un peu plus bas pour l'équilibre)
+      // Titre
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(20); 
       pdf.setFont('helvetica', 'bold');
-      pdf.text("CRÉANCES CLIENTS", margin, 20); // Changé de 'PORTFOLIO CRÉANCES CLIENTS' et descendu à 20
+      pdf.text("CRÉANCES CLIENTS", margin, 20);
       
-      // Suppression de la mention MG GROUP - Gestion de Trésorerie
+      // Légende
+      pdf.setFontSize(6);
+      pdf.setFont('helvetica', 'italic');
+      pdf.text("Âge : 0-15j Vert | 16-30j Bleu | 31-45j Jaune | 46-60j Orange | 61j+ Rouge", margin + 80, 20);
 
       // Infos (Droite)
       pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
       const dateStr = `Généré le : ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`;
       pdf.text(dateStr, pageWidth - margin - pdf.getTextWidth(dateStr), 12);
       pdf.text(`Page ${pageNum}`, pageWidth - margin - pdf.getTextWidth(`Page ${pageNum}`), 18);
 
-      return 32; // Début du contenu plus haut
+      return 32;
     };
 
     let pageNum = 1;
@@ -546,16 +577,18 @@ Source: ${debt.sourceFile}
 
     // Définition des colonnes (Paysage)
     const cols = [
-      { h: 'N°', x: margin, w: 10 },
-      { h: 'Code', x: margin + 10, w: 20 },
-      { h: 'Client', x: margin + 30, w: 65 },
-      { h: 'Rep.', x: margin + 95, w: 12 },
-      { h: 'N° Pièce', x: margin + 107, w: 30 },
-      { h: 'Date', x: margin + 137, w: 25 },
-      { h: 'Échéance', x: margin + 162, w: 25 },
-      { h: 'Âge', x: margin + 187, w: 15, align: 'center' },
-      { h: 'Montant', x: margin + 202, w: 35, align: 'right' },
-      { h: 'Solde', x: margin + 237, w: 35, align: 'right' }
+      { h: 'N°', x: margin, w: 10, align: 'center' },
+      { h: 'Code', x: margin + 10, w: 20, align: 'center' },
+      { h: 'Client', x: margin + 30, w: 55, align: 'center' },
+      { h: 'Rep.', x: margin + 85, w: 12, align: 'center' },
+      { h: 'N° Pièce', x: margin + 97, w: 28, align: 'center' },
+      { h: 'Date', x: margin + 125, w: 22, align: 'center' },
+      { h: 'Échéance', x: margin + 147, w: 22, align: 'center' },
+      { h: 'Âge', x: margin + 169, w: 15, align: 'center' },
+      { h: 'Montant', x: margin + 184, w: 32, align: 'center' },
+      { h: 'Solde', x: margin + 216, w: 32, align: 'center' },
+      { h: 'Source', x: margin + 248, w: 22, align: 'center' },
+      { h: 'Remarque', x: margin + 270, w: 15, align: 'center' }
     ];
 
     // Header Tableau
@@ -566,9 +599,7 @@ Source: ${debt.sourceFile}
       pdf.setTextColor(255, 255, 255);
       pdf.setFont('helvetica', 'bold');
       cols.forEach(col => {
-        if (col.align === 'right') pdf.text(col.h, col.x + col.w, y, { align: 'right' });
-        else if (col.align === 'center') pdf.text(col.h, col.x + (col.w / 2), y, { align: 'center' });
-        else pdf.text(col.h, col.x, y);
+        pdf.text(col.h, col.x + (col.w / 2), y, { align: 'center' });
       });
     };
 
@@ -581,71 +612,76 @@ Source: ${debt.sourceFile}
 
     clients.forEach((client) => {
       const debts = client.filteredDebts || [];
+      const totalClientHeight = debts.length * 7;
       
       debts.forEach((debt: ClientDebt, i: number) => {
-        // Saut de page
         if (currentY > 185) {
           pdf.addPage();
           currentY = addHeader(++pageNum);
           drawTableHeader(currentY);
           currentY += 8;
           pdf.setFontSize(8);
-          pdf.setFont('helvetica', 'normal');
         }
 
-        // Alternance de couleur
         if (globalIndex % 2 === 0) {
           pdf.setFillColor(248, 250, 252);
           pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
         }
 
         pdf.setTextColor(30, 41, 59);
-        pdf.text(String(globalIndex), margin, currentY);
-        pdf.text(client.clientCode || '?', margin + 10, currentY);
-        pdf.text((client.clientName || '').substring(0, 40), margin + 30, currentY);
-        
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(debt.commercialCode || client.commercialCode || '?', margin + 95, currentY);
         pdf.setFont('helvetica', 'normal');
         
-        pdf.text(debt.documentNumber, margin + 107, currentY);
-        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 137, currentY);
-        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 162, currentY);
-        
-        // Âge avec couleur si critique
-        if (debt.age > 90) pdf.setTextColor(185, 28, 28);
-        else if (debt.age > 30) pdf.setTextColor(234, 88, 12);
-        pdf.text(`${debt.age} j`, margin + 187 + 7.5, currentY, { align: 'center' });
-        pdf.setTextColor(30, 41, 59);
+        // Valeurs communes (fusionnées visuellement)
+        if (i === 0) {
+          pdf.text(client.clientCode || '?', margin + 10 + 10, currentY, { align: 'center' });
+          pdf.text((client.clientName || '').substring(0, 32), margin + 30 + 27.5, currentY, { align: 'center' });
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(debt.commercialCode || client.commercialCode || '?', margin + 85 + 6, currentY, { align: 'center' });
+          pdf.setFont('helvetica', 'normal');
+        }
 
-        pdf.text(formatCurrency(debt.amount), margin + 202 + 35, currentY, { align: 'right' });
+        pdf.text(String(globalIndex), margin + 5, currentY, { align: 'center' });
+        pdf.text(debt.documentNumber, margin + 97 + 14, currentY, { align: 'center' });
+        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 125 + 11, currentY, { align: 'center' });
+        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 147 + 11, currentY, { align: 'center' });
+        
+        // Âge avec couleur
+        pdf.setFont('helvetica', 'bold');
+        const age = debt.age;
+        if (age <= 15) pdf.setTextColor(5, 150, 105);
+        else if (age <= 30) pdf.setTextColor(37, 99, 235);
+        else if (age <= 45) pdf.setTextColor(217, 119, 6);
+        else if (age <= 60) pdf.setTextColor(234, 88, 12);
+        else pdf.setTextColor(220, 38, 38);
+        pdf.text(`${age} j`, margin + 169 + 7.5, currentY, { align: 'center' });
+        
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(formatCurrency(debt.amount), margin + 184 + 16, currentY, { align: 'center' });
         
         pdf.setFont('helvetica', 'bold');
         if (debt.balance > 0) pdf.setTextColor(185, 28, 28);
-        pdf.text(formatCurrency(debt.balance), margin + 237 + 35, currentY, { align: 'right' });
+        pdf.text(formatCurrency(debt.balance), margin + 216 + 16, currentY, { align: 'center' });
+        
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
+        const sourceClean = (client.sourceFile || debt.sourceFile || '').replace(/\.pdf$/i, '');
+        pdf.text(sourceClean.substring(0, 12), margin + 248 + 11, currentY, { align: 'center' });
 
         currentY += 7;
         globalIndex++;
       });
 
-      // Ligne de séparation légère entre clients si nécessaire
       pdf.setDrawColor(226, 232, 240);
       pdf.line(margin, currentY - 4, pageWidth - margin, currentY - 4);
     });
-
-    // Total Général
-    if (currentY > 180) {
-      pdf.addPage();
-      currentY = addHeader(++pageNum);
-    }
 
     const totalBalance = clients.reduce((sum, c) => sum + (c.totalBalance || 0), 0);
     const totalAmount = clients.reduce((sum, c) => {
       return sum + (c.filteredDebts || []).reduce((s: number, d: any) => s + (d.amount || 0), 0);
     }, 0);
 
+    if (currentY > 180) { pdf.addPage(); currentY = addHeader(++pageNum); }
     currentY += 5;
     pdf.setFillColor(51, 65, 85);
     pdf.rect(margin, currentY - 6, pageWidth - (2 * margin), 12, 'F');
@@ -653,9 +689,8 @@ Source: ${debt.sourceFile}
     pdf.setFontSize(11);
     pdf.setFont('helvetica', 'bold');
     pdf.text("TOTAL GÉNÉRAL", margin + 5, currentY + 1.5);
-    
-    pdf.text(formatCurrency(totalAmount), margin + 202 + 35, currentY + 1.5, { align: 'right' });
-    pdf.text(formatCurrency(totalBalance), margin + 237 + 35, currentY + 1.5, { align: 'right' });
+    pdf.text(formatCurrency(totalAmount), margin + 184 + 16, currentY + 1.5, { align: 'center' });
+    pdf.text(formatCurrency(totalBalance), margin + 216 + 16, currentY + 1.5, { align: 'center' });
 
     pdf.save(`Rapport_Portefeuille_Detaille_${new Date().toISOString().split('T')[0]}.pdf`);
   }

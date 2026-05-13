@@ -25,7 +25,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function SettingsPage() {
-  const { debts, analysis, clearAll, clearHistory, settings, updateSettings } = useDebtContext();
+  const { debts, analysis, clearAll, clearHistory, settings, updateSettings, logAudit } = useDebtContext();
   const { user, initials, fullName, logout } = useAuth();
   const router = useRouter();
 
@@ -79,6 +79,7 @@ export default function SettingsPage() {
   const handleExportData = () => {
     if (analysis && debts.length > 0) {
       ExportService.saveAnalysis(debts, analysis);
+      logAudit('Export JSON', `Sauvegarde complète des données (${debts.length} créances)`);
     }
   };
 

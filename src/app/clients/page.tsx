@@ -357,6 +357,7 @@ export default function ClientsPage() {
                       excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
                     ].filter(Boolean).join(' | ');
                     ExportService.exportClientsToExcel(filteredClients, activeFilters || 'Aucun');
+                    useDebtContext().logAudit('Export Excel', `Export de ${filteredClients.length} clients | Filtres: ${activeFilters || 'Aucun'}`);
                   }}
                   className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-11 px-5 font-bold"
                 >
@@ -376,6 +377,7 @@ export default function ClientsPage() {
                       excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
                     ].filter(Boolean).join(' | ');
                     ExportService.exportClientsToPDF(filteredClients, activeFilters || 'Aucun');
+                    useDebtContext().logAudit('Export PDF', `Export de ${filteredClients.length} clients | Filtres: ${activeFilters || 'Aucun'}`);
                   }}
                   className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-11 px-5 font-bold"
                 >

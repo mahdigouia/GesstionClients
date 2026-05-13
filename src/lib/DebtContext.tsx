@@ -35,6 +35,7 @@ interface DebtContextType {
   clearHistory: () => void;
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
+  logAudit: (action: string, details: string) => Promise<void>;
 }
 
 export interface AppSettings {
@@ -424,7 +425,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       history,
       clearHistory,
       settings,
-      updateSettings
+      updateSettings,
+      logAudit: logAction
     }}>
       {children}
     </DebtContext.Provider>
