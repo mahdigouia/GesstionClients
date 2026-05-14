@@ -12,20 +12,15 @@ import { ClientDebt } from '@/types/debt';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Calendar, 
-  AlertCircle, 
-  Clock, 
-  ShieldAlert, 
-  ChevronRight, 
-  TrendingUp, 
-  PhoneCall, 
   CheckCircle2,
-  CalendarDays
+  CalendarDays,
+  Menu
 } from 'lucide-react';
 
 export default function InvoicesPage() {
   const { debts, analysis, settings } = useDebtContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
@@ -89,31 +84,31 @@ export default function InvoicesPage() {
       }`} />
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-black text-slate-900 group-hover:text-blue-600 transition-colors">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="font-black text-slate-900 group-hover:text-blue-600 transition-colors text-sm md:text-base">
               {debt.documentNumber}
             </span>
             {debt.isRetention && (
-              <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px]">Retenus</Badge>
+              <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[9px] md:text-[10px]">Retenus</Badge>
             )}
             {debt.balance > 20000 && (
-              <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-[10px]">Grosse Créance</Badge>
+              <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-[9px] md:text-[10px]">Grosse Créance</Badge>
             )}
           </div>
-          <div className="text-sm font-bold text-slate-700">{debt.clientName}</div>
-          <div className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
+          <div className="text-xs md:text-sm font-bold text-slate-700 truncate">{debt.clientName}</div>
+          <div className="text-[9px] md:text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-bold">
             Échéance: {new Date(debt.dueDate).toLocaleDateString('fr-FR')} • {debt.age} jours
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className="text-right">
-            <div className="text-[10px] text-slate-400 font-bold uppercase">Solde restant</div>
-            <div className="text-lg font-black text-slate-900">
-              {debt.balance.toLocaleString('fr-FR')} <span className="text-xs">TND</span>
+        <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+          <div className="text-left md:text-right">
+            <div className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase">Solde restant</div>
+            <div className="text-base md:text-lg font-black text-slate-900">
+              {debt.balance.toLocaleString('fr-FR')} <span className="text-[10px] md:text-xs">TND</span>
             </div>
-            <div className="text-[10px] text-green-600 font-medium">
+            <div className="text-[9px] md:text-[10px] text-green-600 font-medium">
               Règl: {debt.settlement.toLocaleString('fr-FR')} / {debt.amount.toLocaleString('fr-FR')}
             </div>
           </div>
@@ -125,22 +120,30 @@ export default function InvoicesPage() {
 
   return (
     <div className="flex h-screen bg-slate-50/50">
-      <Sidebar />
+      <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
       <div className="flex-1 overflow-y-auto">
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 py-6 sticky top-0 z-20">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 bg-blue-600 rounded-lg">
-                  <FileText className="h-6 w-6 text-white" />
-                </div>
-                <h1 className="text-2xl font-black text-slate-900">Gestionnaire de Trésorerie</h1>
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 md:px-8 py-4 md:py-6 sticky top-0 z-20">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden p-2 -ml-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <FileText className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
-              <p className="text-slate-500 font-medium text-sm">Suivi des encaissements et plan de relance MDS GROUP</p>
+              <div>
+                <h1 className="text-lg md:text-2xl font-black text-slate-900">Gestionnaire de Trésorerie</h1>
+                <p className="hidden md:block text-slate-500 font-medium text-sm">Suivi des encaissements et plan de relance MDS GROUP</p>
+              </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <div className="relative w-64">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+              <div className="relative flex-1 md:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
@@ -152,7 +155,7 @@ export default function InvoicesPage() {
               </div>
               <Button 
                 onClick={() => ExportService.exportToExcel(nonContentiousDebts, analysis || undefined)} 
-                className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-6 font-bold"
+                className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-6 font-bold w-full md:w-auto"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export XLS
@@ -161,7 +164,7 @@ export default function InvoicesPage() {
           </div>
         </header>
 
-        <main className="p-8 max-w-7xl mx-auto space-y-8">
+        <main className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
           {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="border-0 shadow-xl bg-gradient-to-br from-red-500 to-red-600 text-white">
@@ -205,20 +208,22 @@ export default function InvoicesPage() {
           </div>
 
           <Tabs defaultValue="timeline" className="space-y-6">
-            <TabsList className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 inline-flex">
-              <TabsTrigger value="timeline" className="rounded-xl font-bold px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all gap-2">
-                <CalendarDays className="h-4 w-4" />
-                Échéancier
-              </TabsTrigger>
-              <TabsTrigger value="recovery" className="rounded-xl font-bold px-6 data-[state=active]:bg-red-600 data-[state=active]:text-white transition-all gap-2">
-                <PhoneCall className="h-4 w-4" />
-                Plan de Relance
-              </TabsTrigger>
-              <TabsTrigger value="disputes" className="rounded-xl font-bold px-6 data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all gap-2">
-                <ShieldAlert className="h-4 w-4" />
-                Retenus & Litiges
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+              <TabsList className="bg-white p-1 rounded-2xl shadow-sm border border-slate-200 inline-flex min-w-max">
+                <TabsTrigger value="timeline" className="rounded-xl font-bold px-4 md:px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all gap-2 text-xs md:text-sm">
+                  <CalendarDays className="h-4 w-4" />
+                  Échéancier
+                </TabsTrigger>
+                <TabsTrigger value="recovery" className="rounded-xl font-bold px-4 md:px-6 data-[state=active]:bg-red-600 data-[state=active]:text-white transition-all gap-2 text-xs md:text-sm">
+                  <PhoneCall className="h-4 w-4" />
+                  Plan de Relance
+                </TabsTrigger>
+                <TabsTrigger value="disputes" className="rounded-xl font-bold px-4 md:px-6 data-[state=active]:bg-purple-600 data-[state=active]:text-white transition-all gap-2 text-xs md:text-sm">
+                  <ShieldAlert className="h-4 w-4" />
+                  Retenus & Litiges
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="timeline" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 outline-none">
               {/* En retard */}

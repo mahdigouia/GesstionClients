@@ -2,13 +2,15 @@
 
 import { useDebtContext } from '@/lib/DebtContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Scale, User, Calendar, FileText, AlertTriangle, DollarSign, Phone } from 'lucide-react';
+import { Scale, User, Calendar, FileText, AlertTriangle, DollarSign, Phone, Menu } from 'lucide-react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export default function ContentieuxPage() {
   const { debts, analysis } = useDebtContext();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Filtrer les créances en contentieux (IC + age > 365)
   const contentieuxDebts = debts.filter(debt => debt.isContentieux);
@@ -39,21 +41,31 @@ export default function ContentieuxPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+      <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
       <div className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Scale className="h-6 w-6 text-red-600" />
-              <h1 className="text-xl font-semibold text-gray-900">Contentieux</h1>
-              <Badge variant="destructive" className="ml-2">
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden p-2 -ml-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <Scale className="h-5 w-5 md:h-6 md:w-6 text-red-600" />
+              <h1 className="text-lg md:text-xl font-bold text-gray-900">Contentieux</h1>
+              <Badge variant="destructive" className="ml-2 px-2 py-0.5 text-[10px]">
                 {contentieuxDebts.length} dossiers
               </Badge>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Montant total en contentieux</div>
-              <div className="text-xl font-bold text-red-600">
-                {totalContentieux.toLocaleString('fr-FR')} TND
+            <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+              <div className="text-left md:text-right">
+                <div className="text-[10px] md:text-sm text-gray-500 uppercase font-black tracking-widest">Total Contentieux</div>
+                <div className="text-lg md:text-xl font-black text-red-600">
+                  {totalContentieux.toLocaleString('fr-FR')} <span className="text-xs">TND</span>
+                </div>
               </div>
             </div>
           </div>
@@ -73,43 +85,43 @@ export default function ContentieuxPage() {
           ) : (
             <>
               {/* Résumé */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Dossiers Contentieux</CardTitle>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                    <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Dossiers</CardTitle>
                     <Scale className="h-4 w-4 text-red-600" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-red-600">{contentieuxDebts.length}</div>
+                  <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
+                    <div className="text-xl md:text-2xl font-black text-red-600">{contentieuxDebts.length}</div>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Clients Concernés</CardTitle>
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                    <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Clients</CardTitle>
                     <User className="h-4 w-4 text-blue-600" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{clientsList.length}</div>
+                  <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
+                    <div className="text-xl md:text-2xl font-black">{clientsList.length}</div>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Solde Total</CardTitle>
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                    <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Solde</CardTitle>
                     <DollarSign className="h-4 w-4 text-orange-600" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {totalContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} TND
+                  <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
+                    <div className="text-xl md:text-2xl font-black whitespace-nowrap">
+                      {totalContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} <span className="text-xs">TND</span>
                     </div>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Âge Moyen</CardTitle>
+                <Card className="border-0 shadow-sm">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                    <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Âge Moyen</CardTitle>
                     <Calendar className="h-4 w-4 text-purple-600" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
+                  <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
+                    <div className="text-xl md:text-2xl font-black">
                       {Math.round(contentieuxDebts.reduce((sum, d) => sum + d.age, 0) / contentieuxDebts.length)} j
                     </div>
                   </CardContent>
@@ -121,23 +133,23 @@ export default function ContentieuxPage() {
                 {clientsList.map((client: any) => (
                   <Card key={client.clientCode} className="border-red-200">
                     <CardHeader className="bg-red-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                            <User className="h-5 w-5 text-red-600" />
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center space-x-3 min-w-0">
+                            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <User className="h-5 w-5 text-red-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <CardTitle className="text-sm md:text-lg truncate">{client.clientName}</CardTitle>
+                              <p className="text-[10px] md:text-sm text-gray-500 font-bold">Code: {client.clientCode}</p>
+                            </div>
                           </div>
-                          <div>
-                            <CardTitle className="text-lg">{client.clientName}</CardTitle>
-                            <p className="text-sm text-gray-500">Code: {client.clientCode}</p>
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-base md:text-xl font-black text-red-600">
+                              {client.totalBalance.toLocaleString('fr-FR')} <span className="text-[10px]">TND</span>
+                            </div>
+                            <p className="text-[10px] md:text-sm text-gray-500 font-bold">{client.debts.length} facture(s)</p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-red-600">
-                            {client.totalBalance.toLocaleString('fr-FR')} TND
-                          </div>
-                          <p className="text-sm text-gray-500">{client.debts.length} facture(s)</p>
-                        </div>
-                      </div>
                       
                       {/* Commercial info */}
                       {client.commercialCode && (
