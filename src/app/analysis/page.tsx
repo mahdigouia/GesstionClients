@@ -128,8 +128,6 @@ export default function AnalysisPage() {
             </div>
           </div>
         </header>
-          </div>
-        </header>
 
         <main className="p-8 space-y-8 max-w-7xl mx-auto">
           {/* Métriques Clés avec Dualité */}
