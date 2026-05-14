@@ -21,12 +21,12 @@ import {
   User, 
   Clock, 
   CheckCircle2, 
-  Trash2,
+  Calendar,
+  ChevronRight,
+  ArrowLeft,
+  MapPin,
   PhoneCall,
-  Mail,
-  UserCheck,
-  AlertCircle,
-  Calendar
+  Mail
 } from 'lucide-react';
 import { ClientRemark } from '@/types/debt';
 import { Badge } from '@/components/ui/badge';
@@ -47,12 +47,24 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
-  const templates = [
-    { label: "Appel effectué", text: "Appel effectué : le client promet un règlement d'ici la fin de semaine.", icon: <PhoneCall className="h-3 w-3" /> },
-    { label: "Mail envoyé", text: "Relance par email envoyée ce jour. En attente de confirmation.", icon: <Mail className="h-3 w-3" /> },
-    { label: "Promesse tenue", text: "Promesse de règlement confirmée pour le montant total.", icon: <UserCheck className="h-3 w-3" /> },
-    { label: "Litige déclaré", text: "Client déclare un litige sur une facture. Dossier en cours de vérification.", icon: <AlertCircle className="h-3 w-3" /> },
+  const [activeCategory, setActiveCategory] = useState<'none' | 'appel' | 'visite'>('none');
+
+  const categories = [
+    { id: 'appel', label: "Appel effectué", icon: <PhoneCall className="h-3 w-3" />, color: 'blue' },
+    { id: 'visite', label: "Visite sur place", icon: <MapPin className="h-3 w-3" />, color: 'emerald' },
+    { id: 'mail', label: "Mail envoyé", icon: <Mail className="h-3 w-3" />, color: 'slate' },
   ];
+
+  const subOptions: Record<string, { label: string, text: string }[]> = {
+    appel: [
+      { label: "Ma hazzech", text: "Appel : Kalamtou w ma hazzech." },
+      { label: "9ali ija (Date/Montant)", text: "Appel : Kalamtou w 9ali ija [DATE] pour paiement de [MONTANT]." },
+    ],
+    visite: [
+      { label: "Mal9itech Gérant", text: "Visite : Mal9itech Gérant." },
+      { label: "9ali arja3li (Date/Montant)", text: "Visite : 9ali arja3li [DATE] pour paiement de [MONTANT]." },
+    ],
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -104,7 +116,13 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   };
 
   const handleAddTemplate = (templateText: string) => {
-    setNewRemark(prev => prev + (prev ? ' ' : '') + templateText);
+    let text = templateText;
+    // Auto-fill date if available
+    if (promiseDate) {
+      const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
+      text = text.replace('[DATE]', formattedDate);
+    }
+    setNewRemark(prev => prev + (prev ? ' ' : '') + text);
   };
 
   const handleSubmit = () => {
@@ -191,21 +209,55 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
           {/* Saisie */}
           <div className="p-6 bg-white border-t border-slate-100 flex-shrink-0 space-y-4">
             {/* Templates Rapides */}
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modèles rapides</p>
-              <div className="flex flex-wrap gap-2">
-                {templates.map((tpl, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-full border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 gap-1.5 shadow-sm transition-all"
-                    onClick={() => handleAddTemplate(tpl.text)}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modèles rapides</p>
+                {activeCategory !== 'none' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setActiveCategory('none')}
+                    className="h-6 text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 gap-1 px-2"
                   >
-                    {tpl.icon}
-                    {tpl.label}
+                    <ArrowLeft className="h-2.5 w-2.5" /> Retour
                   </Button>
-                ))}
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-2 min-h-[32px]">
+                {activeCategory === 'none' ? (
+                  categories.map((cat) => (
+                    <Button
+                      key={cat.id}
+                      variant="outline"
+                      size="sm"
+                      className={`h-8 rounded-full border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 gap-1.5 shadow-sm transition-all`}
+                      onClick={() => {
+                        if (cat.id === 'mail') {
+                          handleAddTemplate("Relance par email envoyée ce jour. En attente de confirmation.");
+                        } else {
+                          setActiveCategory(cat.id as any);
+                        }
+                      }}
+                    >
+                      {cat.icon}
+                      {cat.label}
+                      {cat.id !== 'mail' && <ChevronRight className="h-3 w-3 opacity-50" />}
+                    </Button>
+                  ))
+                ) : (
+                  subOptions[activeCategory]?.map((opt, i) => (
+                    <Button
+                      key={i}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-full border-blue-100 bg-blue-50/50 text-[10px] font-bold text-blue-700 hover:bg-blue-100 gap-1.5 shadow-sm transition-all animate-in fade-in slide-in-from-left-2"
+                      onClick={() => handleAddTemplate(opt.text)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
 
