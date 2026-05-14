@@ -3,7 +3,7 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText, Menu } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const { debts, analysis, clearAll, clearHistory, settings, updateSettings, logAudit } = useDebtContext();
   const { user, initials, fullName, logout } = useAuth();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [localSettings, setLocalSettings] = useState(settings);
   const [logs, setLogs] = useState<any[]>([]);
@@ -155,12 +156,20 @@ export default function SettingsPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar />
+      <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
       <div className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <Settings className="h-6 w-6 text-blue-600" />
-            <h1 className="text-xl font-semibold text-gray-900">Paramètres</h1>
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-20">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="md:hidden p-2 -ml-2"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <Settings className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+            <h1 className="text-lg md:text-xl font-bold text-gray-900">Paramètres</h1>
           </div>
         </header>
 

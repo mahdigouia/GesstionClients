@@ -384,7 +384,7 @@ Source: ${debt.sourceFile}
   }
 
   // Export de la liste des clients en Excel (Détaillé)
-  static async exportClientsToExcel(clients: any[], activeFilters?: string): Promise<void> {
+  static async exportClientsToExcel(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string): Promise<void> {
     const rows: any[] = [];
     const columns = [
       { header: 'N°', key: 'n', width: 40 },
@@ -413,10 +413,17 @@ Source: ${debt.sourceFile}
           date: new Date(debt.documentDate).toLocaleDateString('fr-FR'),
           due: new Date(debt.dueDate).toLocaleDateString('fr-FR'),
           age: debt.age,
-          amount: debt.amount.toFixed(3),
+           amount: debt.amount.toFixed(3),
           settlement: (debt.settlement || 0).toFixed(3),
           balance: debt.balance.toFixed(3),
-          remark: '',
+          remark: (() => {
+            const r = clientRemarks[client.clientName]?.[0];
+            if (!r) return '';
+            let text = r.content;
+            const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
+            const promiseDateText = r.promiseDate ? ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}` : '';
+            return `${text}\n[Saisi le: ${entryDate}${promiseDateText}]`;
+          })(),
           isFirstInGroup: index === 0,
           groupSize: rowCount
         });
@@ -502,6 +509,12 @@ Source: ${debt.sourceFile}
         }
 
         const rowspanAttr = (col.key === 'remark' && row.isFirstInGroup && row.groupSize > 1) ? ` rowspan="${row.groupSize}"` : '';
+        
+        // Style spécial pour les remarques (effet manuscrit)
+        if (col.key === 'remark' && val) {
+          inlineStyle += " font-family: 'Courier New', cursive; color: #1e40af; font-style: italic; text-align: left; padding: 5px;";
+        }
+
         html += `<td class="${cellClass}" style="${inlineStyle}"${rowspanAttr}>${val ?? ''}</td>`;
       });
       html += `</tr>`;
@@ -514,7 +527,7 @@ Source: ${debt.sourceFile}
   }
 
   // Export de la liste des clients en PDF (Détaillé & Embelli)
-  static async exportClientsToPDF(clients: any[], activeFilters?: string): Promise<void> {
+  static async exportClientsToPDF(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string): Promise<void> {
     const pdf = new jsPDF('l', 'mm', 'a4'); // Mode paysage pour plus d'espace
     const pageWidth = 297;
     const pageHeight = 210;
@@ -657,7 +670,29 @@ Source: ${debt.sourceFile}
         pdf.setFont('helvetica', 'normal');
         // Remarque fusionnée visuellement (affichée une seule fois par groupe)
         if (i === 0) {
-          pdf.text("", margin + 238 + 17.5, currentY, { align: 'center' }); // Valeur remarque (ici vide)
+          const r = clientRemarks[client.clientName]?.[0];
+          if (r) {
+            // Texte principal
+            pdf.setFont('courier', 'italic');
+            pdf.setTextColor(30, 64, 175); // Bleu "encre"
+            pdf.setFontSize(7);
+            const splitRemark = pdf.splitTextToSize(r.content, 33);
+            pdf.text(splitRemark, margin + 238 + 1, currentY - 2.5);
+            
+            // Dates en tout petit
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(100, 116, 139); // Gris ardoise
+            pdf.setFontSize(4.5);
+            const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
+            let dateInfo = `Saisi le: ${entryDate}`;
+            if (r.promiseDate) {
+              dateInfo += ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}`;
+            }
+            pdf.text(dateInfo, margin + 238 + 1, currentY + 3);
+
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(8);
+          }
         }
 
         currentY += 7;

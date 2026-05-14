@@ -11,10 +11,12 @@ interface DebtContextType {
   debts: ClientDebt[];
   analysis: AnalysisResult | null;
   recoveryActions: RecoveryAction[];
+  clientRemarks: Record<string, ClientRemark[]>;
   setDebts: (debts: ClientDebt[]) => void;
   setAnalysis: (analysis: AnalysisResult | null) => void;
   addDebts: (newDebts: ClientDebt[]) => void;
   addRecoveryAction: (action: Omit<RecoveryAction, 'id' | 'date' | 'user'>) => void;
+  addClientRemark: (clientName: string, content: string, promiseDate?: string) => void;
   updateDebtsFromFile: (filename: string, newDebts: ClientDebt[]) => { 
     updated: number, 
     new: number, 
@@ -70,6 +72,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebtsState] = useState<ClientDebt[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [recoveryActions, setRecoveryActions] = useState<RecoveryAction[]>([]);
+  const [clientRemarks, setClientRemarks] = useState<Record<string, ClientRemark[]>>({});
   const [lastUpdatedBy, setLastUpdatedBy] = useState<string | null>(null);
   const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
@@ -89,6 +92,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           const firestoreDebts = data.debts || [];
           setDebtsState(firestoreDebts);
           setRecoveryActions(data.recoveryActions || []);
+          setClientRemarks(data.clientRemarks || {});
           setLastUpdatedBy(data.updatedBy || null);
           setReadAlertIds(data.readAlertIds || []);
           setHistory(data.history || []);
@@ -139,22 +143,28 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       if (savedSettings) {
         setSettings(JSON.parse(savedSettings));
       }
+      const savedRemarks = localStorage.getItem('gc_remarks');
+      if (savedRemarks) {
+        setClientRemarks(JSON.parse(savedRemarks));
+      }
     } catch (e) {
       console.warn('Erreur chargement données sauvegardées:', e);
     }
   };
 
   // Sauvegarder dans Firestore + localStorage
-  const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions) => {
+  const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions, newRemarks: Record<string, ClientRemark[]> = clientRemarks) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
     localStorage.setItem('gc_actions', JSON.stringify(newActions));
-
+    localStorage.setItem('gc_remarks', JSON.stringify(newRemarks));
+    
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       await setDoc(docRef, {
         debts: newDebts,
         recoveryActions: newActions,
+        clientRemarks: newRemarks,
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: newDebts.length,
@@ -186,6 +196,30 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Action de recouvrement', `Ajout d'une action pour le client ${actionData.clientName}`);
+    }
+  };
+
+  const addClientRemark = (clientName: string, content: string, promiseDate?: string) => {
+    const newRemark: ClientRemark = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      clientName,
+      content,
+      date: new Date().toISOString(),
+      user: user?.email || 'Utilisateur inconnu',
+      promiseDate
+    };
+
+    const currentRemarks = clientRemarks[clientName] || [];
+    const updatedRemarks = {
+      ...clientRemarks,
+      [clientName]: [newRemark, ...currentRemarks].slice(0, 50) // Garder les 50 dernières remarques
+    };
+
+    setClientRemarks(updatedRemarks);
+    saveToFirestore(debts, recoveryActions, updatedRemarks);
+    
+    if (user?.email === 'moslem.gouia@gmail.com') {
+      logAction('Remarque Client', `Ajout d'une remarque pour le client ${clientName}`);
     }
   };
 
@@ -412,12 +446,14 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       debts, 
       analysis, 
       recoveryActions,
+      clientRemarks,
       setDebts, 
       setAnalysis, 
       addDebts, 
       updateDebtsFromFile, 
       updateDebtsFromFiles,
       addRecoveryAction,
+      addClientRemark,
       clearAll, 
       lastUpdatedBy,
       readAlertIds,

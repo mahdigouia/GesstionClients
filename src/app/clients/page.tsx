@@ -51,13 +51,18 @@ import {
 } from "@/components/ui/table";
 import { ClientDebt } from '@/types/debt';
 import { Progress } from "@/components/ui/progress";
+import { ClientRemarkModal } from '@/components/ClientRemarkModal';
 
 export default function ClientsPage() {
-  const { debts, analysis } = useDebtContext();
+  const { debts, analysis, clientRemarks, addClientRemark } = useDebtContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCommercial, setSelectedCommercial] = useState('all');
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // State for Remark Modal
+  const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
+  const [remarkClientName, setRemarkClientName] = useState('');
   
   // Tristate filters
   const [contentieuxFilter, setContentieuxFilter] = useState<'off' | 'include' | 'exclude'>('off');
@@ -286,6 +291,12 @@ export default function ClientsPage() {
     setExpandedClients(next);
   };
 
+  const handleOpenRemarkModal = (e: React.MouseEvent, name: string) => {
+    e.stopPropagation();
+    setRemarkClientName(name);
+    setIsRemarkModalOpen(true);
+  };
+
   const allExpanded = filteredClients.length > 0 && expandedClients.size === filteredClients.length;
 
   return (
@@ -493,7 +504,7 @@ export default function ClientsPage() {
                         minAmountFilter ? 'Solde ≥ 5000 TND' : '',
                         excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
                       ].filter(Boolean).join(' | ');
-                      ExportService.exportClientsToExcel(filteredClients, activeFilters || 'Aucun');
+                      ExportService.exportClientsToExcel(filteredClients, clientRemarks, activeFilters || 'Aucun');
                     }}
                     className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-11 px-4 font-bold"
                   >
@@ -513,7 +524,7 @@ export default function ClientsPage() {
                         minAmountFilter ? 'Solde ≥ 5000 TND' : '',
                         excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
                       ].filter(Boolean).join(' | ');
-                      ExportService.exportClientsToPDF(filteredClients, activeFilters || 'Aucun');
+                      ExportService.exportClientsToPDF(filteredClients, clientRemarks, activeFilters || 'Aucun');
                     }}
                     className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-11 px-4 font-bold"
                   >
@@ -641,7 +652,12 @@ export default function ClientsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
                           <span className="text-[9px] md:text-[11px] font-black font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 md:py-1 rounded-lg w-fit">{client.sourceFile || '?'}</span>
-                          <h4 className="font-black text-slate-800 text-sm md:text-xl tracking-tight truncate">{client.clientName}</h4>
+                          <h4 
+                            onClick={(e) => handleOpenRemarkModal(e, client.clientName)}
+                            className="font-black text-slate-800 text-sm md:text-xl tracking-tight truncate hover:text-blue-600 hover:underline decoration-blue-300 underline-offset-4 transition-all"
+                          >
+                            {client.clientName}
+                          </h4>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] md:text-sm text-slate-500 mt-2 md:mt-3">
                           <span className="flex items-center gap-1.5 font-bold bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[10px] md:text-xs text-slate-700 border border-slate-100 whitespace-nowrap">Code: <span className="text-blue-600 font-black">{client.clientCode}</span></span>
@@ -713,6 +729,14 @@ export default function ClientsPage() {
           </div>
         </main>
       </div>
+
+      <ClientRemarkModal
+        isOpen={isRemarkModalOpen}
+        onClose={() => setIsRemarkModalOpen(false)}
+        clientName={remarkClientName}
+        remarks={clientRemarks[remarkClientName] || []}
+        onAddRemark={addClientRemark}
+      />
     </div>
   );
 }

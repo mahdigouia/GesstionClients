@@ -3,7 +3,8 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { Sidebar } from '@/components/Sidebar';
 import { AnalysisService } from '@/lib/analysis';
-import { BarChart3, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Shield, Activity, Crown } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, DollarSign, Users, Clock, Shield, Activity, Crown, Menu } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -18,14 +19,23 @@ export default function AnalysisPage() {
   const { debts, analysis } = useDebtContext();
   const router = useRouter();
   const [selectedRiskFilter, setSelectedRiskFilter] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!analysis) {
     return (
       <div className="flex h-screen bg-gray-50">
-        <Sidebar />
+        <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
         <div className="flex-1 overflow-y-auto">
-          <header className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center space-x-4">
+          <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-4">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden p-2 -ml-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
               <BarChart3 className="h-6 w-6 text-blue-600" />
               <h1 className="text-xl font-semibold text-gray-900">Analyse</h1>
             </div>
@@ -82,32 +92,42 @@ export default function AnalysisPage() {
 
   return (
     <div className="flex h-screen bg-slate-50">
-      <Sidebar />
+      <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
       <div className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-slate-200 px-8 py-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center space-x-4">
-              <div className="p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
-                <Activity className="h-6 w-6 text-white" />
+        <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 md:py-6 sticky top-0 z-20">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex items-center space-x-3 md:space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden p-2 -ml-2"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <div className="p-2 md:p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
+                <Activity className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Analyse Approfondie</h1>
-                <p className="text-slate-500 text-sm">{debts.length} créances auditées en temps réel</p>
+                <h1 className="text-lg md:text-2xl font-bold text-slate-900 tracking-tight">Analyse Approfondie</h1>
+                <p className="hidden md:block text-slate-500 text-sm">{debts.length} créances auditées en temps réel</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-              <div className="text-right border-r border-slate-200 pr-6">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Solde Total</div>
-                <div className="text-lg font-black text-slate-900">{analysis.totalBalance?.toLocaleString('fr-FR') || '0'} <span className="text-[10px] font-normal">TND</span></div>
-                <div className="text-[9px] text-slate-400 font-medium">H.C: {analysis.totalBalanceNoContentieux?.toLocaleString('fr-FR') || '0'} TND</div>
+            <div className="flex items-center justify-between lg:justify-end gap-4 md:gap-6 bg-slate-50 p-3 md:p-4 rounded-2xl border border-slate-100">
+              <div className="text-left md:text-right border-r border-slate-200 pr-4 md:pr-6">
+                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Solde Total</div>
+                <div className="text-base md:text-lg font-black text-slate-900 whitespace-nowrap">{analysis.totalBalance?.toLocaleString('fr-FR') || '0'} <span className="text-[9px] md:text-[10px] font-normal">TND</span></div>
+                <div className="hidden sm:block text-[9px] text-slate-400 font-medium">H.C: {analysis.totalBalanceNoContentieux?.toLocaleString('fr-FR') || '0'} TND</div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Recouvrement</div>
-                <div className="text-lg font-black text-emerald-600">{analysis.recoveryRate.toFixed(1)}%</div>
-                <div className="text-[9px] text-emerald-600 font-bold">H.C: {analysis.recoveryRateNoContentieux.toFixed(1)}%</div>
+                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Recouvrement</div>
+                <div className="text-base md:text-lg font-black text-emerald-600">{analysis.recoveryRate.toFixed(1)}%</div>
+                <div className="hidden sm:block text-[9px] text-emerald-600 font-bold">H.C: {analysis.recoveryRateNoContentieux.toFixed(1)}%</div>
               </div>
             </div>
+          </div>
+        </header>
           </div>
         </header>
 

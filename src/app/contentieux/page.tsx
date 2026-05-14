@@ -60,11 +60,11 @@ export default function ContentieuxPage() {
                 {contentieuxDebts.length} dossiers
               </Badge>
             </div>
-            <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 pt-3 md:pt-0">
+            <div className="flex items-center justify-between lg:justify-end gap-3 md:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
               <div className="text-left md:text-right">
-                <div className="text-[10px] md:text-sm text-gray-500 uppercase font-black tracking-widest">Total Contentieux</div>
-                <div className="text-lg md:text-xl font-black text-red-600">
-                  {totalContentieux.toLocaleString('fr-FR')} <span className="text-xs">TND</span>
+                <div className="text-[9px] md:text-[10px] text-gray-500 uppercase font-black tracking-widest">Total Contentieux</div>
+                <div className="text-base md:text-xl font-black text-red-600 whitespace-nowrap">
+                  {totalContentieux.toLocaleString('fr-FR')} <span className="text-[10px]">TND</span>
                 </div>
               </div>
             </div>
@@ -85,9 +85,9 @@ export default function ContentieuxPage() {
           ) : (
             <>
               {/* Résumé */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6">
                     <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Dossiers</CardTitle>
                     <Scale className="h-4 w-4 text-red-600" />
                   </CardHeader>
@@ -96,7 +96,7 @@ export default function ContentieuxPage() {
                   </CardContent>
                 </Card>
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6">
                     <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Clients</CardTitle>
                     <User className="h-4 w-4 text-blue-600" />
                   </CardHeader>
@@ -105,24 +105,24 @@ export default function ContentieuxPage() {
                   </CardContent>
                 </Card>
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6">
                     <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Solde</CardTitle>
                     <DollarSign className="h-4 w-4 text-orange-600" />
                   </CardHeader>
                   <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
-                    <div className="text-xl md:text-2xl font-black whitespace-nowrap">
+                    <div className="text-xl md:text-2xl font-black whitespace-nowrap overflow-hidden text-ellipsis">
                       {totalContentieux.toLocaleString('fr-FR', {maximumFractionDigits: 0})} <span className="text-xs">TND</span>
                     </div>
                   </CardContent>
                 </Card>
                 <Card className="border-0 shadow-sm">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-6">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 md:p-6">
                     <CardTitle className="text-[10px] md:text-sm font-bold uppercase text-slate-500">Âge Moyen</CardTitle>
                     <Calendar className="h-4 w-4 text-purple-600" />
                   </CardHeader>
                   <CardContent className="px-3 pb-3 md:px-6 md:pb-6">
                     <div className="text-xl md:text-2xl font-black">
-                      {Math.round(contentieuxDebts.reduce((sum, d) => sum + d.age, 0) / contentieuxDebts.length)} j
+                      {contentieuxDebts.length > 0 ? Math.round(contentieuxDebts.reduce((sum, d) => sum + d.age, 0) / contentieuxDebts.length) : 0} j
                     </div>
                   </CardContent>
                 </Card>
@@ -171,29 +171,30 @@ export default function ContentieuxPage() {
                     <CardContent className="p-0">
                       <div className="divide-y divide-gray-200">
                         {client.debts.map((debt: any) => (
-                          <div key={debt.id} className="p-4 flex items-center justify-between hover:bg-gray-50">
-                            <div className="flex items-center space-x-4">
-                              <div className="w-2 h-12 bg-red-500 rounded-full" />
-                              <div>
-                                <div className="flex items-center space-x-2">
+                          <div key={debt.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between hover:bg-gray-50 gap-4">
+                            <div className="flex items-start space-x-3 md:space-x-4 min-w-0">
+                              <div className="w-1.5 h-12 bg-red-500 rounded-full flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <FileText className="h-4 w-4 text-gray-400" />
-                                  <span className="font-medium">{debt.documentNumber}</span>
-                                  <Badge variant="destructive" className="text-xs">IC</Badge>
+                                  <span className="font-bold text-sm truncate">{debt.documentNumber}</span>
+                                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0">IC</Badge>
                                 </div>
-                                <p className="text-sm text-gray-500 mt-1">{debt.description}</p>
-                                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-400">
+                                <p className="text-xs text-gray-500 mt-1 truncate">{debt.description}</p>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[10px] md:text-xs text-gray-400">
                                   <span>Date: {new Date(debt.documentDate).toLocaleDateString('fr-FR')}</span>
+                                  <span className="hidden sm:inline">•</span>
                                   <span>Échéance: {new Date(debt.dueDate).toLocaleDateString('fr-FR')}</span>
-                                  <span className="flex items-center space-x-1 text-red-600">
+                                  <span className="flex items-center space-x-1 text-red-600 font-bold">
                                     <AlertTriangle className="h-3 w-3" />
-                                    <span>Âge: {debt.age} jours</span>
+                                    <span>{debt.age} j</span>
                                   </span>
                                 </div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-bold text-red-600">{debt.balance.toLocaleString('fr-FR')} TND</div>
-                              <div className="text-xs text-gray-500">Montant: {debt.amount.toLocaleString('fr-FR')} TND</div>
+                            <div className="text-right flex-shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-gray-100">
+                              <div className="font-black text-red-600 text-sm md:text-base">{debt.balance.toLocaleString('fr-FR')} <span className="text-[10px]">TND</span></div>
+                              <div className="text-[10px] text-gray-400 font-medium">Montant: {debt.amount.toLocaleString('fr-FR')}</div>
                             </div>
                           </div>
                         ))}

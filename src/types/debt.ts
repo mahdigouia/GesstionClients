@@ -8,6 +8,15 @@ export interface RecoveryAction {
   promiseDate?: string;
 }
 
+export interface ClientRemark {
+  id: string;
+  clientName: string;
+  content: string;
+  date: string;
+  user: string;
+  promiseDate?: string;
+}
+
 export interface CommercialStats {
   code: string;
   name: string;
