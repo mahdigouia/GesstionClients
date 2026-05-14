@@ -16,7 +16,7 @@ interface DebtContextType {
   setAnalysis: (analysis: AnalysisResult | null) => void;
   addDebts: (newDebts: ClientDebt[]) => void;
   addRecoveryAction: (action: Omit<RecoveryAction, 'id' | 'date' | 'user'>) => void;
-  addClientRemark: (clientName: string, content: string, promiseDate?: string) => void;
+  addClientRemark: (clientName: string, content: string, promiseDate?: string, promiseAmount?: number) => void;
   updateDebtsFromFile: (filename: string, newDebts: ClientDebt[]) => { 
     updated: number, 
     new: number, 
@@ -199,14 +199,15 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addClientRemark = (clientName: string, content: string, promiseDate?: string) => {
+  const addClientRemark = (clientName: string, content: string, promiseDate?: string, promiseAmount?: number) => {
     const newRemark: ClientRemark = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       clientName,
       content,
       date: new Date().toISOString(),
       user: user?.email || 'Utilisateur inconnu',
-      promiseDate
+      promiseDate,
+      promiseAmount
     };
 
     const currentRemarks = clientRemarks[clientName] || [];

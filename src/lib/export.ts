@@ -422,7 +422,8 @@ Source: ${debt.sourceFile}
             let text = r.content;
             const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
             const promiseDateText = r.promiseDate ? ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}` : '';
-            return `${text}\n[Saisi le: ${entryDate}${promiseDateText}]`;
+            const promiseAmountText = r.promiseAmount ? ` | Montant: ${r.promiseAmount.toLocaleString('fr-FR')} TND` : '';
+            return `${text}\n[Saisi le: ${entryDate}${promiseDateText}${promiseAmountText}]`;
           })(),
           isFirstInGroup: index === 0,
           groupSize: rowCount
@@ -687,6 +688,9 @@ Source: ${debt.sourceFile}
             let dateInfo = `Saisi le: ${entryDate}`;
             if (r.promiseDate) {
               dateInfo += ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}`;
+            }
+            if (r.promiseAmount) {
+              dateInfo += ` | Montant: ${r.promiseAmount.toLocaleString('fr-FR')} TND`;
             }
             pdf.text(dateInfo, margin + 238 + 1, currentY + 3);
 

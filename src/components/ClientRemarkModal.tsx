@@ -21,12 +21,13 @@ import {
   User, 
   Clock, 
   CheckCircle2, 
-  Calendar,
-  ChevronRight,
   ArrowLeft,
   MapPin,
   PhoneCall,
-  Mail
+  Mail,
+  Coins,
+  Calendar,
+  ChevronRight
 } from 'lucide-react';
 import { ClientRemark } from '@/types/debt';
 import { Badge } from '@/components/ui/badge';
@@ -38,12 +39,13 @@ interface ClientRemarkModalProps {
   onClose: () => void;
   clientName: string;
   remarks: ClientRemark[];
-  onAddRemark: (clientName: string, content: string, promiseDate?: string) => void;
+  onAddRemark: (clientName: string, content: string, promiseDate?: string, promiseAmount?: number) => void;
 }
 
 export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark }: ClientRemarkModalProps) {
   const [newRemark, setNewRemark] = useState('');
   const [promiseDate, setPromiseDate] = useState('');
+  const [promiseAmount, setPromiseAmount] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
 
@@ -88,6 +90,22 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
           }
           if (finalTranscript) {
             setNewRemark(prev => prev + ' ' + finalTranscript);
+            extractEntitiesFromTranscript(finalTranscript);
+          }
+        };
+
+        const extractEntitiesFromTranscript = (text: string) => {
+          // Extraction de la date (Format DD/MM/YYYY ou DD-MM-YYYY)
+          const dateMatch = text.match(/(\d{2})[/-](\d{2})[/-](\d{4})/);
+          if (dateMatch) {
+            const [_, day, month, year] = dateMatch;
+            setPromiseDate(`${year}-${month}-${day}`);
+          }
+
+          // Extraction du montant (Chiffres suivis de TND, DT, ou après le mot "montant")
+          const amountMatch = text.match(/(\d+)\s*(?:TND|DT|dinars?)/i) || text.match(/(?:montant|paiement)\s*(?:de\s*)?(\d+)/i);
+          if (amountMatch && amountMatch[1]) {
+            setPromiseAmount(amountMatch[1]);
           }
         };
 
@@ -122,14 +140,19 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
       text = text.replace('[DATE]', formattedDate);
     }
+    // Auto-fill amount if available
+    if (promiseAmount) {
+      text = text.replace('[MONTANT]', `${promiseAmount} TND`);
+    }
     setNewRemark(prev => prev + (prev ? ' ' : '') + text);
   };
 
   const handleSubmit = () => {
     if (newRemark.trim()) {
-      onAddRemark(clientName, newRemark.trim(), promiseDate || undefined);
+      onAddRemark(clientName, newRemark.trim(), promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
       setNewRemark('');
       setPromiseDate('');
+      setPromiseAmount('');
       onClose();
     }
   };
@@ -193,10 +216,20 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                       <p className="text-sm text-slate-600 leading-relaxed font-medium pl-10 border-l-2 border-slate-50">
                         {remark.content}
                       </p>
-                      {remark.promiseDate && (
-                        <div className="mt-2 ml-10 flex items-center gap-2 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-2 py-1 rounded-md">
-                          <Calendar className="h-3 w-3" />
-                          Promesse : {new Date(remark.promiseDate).toLocaleDateString('fr-FR')}
+                      {(remark.promiseDate || remark.promiseAmount) && (
+                        <div className="mt-2 ml-10 flex flex-wrap items-center gap-3">
+                          {remark.promiseDate && (
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-2 py-1 rounded-md">
+                              <Calendar className="h-3 w-3" />
+                              Promesse : {new Date(remark.promiseDate).toLocaleDateString('fr-FR')}
+                            </div>
+                          )}
+                          {remark.promiseAmount && (
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-1 rounded-md">
+                              <Coins className="h-3 w-3" />
+                              Montant : {remark.promiseAmount.toLocaleString('fr-FR')} TND
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -273,6 +306,22 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                   onChange={(e) => setPromiseDate(e.target.value)}
                   className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="promise-amount" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  <Coins className="h-3 w-3" /> Montant (Optionnel)
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="promise-amount"
+                    type="number"
+                    placeholder="0.000"
+                    value={promiseAmount}
+                    onChange={(e) => setPromiseAmount(e.target.value)}
+                    className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 pr-10"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">TND</span>
+                </div>
               </div>
             </div>
 

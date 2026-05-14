@@ -15,6 +15,7 @@ export interface ClientRemark {
   date: string;
   user: string;
   promiseDate?: string;
+  promiseAmount?: number;
 }
 
 export interface CommercialStats {
