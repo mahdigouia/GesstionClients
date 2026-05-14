@@ -563,43 +563,53 @@ Source: ${debt.sourceFile}
       // 1. Meta info (Haut Droite)
       pdf.setFontSize(7);
       pdf.setTextColor(100, 116, 139);
-      pdf.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, margin + pageWidth - margin - 10, margin + 6, { align: 'right' });
-      pdf.text(`Page ${pageNum}`, margin + pageWidth - margin - 10, margin + 10, { align: 'right' });
+      const rightMargin = margin + pageWidth - margin - 10;
+      
+      pdf.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, rightMargin, margin + 5, { align: 'right' });
+      pdf.text(`Page ${pageNum}`, rightMargin, margin + 9, { align: 'right' });
 
-      // 2. Légende Âge avec Points Colorés
-      const legendY = margin + 15;
+      // 2. Légende Âge avec Cercles Colorés (Plus Premium)
+      const legendY = margin + 14;
       const legendItems = [
-        { text: '0-15j ', color: [5, 150, 105] },
-        { text: '16-30j ', color: [37, 99, 235] },
-        { text: '31-45j ', color: [217, 119, 6] },
-        { text: '46-60j ', color: [234, 88, 12] },
-        { text: '61j+ ', color: [220, 38, 38] }
+        { text: '0-15j', color: [5, 150, 105] },
+        { text: '16-30j', color: [37, 99, 235] },
+        { text: '31-45j', color: [217, 119, 6] },
+        { text: '46-60j', color: [234, 88, 12] },
+        { text: '61j+', color: [220, 38, 38] }
       ];
 
-      // Calculer la largeur totale pour l'alignement à droite
+      // Calcul de la largeur totale pour l'alignement
       let totalWidth = pdf.getTextWidth("Âge : ");
       legendItems.forEach((item, idx) => {
-        totalWidth += pdf.getTextWidth(item.text + "●" + (idx < legendItems.length - 1 ? " | " : ""));
+        totalWidth += pdf.getTextWidth(item.text) + 5; // texte + cercle + marge
+        if (idx < legendItems.length - 1) totalWidth += 4; // séparateur
       });
 
-      let currentX = (margin + pageWidth - margin - 10) - totalWidth;
+      let currentX = rightMargin - totalWidth;
+      
+      // Label "Âge :"
       pdf.setTextColor(100, 116, 139);
-      pdf.text("Âge : ", currentX, legendY);
-      currentX += pdf.getTextWidth("Âge : ");
+      pdf.setFont('helvetica', 'bold');
+      pdf.text("Âge :", currentX, legendY);
+      currentX += pdf.getTextWidth("Âge :") + 2;
+      pdf.setFont('helvetica', 'normal');
 
       legendItems.forEach((item, idx) => {
+        // Texte
         pdf.setTextColor(100, 116, 139);
         pdf.text(item.text, currentX, legendY);
-        currentX += pdf.getTextWidth(item.text);
+        currentX += pdf.getTextWidth(item.text) + 1.5;
         
-        pdf.setTextColor(item.color[0], item.color[1], item.color[2]);
-        pdf.text("●", currentX, legendY);
-        currentX += pdf.getTextWidth("●");
+        // Cercle coloré (Vectoriel)
+        pdf.setFillColor(item.color[0], item.color[1], item.color[2]);
+        pdf.circle(currentX + 1, legendY - 0.8, 0.8, 'F');
+        currentX += 3.5;
         
+        // Séparateur
         if (idx < legendItems.length - 1) {
-          pdf.setTextColor(100, 116, 139);
-          pdf.text(" | ", currentX, legendY);
-          currentX += pdf.getTextWidth(" | ");
+          pdf.setTextColor(203, 213, 225); // Gris plus clair pour le pipe
+          pdf.text("|", currentX, legendY);
+          currentX += 4;
         }
       });
 
