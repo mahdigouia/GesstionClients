@@ -471,7 +471,7 @@ Source: ${debt.sourceFile}
 
     if (title) {
       html += `<div class="title">${title}</div>`;
-      html += `<div class="legend">Légende Âge : 0-15j Vert | 16-30j Bleu | 31-45j Jaune | 46-60j Orange | 61j+ Rouge</div><br>`;
+      html += `<div class="legend">Légende Âge : 0-15j <span style="color: #059669">●</span> | 16-30j <span style="color: #2563eb">●</span> | 31-45j <span style="color: #d97706">●</span> | 46-60j <span style="color: #ea580c">●</span> | 61j+ <span style="color: #dc2626">●</span></div><br>`;
     }
 
     html += `<table border="1"><thead><tr>`;
@@ -560,15 +560,48 @@ Source: ${debt.sourceFile}
       pdf.setFontSize(18);
       pdf.text("CRÉANCES CLIENTS", margin + 45, margin + 12);
       
-      // Légende
+      // 1. Meta info (Haut Droite)
       pdf.setFontSize(7);
       pdf.setTextColor(100, 116, 139);
-      pdf.text("Âge : 0-15j Vert | 16-30j Bleu | 31-45j Jaune | 46-60j Orange | 61j+ Rouge", margin + pageWidth - margin - 10, margin + 12, { align: 'right' });
-      
-      // Meta info
-      pdf.setFontSize(7);
       pdf.text(`Généré le : ${new Date().toLocaleString('fr-FR')}`, margin + pageWidth - margin - 10, margin + 6, { align: 'right' });
       pdf.text(`Page ${pageNum}`, margin + pageWidth - margin - 10, margin + 10, { align: 'right' });
+
+      // 2. Légende Âge avec Points Colorés
+      const legendY = margin + 15;
+      const legendItems = [
+        { text: '0-15j ', color: [5, 150, 105] },
+        { text: '16-30j ', color: [37, 99, 235] },
+        { text: '31-45j ', color: [217, 119, 6] },
+        { text: '46-60j ', color: [234, 88, 12] },
+        { text: '61j+ ', color: [220, 38, 38] }
+      ];
+
+      // Calculer la largeur totale pour l'alignement à droite
+      let totalWidth = pdf.getTextWidth("Âge : ");
+      legendItems.forEach((item, idx) => {
+        totalWidth += pdf.getTextWidth(item.text + "●" + (idx < legendItems.length - 1 ? " | " : ""));
+      });
+
+      let currentX = (margin + pageWidth - margin - 10) - totalWidth;
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("Âge : ", currentX, legendY);
+      currentX += pdf.getTextWidth("Âge : ");
+
+      legendItems.forEach((item, idx) => {
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(item.text, currentX, legendY);
+        currentX += pdf.getTextWidth(item.text);
+        
+        pdf.setTextColor(item.color[0], item.color[1], item.color[2]);
+        pdf.text("●", currentX, legendY);
+        currentX += pdf.getTextWidth("●");
+        
+        if (idx < legendItems.length - 1) {
+          pdf.setTextColor(100, 116, 139);
+          pdf.text(" | ", currentX, legendY);
+          currentX += pdf.getTextWidth(" | ");
+        }
+      });
 
       // Filtres et Statistiques
       pdf.setFontSize(9);
