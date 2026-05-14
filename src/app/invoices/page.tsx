@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useDebtContext } from '@/lib/DebtContext';
 import { Sidebar } from '@/components/Sidebar';
-import { FileText, Search, Filter, Download } from 'lucide-react';
+import { FileText, Search, Filter, Download, ChevronRight, TrendingUp, PhoneCall, ShieldAlert, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExportService } from '@/lib/export';
