@@ -164,21 +164,44 @@ export default function ClientsPage() {
     });
   };
 
-  // Counts for tristate filters
+  // Counts for tristate filters - Count individual lines (invoices) instead of clients for consistency with PDF and Dashboard
   const stats = useMemo(() => {
     if (!analysis) return { contentieux: 0, retained: 0, partial: 0, nonContentieux: 0, nonRetained: 0, nonPartial: 0 };
     
-    // The counts should also respect the Age and Amount filters to be consistent
-    const list = analysis.clientBreakdown || [];
+    // Start with the full debts list or filtered by commercial/search
+    let list = debts;
+    
+    if (selectedCommercial !== 'all') {
+      list = list.filter(d => d.commercialName === selectedCommercial);
+    }
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(d => 
+        (d.clientName || '').toLowerCase().includes(term) || 
+        (d.clientCode || '').toLowerCase().includes(term) ||
+        (d.documentNumber || '').toLowerCase().includes(term)
+      );
+    }
+    
+    // Apply Age and Amount exclusions to counts for total consistency
+    list = list.filter(d => !isAgeExcluded(d.age));
+    if (minAmountFilter) {
+      list = list.filter(d => {
+        const balance = typeof d.balance === 'number' ? d.balance : parseFloat(String(d.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
+        return balance >= 5000;
+      });
+    }
+
     return {
-      contentieux: list.filter(c => clientHasContentieux(c.clientName)).length,
-      retained: list.filter(c => clientHasRetained(c.clientName)).length,
-      partial: list.filter(c => clientHasPartial(c.clientName)).length,
-      nonContentieux: list.filter(c => !clientHasContentieux(c.clientName)).length,
-      nonRetained: list.filter(c => !clientHasRetained(c.clientName)).length,
-      nonPartial: list.filter(c => !clientHasPartial(c.clientName)).length
+      contentieux: list.filter(d => isContentieux(d)).length,
+      retained: list.filter(d => isRetained(d)).length,
+      partial: list.filter(d => isPartial(d)).length,
+      nonContentieux: list.filter(d => !isContentieux(d)).length,
+      nonRetained: list.filter(d => !isRetained(d)).length,
+      nonPartial: list.filter(d => !isPartial(d)).length
     };
-  }, [analysis, debts, excludedAgeRanges, minAmountFilter]);
+  }, [analysis, debts, selectedCommercial, searchTerm, excludedAgeRanges, minAmountFilter]);
 
   // Filtered client list logic with line-level filtering
   const filteredClients = useMemo(() => {
