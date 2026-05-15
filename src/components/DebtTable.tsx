@@ -137,7 +137,8 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
       if (filters.docType && !(debt.documentNumber || '').toUpperCase().startsWith(filters.docType)) return false;
 
       // --- Special invoices bypass all STATUS and AMOUNT filters below ---
-      if (isSpecial) return true;
+      // MODIFICATION: If we are specifically filtering for RETAINED, do NOT bypass for specials
+      if (isSpecial && filters.retainedFilter !== 'include') return true;
 
       // 5. Tristate Filters - STATUS FILTERS (bypassed by special invoices)
       if (filters.contentieuxFilter !== 'off') {

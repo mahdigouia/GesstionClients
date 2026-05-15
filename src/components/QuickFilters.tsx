@@ -106,7 +106,8 @@ export function QuickFilters({ debts, onFilterChange, onNavigateToDetail }: Quic
     return data.filter(d => {
       // Special invoices (Negative balance or Credit Notes) - ALWAYS SHOW
       const isSpecial = (d.balance < 0) || /^(AVS|AVT|FRS|FRT)/i.test(d.documentNumber || '');
-      if (isSpecial) return true;
+      // MODIFICATION: If we are specifically filtering for RETAINED, do NOT bypass for specials
+      if (isSpecial && filterId !== 'retained') return true;
 
       if (filterId === 'all') return true;
       if (filterId === 'retained') return isRetained(d);

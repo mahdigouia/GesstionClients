@@ -208,7 +208,8 @@ export default function ClientsPage() {
         if (selectedCommercial !== 'all' && debt.commercialName !== selectedCommercial) return false;
 
         // --- Special invoices bypass STATUS and AMOUNT filters below ---
-        if (isSpecial) return true;
+        // MODIFICATION: If we are specifically filtering for RETAINED, do NOT bypass for specials
+        if (isSpecial && retainedFilter !== 'include') return true;
 
         // 2. Age exclusion logic
         const rawAge = debt.age;
