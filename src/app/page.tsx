@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/select';
 
 export default function Home() {
-  const { debts, analysis, addDebts, updateDebtsFromFile, updateDebtsFromFiles, setDebts, setAnalysis, addRecoveryAction } = useDebtContext();
+  const { debts, analysis, addDebts, updateDebtsFromFile, updateDebtsFromFiles, setDebts, setAnalysis, addRecoveryAction, logAudit } = useDebtContext();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -138,6 +138,8 @@ export default function Home() {
         description: `${stats.new} nouvelles factures, ${stats.updated} mises à jour, ${stats.removed} soldées.`,
         variant: "default",
       });
+
+      logAudit('Import Fichiers', `Traitement de ${filesProcessed} fichiers (${allExtractedData.map(d => d.filename).join(', ')}). ${stats.new} nouvelles, ${stats.updated} MAJ, ${stats.removed} soldées.`);
       
       // Étape finale
       setProgress(100);
@@ -167,19 +169,19 @@ export default function Home() {
 
   const handleExportExcel = () => {
     if (debts.length > 0) {
-      ExportService.exportToExcel(debts, analysis);
+      ExportService.exportToExcel(debts, analysis || undefined, logAudit);
     }
   };
 
   const handleExportPDF = async () => {
     if (analysis) {
-      await ExportService.exportToPDF('dashboard-content');
+      await ExportService.exportToPDF('dashboard-content', undefined, logAudit);
     }
   };
 
   const handleSaveAnalysis = () => {
     if (debts.length > 0 && analysis) {
-      ExportService.saveAnalysis(debts, analysis);
+      ExportService.saveAnalysis(debts, analysis, undefined, logAudit);
     }
   };
 
@@ -224,7 +226,7 @@ export default function Home() {
               {debts.length > 0 && (
                 <div className="flex items-center space-x-1 md:space-x-2">
                   <Button 
-                    onClick={() => ExportService.exportToExcelByCommercial(debts)} 
+                    onClick={() => ExportService.exportToExcelByCommercial(debts, logAudit)} 
                     variant="outline" 
                     size="sm" 
                     className="h-9 px-2 md:px-3 bg-green-50 hover:bg-green-100 border-green-200 text-green-700 gap-1.5"
@@ -234,7 +236,7 @@ export default function Home() {
                     <span className="hidden sm:inline text-xs font-bold">Excel</span>
                   </Button>
                   <Button 
-                    onClick={() => ExportService.generateWordReportWithAI(debts, analysis || undefined)} 
+                    onClick={() => ExportService.generateWordReportWithAI(debts, analysis || undefined, logAudit)} 
                     variant="outline" 
                     size="sm" 
                     className="h-9 px-2 md:px-3 bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700 gap-1.5"
@@ -384,7 +386,7 @@ export default function Home() {
                   <TabsContent value="table" className="space-y-6">
                     <DebtTable 
                       debts={filteredDebts.length > 0 ? filteredDebts : debts} 
-                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts)}
+                      onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts, analysis || undefined, logAudit)}
                       onClientClick={handleShowClientHistory}
                       onQuickAction={(clientName) => {
                         setQuickActionClient(clientName);

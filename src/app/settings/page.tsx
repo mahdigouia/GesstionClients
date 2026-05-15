@@ -79,8 +79,7 @@ export default function SettingsPage() {
 
   const handleExportData = () => {
     if (analysis && debts.length > 0) {
-      ExportService.saveAnalysis(debts, analysis);
-      logAudit('Export JSON', `Sauvegarde complète des données (${debts.length} créances)`);
+      ExportService.saveAnalysis(debts, analysis, undefined, logAudit);
     }
   };
 
@@ -98,7 +97,11 @@ export default function SettingsPage() {
             if (data.debts) {
               localStorage.setItem('gc_debts', JSON.stringify(data.debts));
               localStorage.setItem('gc_analysis', JSON.stringify(data.analysis));
-              window.location.reload();
+              
+              // Journalisation avant le reload
+              logAudit('Import JSON', `Restauration manuelle de ${data.debts.length} créances depuis un fichier JSON`).then(() => {
+                window.location.reload();
+              });
             }
           } catch (err) {
             alert('Fichier invalide');

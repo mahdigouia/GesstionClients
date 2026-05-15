@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function InvoicesPage() {
-  const { debts, analysis, settings } = useDebtContext();
+  const { debts, analysis, settings, logAudit } = useDebtContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -154,7 +154,7 @@ export default function InvoicesPage() {
                 />
               </div>
               <Button 
-                onClick={() => ExportService.exportToExcel(nonContentiousDebts, analysis || undefined)} 
+                onClick={() => ExportService.exportToExcel(nonContentiousDebts, analysis || undefined, logAudit)} 
                 className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-6 font-bold w-full md:w-auto"
               >
                 <Download className="h-4 w-4 mr-2" />

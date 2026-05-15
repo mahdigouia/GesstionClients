@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export default function ImportPage() {
-  const { debts, addDebts } = useDebtContext();
+  const { debts, addDebts, logAudit } = useDebtContext();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +67,7 @@ export default function ImportPage() {
       if (allNewDebts.length > 0) {
         addDebts(allNewDebts);
         setSuccessMessage(`${allNewDebts.length} créances importées depuis ${files.length} fichier(s)`);
+        logAudit('Import OCR', `Importation de ${allNewDebts.length} créances depuis ${files.length} fichiers via la page Import OCR (${files.map(f => f.name).join(', ')})`);
       } else {
         setError('Aucune créance n\'a pu être extraite des fichiers sélectionnés.');
       }

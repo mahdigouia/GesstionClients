@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Download, X, History, Calendar, PhoneCall } from 'lucide-react';
 import { ClientDebt } from '@/types/debt';
+import { useDebtContext } from '@/lib/DebtContext';
 import { AnalysisService } from '@/lib/analysis';
 import { ClientSearchFilters } from './ClientSearchFilters';
 import { AutocompleteSearch } from './AutocompleteSearch';
@@ -28,6 +29,7 @@ interface DebtTableProps {
 }
 
 export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: DebtTableProps) {
+  const { logAudit } = useDebtContext();
   // State for all filters moved here for single source of truth
   const [filters, setFilters] = useState({
     searchTerm: '',
@@ -255,7 +257,7 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => ExportService.exportToExcel(filteredDebts)}
+              onClick={() => ExportService.exportToExcel(filteredDebts, undefined, logAudit)}
               className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
             >
               <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -270,11 +272,11 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
                 if (filters.retainedFilter === 'include') activeLabels.push('Retenue');
                 if (filters.partialFilter === 'include') activeLabels.push('Partiel');
                 if (selectedClient) activeLabels.push(`Client: ${selectedClient}`);
-                
                 ExportService.exportFilteredToPDF(
                   filteredDebts, 
                   "Rapport des Créances", 
-                  activeLabels.length > 0 ? activeLabels.join(' + ') : 'Aucun filtre'
+                  activeLabels.length > 0 ? activeLabels.join(' + ') : 'Aucun filtre',
+                  logAudit
                 );
               }}
               className="bg-red-50 hover:bg-red-100 border-red-200 text-red-700"

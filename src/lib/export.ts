@@ -6,7 +6,7 @@ import { saveAs } from 'file-saver';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 
 export class ExportService {
-  static async exportToExcel(debts: ClientDebt[], analysis?: AnalysisResult): Promise<void> {
+  static async exportToExcel(debts: ClientDebt[], analysis?: AnalysisResult, onLog?: (action: string, details: string) => void): Promise<void> {
     const workbook = XLSX.utils.book_new();
 
     // Feuille des créances
@@ -60,11 +60,14 @@ export class ExportService {
     }
 
     // Générer et télécharger le fichier
-    const fileName = `gestion-creances-${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
+
+    if (onLog) {
+      onLog('Export Excel', `Extraction de ${debts.length} créances${analysis ? ' avec analyse' : ''}`);
+    }
   }
 
-  static async exportToPDF(elementId: string, fileName?: string): Promise<void> {
+  static async exportToPDF(elementId: string, fileName?: string, onLog?: (action: string, details: string) => void): Promise<void> {
     const element = document.getElementById(elementId);
     if (!element) {
       throw new Error('Élément non trouvé pour l\'export PDF');
@@ -99,9 +102,13 @@ export class ExportService {
 
     const defaultFileName = `rapport-creances-${new Date().toISOString().split('T')[0]}.pdf`;
     pdf.save(fileName || defaultFileName);
+
+    if (onLog) {
+      onLog('Export PDF (Capture)', `Export PDF de l'élément ${elementId}`);
+    }
   }
 
-  static async exportFilteredToPDF(debts: ClientDebt[], title: string = "Rapport des Créances", activeFilters?: string): Promise<void> {
+  static async exportFilteredToPDF(debts: ClientDebt[], title: string = "Rapport des Créances", activeFilters?: string, onLog?: (action: string, details: string) => void): Promise<void> {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = 210;
     const pageHeight = 297;
@@ -254,6 +261,10 @@ export class ExportService {
 
     const fileName = `Rapport_Creances_${new Date().toISOString().split('T')[0]}.pdf`;
     pdf.save(fileName);
+
+    if (onLog) {
+      onLog('Export PDF Filtré', `Rapport "${title}" avec ${debts.length} lignes. Filtres: ${activeFilters || 'Aucun'}`);
+    }
   }
 
   static generateReport(debts: ClientDebt[], analysis: AnalysisResult): string {
@@ -360,7 +371,7 @@ Source: ${debt.sourceFile}
   }
 
   // Sauvegarder l'analyse complète dans un fichier JSON
-  static saveAnalysis(debts: ClientDebt[], analysis: AnalysisResult, fileName?: string): void {
+  static saveAnalysis(debts: ClientDebt[], analysis: AnalysisResult, fileName?: string, onLog?: (action: string, details: string) => void): void {
     const analysisData = {
       exportDate: new Date().toISOString(),
       exportDateFormatted: new Date().toLocaleDateString('fr-FR'),
@@ -381,10 +392,14 @@ Source: ${debt.sourceFile}
     
     this.downloadTextFile(jsonContent, defaultFileName);
     console.log(`Analyse sauvegardée: ${defaultFileName}`);
+
+    if (onLog) {
+      onLog('Export JSON', `Sauvegarde de l'analyse complète (${debts.length} créances)`);
+    }
   }
 
   // Export de la liste des clients en Excel (Détaillé)
-  static async exportClientsToExcel(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string): Promise<void> {
+  static async exportClientsToExcel(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string, onLog?: (action: string, details: string) => void): Promise<void> {
     const rows: any[] = [];
     const columns = [
       { header: 'N°', key: 'n', width: 40 },
@@ -437,6 +452,10 @@ Source: ${debt.sourceFile}
       `Creances_Clients_Detaille_${new Date().toISOString().split('T')[0]}.xls`,
       `CRÉANCES CLIENTS - ${new Date().toLocaleDateString('fr-FR')}`
     );
+
+    if (onLog) {
+      onLog('Export Excel Détaillé', `Export de ${clients.length} clients. Filtres: ${activeFilters || 'Aucun'}`);
+    }
   }
 
   // Helper pour générer un Excel stylisé via HTML (Supporté par Excel avec couleurs)
@@ -528,7 +547,7 @@ Source: ${debt.sourceFile}
   }
 
   // Export de la liste des clients en PDF (Détaillé & Embelli)
-  static async exportClientsToPDF(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string): Promise<void> {
+  static async exportClientsToPDF(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string, onLog?: (action: string, details: string) => void): Promise<void> {
     const pdf = new jsPDF('l', 'mm', 'a4'); // Mode paysage pour plus d'espace
     const pageWidth = 297;
     const pageHeight = 210;
@@ -769,10 +788,14 @@ Source: ${debt.sourceFile}
     pdf.text(formatCurrency(totalBalance), margin + 208 + 15, currentY + 1.5, { align: 'center' });
 
     pdf.save(`Rapport_Portefeuille_Detaille_${new Date().toISOString().split('T')[0]}.pdf`);
+
+    if (onLog) {
+      onLog('Export PDF Détaillé', `Rapport portefeuille avec ${clients.length} clients. Filtres: ${activeFilters || 'Aucun'}`);
+    }
   }
 
   // Export Excel par Commercial avec résumé contentieux/non-contentieux
-  static async exportToExcelByCommercial(debts: ClientDebt[]): Promise<void> {
+  static async exportToExcelByCommercial(debts: ClientDebt[], onLog?: (action: string, details: string) => void): Promise<void> {
     const workbook = XLSX.utils.book_new();
     
     // Grouper par commercial
@@ -830,8 +853,11 @@ Source: ${debt.sourceFile}
       XLSX.utils.book_append_sheet(workbook, detailSheet, sheetName);
     });
     
-    const fileName = `rapport-commercial-${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
+
+    if (onLog) {
+      onLog('Export Excel par Commercial', `Extraction groupée par commercial pour ${debts.length} créances`);
+    }
   }
 
   // Analyse IA simulée pour le rapport Word
@@ -868,7 +894,7 @@ Source: ${debt.sourceFile}
   }
 
   // Générer rapport Word avec analyse IA
-  static async generateWordReportWithAI(debts: ClientDebt[], analysis?: AnalysisResult): Promise<void> {
+  static async generateWordReportWithAI(debts: ClientDebt[], analysis?: AnalysisResult, onLog?: (action: string, details: string) => void): Promise<void> {
     const reportDate = new Date().toLocaleDateString('fr-FR', {
       weekday: 'long',
       year: 'numeric',
@@ -1056,5 +1082,9 @@ Source: ${debt.sourceFile}
     const blob = await Packer.toBlob(doc);
     const fileName = `rapport-ia-documents-${new Date().toISOString().split('T')[0]}.docx`;
     saveAs(blob, fileName);
+
+    if (onLog) {
+      onLog('Export Word IA', `Génération du rapport stratégique Word pour ${debts.length} créances`);
+    }
   }
 }
