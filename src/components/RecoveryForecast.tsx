@@ -40,7 +40,7 @@ export function RecoveryForecast() {
     // Group by week for the chart
     const groupedByDate: Record<string, number> = {};
     futurePromises.forEach(r => {
-      const date = new Date(r.promiseDate!).toLocaleDateString('fr-FR', { day: '2D', month: '2D' });
+      const date = new Date(r.promiseDate!).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
       groupedByDate[date] = (groupedByDate[date] || 0) + (r.promiseAmount || 0);
     });
 

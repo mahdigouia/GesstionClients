@@ -149,10 +149,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       console.warn('Erreur chargement données sauvegardées:', e);
-    }
-  };
-
-  // Sauvegarder dans Firestore + localStorage
+      // Sauvegarder dans Firestore + localStorage
   const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions, newRemarks: Record<string, ClientRemark[]> = clientRemarks) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
@@ -170,7 +167,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         debtCount: newDebts.length,
         readAlertIds: readAlertIds,
         history: updateHistory(newDebts, history)
-      });
+      }, { merge: true });
       console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances et ${newActions.length} actions dans Firestore par ${user?.email}`);
       
       // Journalisation pour l'utilisateur spécifique
@@ -351,7 +348,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         updatedBy: user?.email || 'unknown',
         debtCount: 0,
         history: []
-      });
+      }, { merge: true });
       if (user?.email === 'moslem.gouia@gmail.com') {
         logAction('Suppression Totale', `L'utilisateur a vidé toutes les données du système`);
       }
