@@ -275,7 +275,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     saveToFirestore(debts, recoveryActions, updatedRemarks);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
-      logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`)  const setDebts = (newDebts: ClientDebt[]) => {
+      logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`);
+    }
+  };
+
+  const setDebts = (newDebts: ClientDebt[]) => {
     setDebtsState(newDebts);
     saveToFirestore(newDebts, recoveryActions, clientRemarks, archiveDebts);
     
