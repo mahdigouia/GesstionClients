@@ -33,17 +33,17 @@ export class ExportService {
     const avgAge = debts.length > 0 ? Math.round(debts.reduce((sum, d) => sum + d.age, 0) / debts.length) : 0;
 
     debtsData.push({
-      'Code Client': 'TOTAL / MOYENNE',
+      'Code Client': 'TOTAL GÉNÉRAL',
       'Nom Client': '',
       'Téléphone': '',
       'N° Pièce': '',
       'Description': '',
       'Date Document': '',
-      'Date Échéance': '',
+      'Date Échéance': 'Moyenne Âge ➔',
       'Montant': totalAmount,
       'Règlement': totalSettlement,
       'Solde': totalBalance,
-      'Âge (jours)': avgAge,
+      'Âge (jours)': `${avgAge} j (Moyenne)` as any,
       'Jours de Paiement': '' as any,
       'Niveau Risque': '',
       'Fichier Source': ''
@@ -586,10 +586,13 @@ Source: ${debt.sourceFile}
       let xNumAttr = "";
 
       if (col.key === 'code') {
-        cellHtml = "TOTAL / MOYENNE";
+        cellHtml = "TOTAL GÉNÉRAL";
+      } else if (col.key === 'due') {
+        cellHtml = "Moyenne Âge ➔";
+        inlineStyle += " text-align: right; color: #64748b; font-style: italic; font-size: 9pt;";
       } else if (col.key === 'age') {
-        cellHtml = `${avgAge} j`;
-        inlineStyle += " color: #0f172a; mso-number-format:'0';";
+        cellHtml = `${avgAge} j (Moy)`;
+        inlineStyle += " color: #0f172a; mso-number-format:'0\\ \\\"j (Moyenne)\\\"';";
         xNumAttr = ` x:num="${avgAge}"`;
       } else if (col.key === 'amount') {
         cellHtml = totalAmount.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
