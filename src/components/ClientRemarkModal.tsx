@@ -164,19 +164,46 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   };
 
+  const [lastAppliedDate, setLastAppliedDate] = useState('[DATE]');
+  const [lastAppliedAmount, setLastAppliedAmount] = useState('[MONTANT]');
+
   useEffect(() => {
-    if (promiseDate && newRemark.includes('[DATE]')) {
-      const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
-      setNewRemark(prev => prev.replace(/\[DATE\]/g, formattedDate));
+    // Gestion de la date
+    const targetDateStr = promiseDate && promiseDate.length === 10 
+      ? new Date(promiseDate).toLocaleDateString('fr-FR') 
+      : '[DATE]';
+
+    if (lastAppliedDate !== targetDateStr) {
+      setNewRemark(prev => {
+        if (prev.includes(lastAppliedDate)) {
+          return prev.replace(lastAppliedDate, targetDateStr);
+        }
+        return prev;
+      });
+      setLastAppliedDate(targetDateStr);
     }
-    if (promiseAmount && newRemark.includes('[MONTANT]')) {
-      setNewRemark(prev => prev.replace(/\[MONTANT\]/g, `${promiseAmount} TND`));
+  }, [promiseDate, lastAppliedDate]);
+
+  useEffect(() => {
+    // Gestion du montant
+    const targetAmountStr = promiseAmount 
+      ? `${promiseAmount} TND` 
+      : '[MONTANT]';
+
+    if (lastAppliedAmount !== targetAmountStr) {
+      setNewRemark(prev => {
+        if (prev.includes(lastAppliedAmount)) {
+          return prev.replace(lastAppliedAmount, targetAmountStr);
+        }
+        return prev;
+      });
+      setLastAppliedAmount(targetAmountStr);
     }
-  }, [promiseDate, promiseAmount]);
+  }, [promiseAmount, lastAppliedAmount]);
 
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
-    if (promiseDate) {
+    if (promiseDate && promiseDate.length === 10) {
       const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
       text = text.replace(/\[DATE\]/g, formattedDate);
     }
@@ -189,10 +216,22 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const handleSubmit = () => {
     if (newRemark.trim()) {
       let finalRemark = newRemark.trim();
-      if (promiseDate) {
+      if (promiseDate && promiseDate.length === 10) {
         const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
         finalRemark = finalRemark.replace(/\[DATE\]/g, formattedDate);
       }
+      if (promiseAmount) {
+        finalRemark = finalRemark.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
+      }
+      onAddRemark(clientName, finalRemark, promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
+      setNewRemark('');
+      setPromiseDate('');
+      setPromiseAmount('');
+      setLastAppliedDate('[DATE]');
+      setLastAppliedAmount('[MONTANT]');
+      onClose();
+    }
+  };
       if (promiseAmount) {
         finalRemark = finalRemark.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
       }
@@ -293,7 +332,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                               <Label className="text-[10px] font-bold text-slate-400 mb-1 block">Date de promesse</Label>
-                              <Input type="date" value={editPromiseDate} onChange={(e) => setEditPromiseDate(e.target.value)} className="h-8 text-xs rounded-lg" />
+                              <Input type="date" value={editPromiseDate} onChange={(e) => setEditPromiseDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="h-8 text-xs rounded-lg" />
                             </div>
                             <div>
                               <Label className="text-[10px] font-bold text-slate-400 mb-1 block">Montant (TND)</Label>
@@ -405,6 +444,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                   type="date"
                   value={promiseDate}
                   onChange={(e) => setPromiseDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
                   className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10"
                 />
               </div>
