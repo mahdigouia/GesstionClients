@@ -232,16 +232,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       onClose();
     }
   };
-      if (promiseAmount) {
-        finalRemark = finalRemark.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
-      }
-      onAddRemark(clientName, finalRemark, promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
-      setNewRemark('');
-      setPromiseDate('');
-      setPromiseAmount('');
-      onClose();
-    }
-  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
