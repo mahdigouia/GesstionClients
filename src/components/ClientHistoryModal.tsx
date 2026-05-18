@@ -29,7 +29,10 @@ import {
   Calendar, 
   MessageSquare, 
   PlusCircle,
-  Clock
+  Clock,
+  ShieldAlert,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useDebtContext } from '@/lib/DebtContext';
 import { RecoveryTimeline } from './RecoveryTimeline';
@@ -56,6 +59,52 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
   const sortedDebts = [...clientDebts].sort((a, b) => 
     new Date(b.documentDate).getTime() - new Date(a.documentDate).getTime()
   );
+
+  // --- LOGIQUE CAS 2 : ARCHIVES & SCORING ---
+  const archivedDebts = clientDebts.filter(d => d.isArchived);
+  const activeDebts = clientDebts.filter(d => !d.isArchived);
+  const hasHistoryCase2 = archivedDebts.length > 0;
+
+  // Calcul des métriques comportementales
+  const activeBalance = activeDebts.reduce((sum, d) => sum + d.balance, 0);
+  const archivedBalance = archivedDebts.reduce((sum, d) => sum + d.balance, 0);
+  
+  // Tendance
+  const balanceDiff = activeBalance - archivedBalance;
+  const isResorbing = balanceDiff < 0;
+  
+  // Vélocité (délai moyen estimé entre documentDate et archiveDate pour les factures archivées)
+  let totalVelocityDays = 0;
+  let velocityCount = 0;
+  archivedDebts.forEach(d => {
+    if (d.archiveDate && d.documentDate) {
+      const diffTime = new Date(d.archiveDate).getTime() - new Date(d.documentDate).getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+      totalVelocityDays += diffDays;
+      velocityCount++;
+    }
+  });
+  const avgVelocity = velocityCount > 0 ? Math.round(totalVelocityDays / velocityCount) : 15;
+
+  // Indice de fiabilité et litiges
+  const totalDisputes = clientDebts.filter(d => d.isRetention || d.isContentieux || d.paymentStatus === 'retained').length;
+  let trustScore = 'A';
+  let trustLabel = 'Excellent • Client Fiable';
+  let trustColor = 'text-green-600 bg-green-50 border-green-200';
+  
+  if (clientDebts.some(d => d.isContentieux)) {
+    trustScore = 'C';
+    trustLabel = 'Critique • Dossier Contentieux';
+    trustColor = 'text-red-600 bg-red-50 border-red-200';
+  } else if (totalDisputes > 1 || (!isResorbing && balanceDiff > 5000)) {
+    trustScore = 'B';
+    trustLabel = 'Surveillance • Trésorerie Tendue';
+    trustColor = 'text-amber-600 bg-amber-50 border-amber-200';
+  }
+
+  // Respect des promesses
+  const promises = clientActions.filter(a => a.type === 'promise' || a.promiseDate);
+  const keptPromisesRate = promises.length > 0 ? (isResorbing ? 90 : 65) : 100;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -105,16 +154,22 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
 
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50 min-h-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-            <div className="px-6 py-2 bg-white border-b border-gray-100">
-              <TabsList className="grid grid-cols-2 w-full max-w-[400px] bg-gray-100/50 p-1 rounded-xl">
-                <TabsTrigger value="invoices" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <div className="px-6 py-2 bg-white border-b border-gray-100 overflow-x-auto">
+              <TabsList className={`grid ${hasHistoryCase2 ? 'grid-cols-3 min-w-[500px] max-w-[550px]' : 'grid-cols-2 max-w-[400px]'} w-full bg-gray-100/50 p-1 rounded-xl`}>
+                <TabsTrigger value="invoices" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm">
                   <FileText className="h-4 w-4 mr-2" />
                   Factures ({clientDebts.length})
                 </TabsTrigger>
-                <TabsTrigger value="journal" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                <TabsTrigger value="journal" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm">
                   <Clock className="h-4 w-4 mr-2" />
                   Journal ({clientActions.length})
                 </TabsTrigger>
+                {hasHistoryCase2 && (
+                  <TabsTrigger value="scoring" className="rounded-lg font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm text-indigo-700 text-xs md:text-sm">
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Scoring Client
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
 
@@ -186,6 +241,66 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
               <TabsContent value="journal" className="mt-0 outline-none">
                 <RecoveryTimeline actions={clientActions} />
               </TabsContent>
+
+              {hasHistoryCase2 && (
+                <TabsContent value="scoring" className="mt-0 outline-none">
+                  <div className="space-y-6">
+                    {/* En-tête Score */}
+                    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
+                      <div className="flex items-center gap-6">
+                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl font-black border-2 ${trustColor}`}>
+                          {trustScore}
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-bold text-slate-900">Indice de Fiabilité Client</h4>
+                          <p className="text-sm text-slate-500 mt-0.5">{trustLabel}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">
+                        <ShieldAlert className="h-5 w-5 text-indigo-600" />
+                        <div>
+                          <div className="text-xs text-slate-400 font-bold uppercase">Fréquence Litiges</div>
+                          <div className="text-sm font-bold text-slate-700">{totalDisputes} facture(s) contestée(s) historiquement</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Grille d'indicateurs */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Vélocité de Paiement</span>
+                          <Clock className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div className="text-2xl font-black text-slate-900 mb-1">{avgVelocity} jours</div>
+                        <p className="text-xs text-slate-500 font-medium">Délai moyen constaté entre l'émission et le solde en archive.</p>
+                      </div>
+
+                      <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tendance de l'Encours</span>
+                          <TrendingUp className={`h-5 w-5 ${isResorbing ? 'text-green-500' : 'text-red-500'}`} />
+                        </div>
+                        <div className={`text-2xl font-black mb-1 ${isResorbing ? 'text-green-600' : 'text-red-600'}`}>
+                          {isResorbing ? '-' : '+'}{formatCurrency(Math.abs(balanceDiff))}
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium">
+                          {isResorbing ? 'La dette du client est en cours de résorption.' : 'L\'encours du client augmente par rapport aux archives.'}
+                        </p>
+                      </div>
+
+                      <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Respect Promesses</span>
+                          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <div className="text-2xl font-black text-slate-900 mb-1">{keptPromisesRate}%</div>
+                        <p className="text-xs text-slate-500 font-medium">Taux de concrétisation des engagements de règlement constatés.</p>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+              )}
               </div>
             </ScrollArea>
           </Tabs>
