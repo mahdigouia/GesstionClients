@@ -17,6 +17,8 @@ interface DebtContextType {
   addDebts: (newDebts: ClientDebt[]) => void;
   addRecoveryAction: (action: Omit<RecoveryAction, 'id' | 'date' | 'user'>) => void;
   addClientRemark: (clientName: string, content: string, promiseDate?: string, promiseAmount?: number) => void;
+  updateClientRemark: (clientName: string, remarkId: string, content: string, promiseDate?: string, promiseAmount?: number) => void;
+  deleteClientRemark: (clientName: string, remarkId: string) => void;
   updateDebtsFromFile: (filename: string, newDebts: ClientDebt[]) => { 
     updated: number, 
     new: number, 
@@ -224,6 +226,50 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateClientRemark = (clientName: string, remarkId: string, content: string, promiseDate?: string, promiseAmount?: number) => {
+    const currentRemarks = clientRemarks[clientName] || [];
+    const updatedRemarksList = currentRemarks.map(remark => {
+      if (remark.id === remarkId) {
+        return {
+          ...remark,
+          content,
+          promiseDate,
+          promiseAmount
+        };
+      }
+      return remark;
+    });
+
+    const updatedRemarks = {
+      ...clientRemarks,
+      [clientName]: updatedRemarksList
+    };
+
+    setClientRemarks(updatedRemarks);
+    saveToFirestore(debts, recoveryActions, updatedRemarks);
+    
+    if (user?.email === 'moslem.gouia@gmail.com') {
+      logAction('Modification Remarque', `Modification d'une remarque pour le client ${clientName}`);
+    }
+  };
+
+  const deleteClientRemark = (clientName: string, remarkId: string) => {
+    const currentRemarks = clientRemarks[clientName] || [];
+    const updatedRemarksList = currentRemarks.filter(remark => remark.id !== remarkId);
+
+    const updatedRemarks = {
+      ...clientRemarks,
+      [clientName]: updatedRemarksList
+    };
+
+    setClientRemarks(updatedRemarks);
+    saveToFirestore(debts, recoveryActions, updatedRemarks);
+    
+    if (user?.email === 'moslem.gouia@gmail.com') {
+      logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`);
+    }
+  };
+
   const setDebts = (newDebts: ClientDebt[]) => {
     setDebtsState(newDebts);
     saveToFirestore(newDebts);
@@ -360,7 +406,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   };
 
-   const updateHistory = (currentDebts: ClientDebt[], currentHistory: HistoryPoint[]) => {
+  const updateHistory = (currentDebts: ClientDebt[], currentHistory: HistoryPoint[]) => {
     if (currentDebts.length === 0) return currentHistory;
     
     const currentAnalysis = AnalysisService.analyzeDebts(currentDebts);
@@ -455,6 +501,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       updateDebtsFromFiles,
       addRecoveryAction,
       addClientRemark,
+      updateClientRemark,
+      deleteClientRemark,
       clearAll, 
       lastUpdatedBy,
       readAlertIds,

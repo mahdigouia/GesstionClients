@@ -27,12 +27,17 @@ import {
   Mail,
   Coins,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  Pencil,
+  X,
+  Check
 } from 'lucide-react';
 import { ClientRemark } from '@/types/debt';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/lib/AuthContext';
 
 interface ClientRemarkModalProps {
   isOpen: boolean;
@@ -40,14 +45,40 @@ interface ClientRemarkModalProps {
   clientName: string;
   remarks: ClientRemark[];
   onAddRemark: (clientName: string, content: string, promiseDate?: string, promiseAmount?: number) => void;
+  onUpdateRemark?: (clientName: string, remarkId: string, content: string, promiseDate?: string, promiseAmount?: number) => void;
+  onDeleteRemark?: (clientName: string, remarkId: string) => void;
 }
 
-export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark }: ClientRemarkModalProps) {
+export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark, onUpdateRemark, onDeleteRemark }: ClientRemarkModalProps) {
+  const { user } = useAuth();
   const [newRemark, setNewRemark] = useState('');
   const [promiseDate, setPromiseDate] = useState('');
   const [promiseAmount, setPromiseAmount] = useState('');
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+
+  const [editingRemarkId, setEditingRemarkId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editPromiseDate, setEditPromiseDate] = useState('');
+  const [editPromiseAmount, setEditPromiseAmount] = useState('');
+
+  const handleStartEdit = (remark: ClientRemark) => {
+    setEditingRemarkId(remark.id);
+    setEditContent(remark.content);
+    setEditPromiseDate(remark.promiseDate ? new Date(remark.promiseDate).toISOString().split('T')[0] : '');
+    setEditPromiseAmount(remark.promiseAmount ? remark.promiseAmount.toString() : '');
+  };
+
+  const handleSaveEdit = (remarkId: string) => {
+    if (editContent.trim() && onUpdateRemark) {
+      onUpdateRemark(clientName, remarkId, editContent.trim(), editPromiseDate || undefined, editPromiseAmount ? parseFloat(editPromiseAmount) : undefined);
+      setEditingRemarkId(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingRemarkId(null);
+  };
 
   const [activeCategory, setActiveCategory] = useState<'none' | 'appel' | 'visite'>('none');
 
@@ -196,7 +227,17 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {remarks.map((remark) => (
+                  {remarks.map((remark) => {
+                    const isAuthor = user?.email && remark.user && user.email.toLowerCase() === remark.user.toLowerCase();
+                    const remarkTime = new Date(remark.date).getTime();
+                    const isWithin24h = (Date.now() - remarkTime) < 24 * 60 * 60 * 1000;
+                    const isAdmin = user?.email && ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'].includes(user.email.toLowerCase());
+
+                    const canDelete = isAdmin || (isAuthor && isWithin24h);
+                    const canEdit = isAuthor && isWithin24h;
+                    const isEditing = editingRemarkId === remark.id;
+
+                    return (
                     <div key={remark.id} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-2">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -211,29 +252,73 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                             </div>
                           </div>
                         </div>
-                        <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px] font-black uppercase px-2 py-0.5">Enregistré</Badge>
-                      </div>
-                      <p className="text-sm text-slate-600 leading-relaxed font-medium pl-10 border-l-2 border-slate-50">
-                        {remark.content}
-                      </p>
-                      {(remark.promiseDate || remark.promiseAmount) && (
-                        <div className="mt-2 ml-10 flex flex-wrap items-center gap-3">
-                          {remark.promiseDate && (
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-2 py-1 rounded-md">
-                              <Calendar className="h-3 w-3" />
-                              Promesse : {new Date(remark.promiseDate).toLocaleDateString('fr-FR')}
-                            </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-emerald-50 text-emerald-600 border-emerald-100 text-[9px] font-black uppercase px-2 py-0.5">Enregistré</Badge>
+                          {!isEditing && canEdit && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-blue-600 hover:bg-blue-50" onClick={() => handleStartEdit(remark)} title="Modifier la remarque (disponible 24h)">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
                           )}
-                          {remark.promiseAmount && (
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-1 rounded-md">
-                              <Coins className="h-3 w-3" />
-                              Montant : {remark.promiseAmount.toLocaleString('fr-FR')} TND
-                            </div>
+                          {!isEditing && canDelete && onDeleteRemark && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-rose-600 hover:bg-rose-50" onClick={() => onDeleteRemark(clientName, remark.id)} title="Supprimer la remarque">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           )}
                         </div>
+                      </div>
+
+                      {isEditing ? (
+                        <div className="space-y-3 pl-10">
+                          <Textarea 
+                            value={editContent} 
+                            onChange={(e) => setEditContent(e.target.value)} 
+                            className="text-sm font-medium p-3 min-h-[80px] rounded-xl border-slate-200"
+                          />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-[10px] font-bold text-slate-400 mb-1 block">Date de promesse</Label>
+                              <Input type="date" value={editPromiseDate} onChange={(e) => setEditPromiseDate(e.target.value)} className="h-8 text-xs rounded-lg" />
+                            </div>
+                            <div>
+                              <Label className="text-[10px] font-bold text-slate-400 mb-1 block">Montant (TND)</Label>
+                              <Input type="number" value={editPromiseAmount} onChange={(e) => setEditPromiseAmount(e.target.value)} placeholder="0.000" className="h-8 text-xs rounded-lg" />
+                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1">
+                            <Button variant="outline" size="sm" onClick={handleCancelEdit} className="h-7 text-xs px-3 rounded-lg">
+                              <X className="h-3 w-3 mr-1" /> Annuler
+                            </Button>
+                            <Button size="sm" onClick={() => handleSaveEdit(remark.id)} className="h-7 text-xs px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                              <Check className="h-3 w-3 mr-1" /> Enregistrer
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm text-slate-600 leading-relaxed font-medium pl-10 border-l-2 border-slate-50">
+                            {remark.content}
+                          </p>
+                          {(remark.promiseDate || remark.promiseAmount) && (
+                            <div className="mt-2 ml-10 flex flex-wrap items-center gap-3">
+                              {remark.promiseDate && (
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 bg-blue-50 w-fit px-2 py-1 rounded-md">
+                                  <Calendar className="h-3 w-3" />
+                                  Promesse : {new Date(remark.promiseDate).toLocaleDateString('fr-FR')}
+                                </div>
+                              )}
+                              {remark.promiseAmount && (
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-1 rounded-md">
+                                  <Coins className="h-3 w-3" />
+                                  Montant : {remark.promiseAmount.toLocaleString('fr-FR')} TND
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>

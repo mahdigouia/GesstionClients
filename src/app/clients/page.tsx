@@ -54,7 +54,7 @@ import { Progress } from "@/components/ui/progress";
 import { ClientRemarkModal } from '@/components/ClientRemarkModal';
 
 export default function ClientsPage() {
-  const { debts, analysis, clientRemarks, addClientRemark, logAudit } = useDebtContext();
+  const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit } = useDebtContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCommercial, setSelectedCommercial] = useState('all');
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
@@ -760,6 +760,8 @@ export default function ClientsPage() {
         clientName={remarkClientName}
         remarks={clientRemarks[remarkClientName] || []}
         onAddRemark={addClientRemark}
+        onUpdateRemark={updateClientRemark}
+        onDeleteRemark={deleteClientRemark}
       />
     </div>
   );
