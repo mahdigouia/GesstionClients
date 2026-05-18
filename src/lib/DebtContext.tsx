@@ -9,6 +9,7 @@ import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 interface DebtContextType {
   debts: ClientDebt[];
+  archiveDebts: ClientDebt[];
   analysis: AnalysisResult | null;
   recoveryActions: RecoveryAction[];
   clientRemarks: Record<string, ClientRemark[]>;
@@ -72,6 +73,7 @@ const FIRESTORE_DOC = 'current_debts';
 
 export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebtsState] = useState<ClientDebt[]>([]);
+  const [archiveDebts, setArchiveDebtsState] = useState<ClientDebt[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [recoveryActions, setRecoveryActions] = useState<RecoveryAction[]>([]);
   const [clientRemarks, setClientRemarks] = useState<Record<string, ClientRemark[]>>({});
@@ -93,6 +95,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           const data = snapshot.data();
           const firestoreDebts = data.debts || [];
           setDebtsState(firestoreDebts);
+          setArchiveDebtsState(data.archiveDebts || []);
           setRecoveryActions(data.recoveryActions || []);
           setClientRemarks(data.clientRemarks || {});
           setLastUpdatedBy(data.updatedBy || null);
@@ -134,9 +137,13 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const loadFromLocalStorage = () => {
     try {
       const savedDebts = localStorage.getItem('gc_debts');
+      const savedArchive = localStorage.getItem('gc_archive');
       const savedAnalysis = localStorage.getItem('gc_analysis');
       if (savedDebts) {
         setDebtsState(JSON.parse(savedDebts));
+      }
+      if (savedArchive) {
+        setArchiveDebtsState(JSON.parse(savedArchive));
       }
       if (savedAnalysis) {
         setAnalysis(JSON.parse(savedAnalysis));
@@ -155,16 +162,18 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   // Sauvegarder dans Firestore + localStorage
-  const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions, newRemarks: Record<string, ClientRemark[]> = clientRemarks) => {
+  const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions, newRemarks: Record<string, ClientRemark[]> = clientRemarks, newArchive: ClientDebt[] = archiveDebts) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
     localStorage.setItem('gc_actions', JSON.stringify(newActions));
     localStorage.setItem('gc_remarks', JSON.stringify(newRemarks));
+    localStorage.setItem('gc_archive', JSON.stringify(newArchive));
     
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       await setDoc(docRef, {
         debts: newDebts,
+        archiveDebts: newArchive,
         recoveryActions: newActions,
         clientRemarks: newRemarks,
         updatedAt: serverTimestamp(),
@@ -266,13 +275,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     saveToFirestore(debts, recoveryActions, updatedRemarks);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
-      logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`);
-    }
-  };
-
-  const setDebts = (newDebts: ClientDebt[]) => {
+      logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`)  const setDebts = (newDebts: ClientDebt[]) => {
     setDebtsState(newDebts);
-    saveToFirestore(newDebts);
+    saveToFirestore(newDebts, recoveryActions, clientRemarks, archiveDebts);
     
     // Analyse locale
     if (newDebts.length > 0) {
@@ -282,8 +287,6 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       // Mettre à jour l'état local avec les créances enrichies (isContentieux, etc.)
       if (newAnalysis.processedDebts) {
         setDebtsState(newAnalysis.processedDebts);
-        // On ne sauvegarde pas forcément les processedDebts dans Firestore ici 
-        // pour garder les originaux si besoin, mais l'UI utilisera les versions traitées.
       }
       
       localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
@@ -303,7 +306,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const updatedDebts = Array.from(debtMap.values());
       
       // Sauvegarder la version finale fusionnée
-      saveToFirestore(updatedDebts);
+      saveToFirestore(updatedDebts, recoveryActions, clientRemarks, archiveDebts);
 
       if (user?.email === 'moslem.gouia@gmail.com') {
         logAction('Import de masse', `Ajout de ${newDebts.length} nouvelles créances`);
@@ -327,6 +330,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     
     // We'll work on a copy of the debts
     let currentTotalDebts = [...debts];
+    let currentArchiveDebts = [...archiveDebts];
     
     let totalUpdated = 0;
     let totalNew = 0;
@@ -363,13 +367,39 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
       totalRemoved += Math.max(0, existingDebtsForFile.length - (newDebtsForFile.length - (debtsWithDate.filter(nd => !existingDebtsForFile.some(ed => ed.documentNumber === nd.documentNumber)).length)));
       
+      // Archiver les anciennes créances de ce fichier au lieu de les écraser
+      if (existingDebtsForFile.length > 0) {
+        const archivedOfThisFile = existingDebtsForFile.map(d => ({ 
+          ...d, 
+          isArchived: true, 
+          archiveDate: today 
+        }));
+        // On fusionne avec currentArchiveDebts en évitant les doublons stricts d'identifiants
+        const existingArchiveFiltered = currentArchiveDebts.filter(ad => !archivedOfThisFile.some(newAd => newAd.id === ad.id));
+        currentArchiveDebts = [...existingArchiveFiltered, ...archivedOfThisFile];
+      }
+
       // Re-assemble currentTotalDebts for the next iteration
       const otherDebtsReset = otherDebts.map(d => ({ ...d, isRecentlyUpdated: false }));
       currentTotalDebts = [...otherDebtsReset, ...debtsWithDate];
     });
 
     // Final update
-    setDebts(currentTotalDebts);
+    setArchiveDebtsState(currentArchiveDebts);
+    setDebtsState(currentTotalDebts);
+    saveToFirestore(currentTotalDebts, recoveryActions, clientRemarks, currentArchiveDebts);
+    
+    // Analyse locale
+    if (currentTotalDebts.length > 0) {
+      const newAnalysis = AnalysisService.analyzeDebts(currentTotalDebts);
+      setAnalysis(newAnalysis);
+      if (newAnalysis.processedDebts) {
+        setDebtsState(newAnalysis.processedDebts);
+      }
+      localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
+    } else {
+      setAnalysis(null);
+    }
 
     return {
       updated: totalUpdated,
@@ -385,14 +415,17 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   const clearAll = async () => {
     setDebtsState([]);
+    setArchiveDebtsState([]);
     setAnalysis(null);
     localStorage.removeItem('gc_debts');
+    localStorage.removeItem('gc_archive');
     localStorage.removeItem('gc_analysis');
 
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       await setDoc(docRef, {
         debts: [],
+        archiveDebts: [],
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: 0,
@@ -491,6 +524,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   return (
     <DebtContext.Provider value={{ 
       debts, 
+      archiveDebts,
       analysis, 
       recoveryActions,
       clientRemarks,

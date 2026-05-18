@@ -134,10 +134,17 @@ export function ClientHistoryModal({ isOpen, onClose, clientDebts, clientName }:
                     </TableHeader>
                     <TableBody>
                       {sortedDebts.map((debt) => (
-                        <TableRow key={debt.id} className="hover:bg-blue-50/30 transition-colors">
+                        <TableRow key={debt.id} className={`hover:bg-blue-50/30 transition-colors ${debt.isArchived ? 'bg-slate-50/70 opacity-75' : ''}`}>
                           <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-bold text-gray-900">{debt.documentNumber}</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-900">{debt.documentNumber}</span>
+                                {debt.isArchived && (
+                                  <Badge variant="outline" className="bg-slate-200 text-slate-700 text-[9px] border-slate-300 font-semibold px-1.5 py-0">
+                                    Archive ({format(new Date(debt.archiveDate || debt.lastImportDate || debt.documentDate), 'dd/MM/yy')})
+                                  </Badge>
+                                )}
+                              </div>
                               <span className="text-[10px] text-gray-400 uppercase">{debt.sourceFile}</span>
                             </div>
                           </TableCell>

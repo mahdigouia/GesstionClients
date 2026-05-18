@@ -564,12 +564,14 @@ Source: ${debt.sourceFile}
 
         const rowspanAttr = (col.key === 'remark' && row.isFirstInGroup && row.groupSize > 1) ? ` rowspan="${row.groupSize}"` : '';
         
-        // Style spécial pour les remarques (effet manuscrit)
+        // Style spécial pour les remarques (effet manuscrit avec retour à la ligne et hauteur automatique)
+        let displayVal = val ?? '';
         if (col.key === 'remark' && val) {
-          inlineStyle += " font-family: 'Courier New', cursive; color: #1e40af; font-style: italic; text-align: left; padding: 5px;";
+          inlineStyle += " font-family: 'Courier New', cursive; color: #1e40af; font-style: italic; text-align: left; padding: 5px; white-space: normal; vertical-align: top; mso-height-source: auto;";
+          displayVal = String(val).replace(/\n/g, '<br>');
         }
 
-        html += `<td class="${cellClass}" style="${inlineStyle}"${xNumAttr}${rowspanAttr}>${val ?? ''}</td>`;
+        html += `<td class="${cellClass}" style="${inlineStyle}"${xNumAttr}${rowspanAttr}>${displayVal}</td>`;
       });
       html += `</tr>`;
     });
@@ -806,6 +808,7 @@ Source: ${debt.sourceFile}
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
         // Remarque fusionnée visuellement (affichée une seule fois par groupe)
+        let rowAdvance = 7;
         if (i === 0) {
           const r = clientRemarks[client.clientName]?.[0];
           if (r) {
@@ -828,14 +831,32 @@ Source: ${debt.sourceFile}
             if (r.promiseAmount) {
               dateInfo += ` | Montant: ${r.promiseAmount.toLocaleString('fr-FR')} TND`;
             }
-            pdf.text(dateInfo, margin + 238 + 1, currentY + 3);
+            const remarkLinesHeight = splitRemark.length * 2.8;
+            pdf.text(dateInfo, margin + 238 + 1, currentY - 2.5 + remarkLinesHeight + 1);
 
             pdf.setFont('helvetica', 'normal');
             pdf.setFontSize(8);
+
+            if (debts.length === 1) {
+              const totalRemarkHeight = remarkLinesHeight + 5;
+              if (totalRemarkHeight > 7) {
+                rowAdvance = totalRemarkHeight;
+              }
+            }
+          }
+        } else if (i === debts.length - 1) {
+          const r = clientRemarks[client.clientName]?.[0];
+          if (r) {
+            const splitRemark = pdf.splitTextToSize(r.content, 33);
+            const totalRemarkHeight = (splitRemark.length * 2.8) + 5;
+            const groupStandardHeight = debts.length * 7;
+            if (totalRemarkHeight > groupStandardHeight) {
+              rowAdvance += (totalRemarkHeight - groupStandardHeight);
+            }
           }
         }
 
-        currentY += 7;
+        currentY += rowAdvance;
         globalIndex++;
       });
 

@@ -58,6 +58,8 @@ export interface ClientDebt {
   isRecentlyUpdated?: boolean;
   extractIndex?: number;
   isRetention?: boolean;
+  isArchived?: boolean;
+  archiveDate?: string;
 }
 
 export interface AnalysisResult {

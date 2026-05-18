@@ -49,7 +49,7 @@ import {
 } from '@/components/ui/select';
 
 export default function Home() {
-  const { debts, analysis, addDebts, updateDebtsFromFile, updateDebtsFromFiles, setDebts, setAnalysis, addRecoveryAction, logAudit } = useDebtContext();
+  const { debts, archiveDebts, analysis, addDebts, updateDebtsFromFile, updateDebtsFromFiles, setDebts, setAnalysis, addRecoveryAction, logAudit } = useDebtContext();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -83,6 +83,7 @@ export default function Home() {
     setProgress(0);
     setError(null);
     setWaitingMessage(null);
+    let filesProcessed = 0;
     
     try {
       // Étape 1: Attendre que le service Python soit disponible
@@ -161,9 +162,16 @@ export default function Home() {
   };
 
   const handleShowClientHistory = (clientName: string) => {
-    const history = debts.filter(d => d.clientName === clientName);
+    const activeClientDebts = debts.filter(d => d.clientName === clientName);
+    const archivedClientDebts = (archiveDebts || []).filter(d => d.clientName === clientName);
+    
+    // Fusionner pour l'historique en combinant créances actives et archivées
+    const combinedMap = new Map<string, ClientDebt>();
+    archivedClientDebts.forEach(d => combinedMap.set(d.documentNumber + '_' + (d.lastImportDate || ''), d));
+    activeClientDebts.forEach(d => combinedMap.set(d.documentNumber + '_' + (d.lastImportDate || ''), d));
+    
     setSelectedClientName(clientName);
-    setClientHistoryDebts(history);
+    setClientHistoryDebts(Array.from(combinedMap.values()));
     setIsHistoryModalOpen(true);
   };
 

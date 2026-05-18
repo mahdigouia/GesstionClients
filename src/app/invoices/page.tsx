@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function InvoicesPage() {
-  const { debts, analysis, settings, logAudit } = useDebtContext();
+  const { debts, archiveDebts, analysis, settings, logAudit } = useDebtContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -27,9 +27,16 @@ export default function InvoicesPage() {
   const [clientHistoryDebts, setClientHistoryDebts] = useState<ClientDebt[]>([]);
 
   const handleShowClientHistory = (clientName: string) => {
-    const history = debts.filter(d => d.clientName === clientName);
+    const activeClientDebts = debts.filter(d => d.clientName === clientName);
+    const archivedClientDebts = (archiveDebts || []).filter(d => d.clientName === clientName);
+    
+    // Fusionner pour l'historique en combinant créances actives et archivées
+    const combinedMap = new Map<string, ClientDebt>();
+    archivedClientDebts.forEach(d => combinedMap.set(d.documentNumber + '_' + (d.lastImportDate || ''), d));
+    activeClientDebts.forEach(d => combinedMap.set(d.documentNumber + '_' + (d.lastImportDate || ''), d));
+    
     setSelectedClientName(clientName);
-    setClientHistoryDebts(history);
+    setClientHistoryDebts(Array.from(combinedMap.values()));
     setIsHistoryModalOpen(true);
   };
 
