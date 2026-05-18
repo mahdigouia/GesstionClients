@@ -728,7 +728,13 @@ export default function ClientsPage() {
                                   <TableCell className="hidden md:table-cell text-xs md:text-sm font-bold text-emerald-600 text-right py-3 md:py-5">{(debt.settlement ?? 0).toLocaleString('fr-FR')} TND</TableCell>
                                   <TableCell className="text-sm md:text-base font-black text-rose-600 text-right py-3 md:py-5">{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</TableCell>
                                   <TableCell className="text-center py-3 md:py-5">
-                                    <Badge className={`font-black px-2 py-0.5 md:px-3 md:py-1 rounded-lg text-[9px] md:text-[11px] ${debt.age > 90 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'}`}>{debt.age} j</Badge>
+                                    <Badge className={`font-black px-3 py-1 md:px-4 md:py-1.5 rounded-xl text-xs md:text-sm shadow-sm border ${
+                                      debt.age <= 15 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                      debt.age <= 30 ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                      debt.age <= 45 ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                      debt.age <= 60 ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                      'bg-rose-100 text-rose-700 border-rose-200'
+                                    }`}>{debt.age} j</Badge>
                                   </TableCell>
                                   <TableCell className="hidden sm:table-cell py-3 md:py-5 px-4 md:px-6">
                                     <div className="flex flex-col gap-1.5 min-w-[60px] md:min-w-[100px]">

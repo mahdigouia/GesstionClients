@@ -446,14 +446,15 @@ export function DebtTable({ debts, onExport, onClientClick, onQuickAction }: Deb
                     {debt.balance.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TND
                   </TableCell>
                   <TableCell className="text-center">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      debt.age > 365 ? 'bg-red-100 text-red-800' :
-                      debt.age > 90 ? 'bg-orange-100 text-orange-800' :
-                      debt.age > 30 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
+                    <Badge className={`font-black px-3 py-1 md:px-4 md:py-1.5 rounded-xl text-xs md:text-sm shadow-sm border ${
+                      debt.age <= 15 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                      debt.age <= 30 ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                      debt.age <= 45 ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                      debt.age <= 60 ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                      'bg-rose-100 text-rose-700 border-rose-200'
                     }`}>
-                      {debt.age}j
-                    </span>
+                      {debt.age} j
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     {debt.paymentDays}

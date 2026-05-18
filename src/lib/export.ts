@@ -428,9 +428,9 @@ Source: ${debt.sourceFile}
           date: new Date(debt.documentDate).toLocaleDateString('fr-FR'),
           due: new Date(debt.dueDate).toLocaleDateString('fr-FR'),
           age: debt.age,
-           amount: debt.amount.toFixed(3),
-          settlement: (debt.settlement || 0).toFixed(3),
-          balance: debt.balance.toFixed(3),
+          amount: debt.amount,
+          settlement: debt.settlement || 0,
+          balance: debt.balance,
           remark: (() => {
             const r = clientRemarks[client.clientName]?.[0];
             if (!r) return '';
@@ -511,6 +511,8 @@ Source: ${debt.sourceFile}
         let val = row[col.key];
         let cellClass = "cell";
         let inlineStyle = "";
+        let xNumAttr = "";
+
         if (col.bold) cellClass += " bold";
         
         // Coloration par âge via styles en ligne (plus fiable pour Excel)
@@ -521,11 +523,21 @@ Source: ${debt.sourceFile}
           else if (age <= 45) inlineStyle = "color: #d97706; font-weight: bold;";
           else if (age <= 60) inlineStyle = "color: #ea580c; font-weight: bold;";
           else inlineStyle = "color: #dc2626; font-weight: bold;";
+
+          xNumAttr = ` x:num="${age}"`;
+          inlineStyle += " mso-number-format:'0';";
         }
 
-        // Style conditionnel pour le solde
-        if (col.key === 'balance' && parseFloat(val) > 0) {
-          inlineStyle += " color: #b91c1c; font-weight: bold;";
+        // Style conditionnel pour le solde et autres nombres
+        if (col.type === 'number' && col.key !== 'age') {
+          const numVal = typeof val === 'number' ? val : parseFloat(val || 0);
+          xNumAttr = ` x:num="${numVal}"`;
+          inlineStyle += " mso-number-format:'\\#\\,\\#\\#0.000';";
+          if (col.key === 'balance' && numVal > 0) {
+            inlineStyle += " color: #b91c1c; font-weight: bold;";
+          }
+          // Formatage d'affichage HTML (fallback)
+          val = numVal.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
         }
 
         const rowspanAttr = (col.key === 'remark' && row.isFirstInGroup && row.groupSize > 1) ? ` rowspan="${row.groupSize}"` : '';
@@ -535,7 +547,7 @@ Source: ${debt.sourceFile}
           inlineStyle += " font-family: 'Courier New', cursive; color: #1e40af; font-style: italic; text-align: left; padding: 5px;";
         }
 
-        html += `<td class="${cellClass}" style="${inlineStyle}"${rowspanAttr}>${val ?? ''}</td>`;
+        html += `<td class="${cellClass}" style="${inlineStyle}"${xNumAttr}${rowspanAttr}>${val ?? ''}</td>`;
       });
       html += `</tr>`;
     });
