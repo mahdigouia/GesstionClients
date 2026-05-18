@@ -27,6 +27,28 @@ export class ExportService {
       'Fichier Source': debt.sourceFile
     }));
 
+    const totalAmount = debts.reduce((sum, d) => sum + d.amount, 0);
+    const totalSettlement = debts.reduce((sum, d) => sum + (d.settlement || 0), 0);
+    const totalBalance = debts.reduce((sum, d) => sum + d.balance, 0);
+    const avgAge = debts.length > 0 ? Math.round(debts.reduce((sum, d) => sum + d.age, 0) / debts.length) : 0;
+
+    debtsData.push({
+      'Code Client': 'TOTAL / MOYENNE',
+      'Nom Client': '',
+      'Téléphone': '',
+      'N° Pièce': '',
+      'Description': '',
+      'Date Document': '',
+      'Date Échéance': '',
+      'Montant': totalAmount,
+      'Règlement': totalSettlement,
+      'Solde': totalBalance,
+      'Âge (jours)': avgAge,
+      'Jours de Paiement': '' as any,
+      'Niveau Risque': '',
+      'Fichier Source': ''
+    });
+
     const debtsSheet = XLSX.utils.json_to_sheet(debtsData);
     XLSX.utils.book_append_sheet(workbook, debtsSheet, 'Créances');
 
@@ -551,6 +573,43 @@ Source: ${debt.sourceFile}
       });
       html += `</tr>`;
     });
+
+    const totalAmount = data.reduce((sum, r) => sum + (typeof r.amount === 'number' ? r.amount : parseFloat(r.amount || 0)), 0);
+    const totalSettlement = data.reduce((sum, r) => sum + (typeof r.settlement === 'number' ? r.settlement : parseFloat(r.settlement || 0)), 0);
+    const totalBalance = data.reduce((sum, r) => sum + (typeof r.balance === 'number' ? r.balance : parseFloat(r.balance || 0)), 0);
+    const avgAge = data.length > 0 ? Math.round(data.reduce((sum, r) => sum + (typeof r.age === 'number' ? r.age : parseInt(r.age || 0)), 0) / data.length) : 0;
+
+    html += `<tr style="background-color: #f1f5f9; font-weight: bold;">`;
+    columns.forEach(col => {
+      let cellHtml = "";
+      let inlineStyle = "border: 0.5pt solid #cbd5e1; font-family: sans-serif; font-size: 10pt; text-align: center; vertical-align: middle; font-weight: bold;";
+      let xNumAttr = "";
+
+      if (col.key === 'code') {
+        cellHtml = "TOTAL / MOYENNE";
+      } else if (col.key === 'age') {
+        cellHtml = `${avgAge} j`;
+        inlineStyle += " color: #0f172a; mso-number-format:'0';";
+        xNumAttr = ` x:num="${avgAge}"`;
+      } else if (col.key === 'amount') {
+        cellHtml = totalAmount.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        inlineStyle += " mso-number-format:'\\#\\,\\#\\#0.000';";
+        xNumAttr = ` x:num="${totalAmount}"`;
+      } else if (col.key === 'settlement') {
+        cellHtml = totalSettlement.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        inlineStyle += " mso-number-format:'\\#\\,\\#\\#0.000'; color: #059669;";
+        xNumAttr = ` x:num="${totalSettlement}"`;
+      } else if (col.key === 'balance') {
+        cellHtml = totalBalance.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        inlineStyle += " mso-number-format:'\\#\\,\\#\\#0.000'; color: #b91c1c;";
+        xNumAttr = ` x:num="${totalBalance}"`;
+      } else {
+        cellHtml = "";
+      }
+
+      html += `<td style="${inlineStyle}"${xNumAttr}>${cellHtml}</td>`;
+    });
+    html += `</tr>`;
 
     html += `</tbody></table></body></html>`;
 
