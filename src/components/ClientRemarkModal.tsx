@@ -164,23 +164,39 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   };
 
+  useEffect(() => {
+    if (promiseDate && newRemark.includes('[DATE]')) {
+      const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
+      setNewRemark(prev => prev.replace(/\[DATE\]/g, formattedDate));
+    }
+    if (promiseAmount && newRemark.includes('[MONTANT]')) {
+      setNewRemark(prev => prev.replace(/\[MONTANT\]/g, `${promiseAmount} TND`));
+    }
+  }, [promiseDate, promiseAmount]);
+
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
-    // Auto-fill date if available
     if (promiseDate) {
       const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
-      text = text.replace('[DATE]', formattedDate);
+      text = text.replace(/\[DATE\]/g, formattedDate);
     }
-    // Auto-fill amount if available
     if (promiseAmount) {
-      text = text.replace('[MONTANT]', `${promiseAmount} TND`);
+      text = text.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
     }
     setNewRemark(prev => prev + (prev ? ' ' : '') + text);
   };
 
   const handleSubmit = () => {
     if (newRemark.trim()) {
-      onAddRemark(clientName, newRemark.trim(), promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
+      let finalRemark = newRemark.trim();
+      if (promiseDate) {
+        const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
+        finalRemark = finalRemark.replace(/\[DATE\]/g, formattedDate);
+      }
+      if (promiseAmount) {
+        finalRemark = finalRemark.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
+      }
+      onAddRemark(clientName, finalRemark, promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
       setNewRemark('');
       setPromiseDate('');
       setPromiseAmount('');

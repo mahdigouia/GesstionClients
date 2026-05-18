@@ -457,6 +457,12 @@ Source: ${debt.sourceFile}
             const r = clientRemarks[client.clientName]?.[0];
             if (!r) return '';
             let text = r.content;
+            if (r.promiseDate) {
+              text = text.replace(/\[DATE\]/g, new Date(r.promiseDate).toLocaleDateString('fr-FR'));
+            }
+            if (r.promiseAmount) {
+              text = text.replace(/\[MONTANT\]/g, `${r.promiseAmount.toLocaleString('fr-FR')} TND`);
+            }
             const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
             const promiseDateText = r.promiseDate ? ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}` : '';
             const promiseAmountText = r.promiseAmount ? ` | Montant: ${r.promiseAmount.toLocaleString('fr-FR')} TND` : '';
@@ -756,6 +762,7 @@ Source: ${debt.sourceFile}
 
     clients.forEach((client) => {
       const debts = client.filteredDebts || [];
+      const startY = currentY;
       
       debts.forEach((debt: ClientDebt, i: number) => {
         if (currentY > 185) {
@@ -768,13 +775,13 @@ Source: ${debt.sourceFile}
 
         if (globalIndex % 2 === 0) {
           pdf.setFillColor(248, 250, 252);
-          pdf.rect(margin, currentY - 5, pageWidth - (2 * margin), 7, 'F');
+          // Remplir uniquement la zone des créances pour ne pas écraser la remarque multilingue
+          pdf.rect(margin, currentY - 5, 238, 7, 'F');
         }
 
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
         
-        // Répétition des informations client sur chaque ligne pour éviter le vide
         pdf.text(client.clientCode || '?', margin + 8 + 9, currentY, { align: 'center' });
         pdf.text((client.clientName || '').substring(0, 32), margin + 26 + 26, currentY, { align: 'center' });
         
@@ -787,7 +794,6 @@ Source: ${debt.sourceFile}
         pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 122 + 11, currentY, { align: 'center' });
         pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 144 + 11, currentY, { align: 'center' });
         
-        // Âge avec couleur
         pdf.setFont('helvetica', 'bold');
         const age = debt.age;
         if (age <= 15) pdf.setTextColor(5, 150, 105);
@@ -805,60 +811,49 @@ Source: ${debt.sourceFile}
         if (debt.balance > 0) pdf.setTextColor(185, 28, 28);
         pdf.text(formatCurrency(debt.balance), margin + 208 + 15, currentY, { align: 'center' });
         
-        pdf.setTextColor(30, 41, 59);
-        pdf.setFont('helvetica', 'normal');
-        // Remarque fusionnée visuellement (affichée une seule fois par groupe)
-        let rowAdvance = 7;
-        if (i === 0) {
-          const r = clientRemarks[client.clientName]?.[0];
-          if (r) {
-            // Texte principal
-            pdf.setFont('courier', 'italic');
-            pdf.setTextColor(30, 64, 175); // Bleu "encre"
-            pdf.setFontSize(7);
-            const splitRemark = pdf.splitTextToSize(r.content, 33);
-            pdf.text(splitRemark, margin + 238 + 1, currentY - 2.5);
-            
-            // Dates en tout petit
-            pdf.setFont('helvetica', 'normal');
-            pdf.setTextColor(100, 116, 139); // Gris ardoise
-            pdf.setFontSize(4.5);
-            const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
-            let dateInfo = `Saisi le: ${entryDate}`;
-            if (r.promiseDate) {
-              dateInfo += ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}`;
-            }
-            if (r.promiseAmount) {
-              dateInfo += ` | Montant: ${r.promiseAmount.toLocaleString('fr-FR')} TND`;
-            }
-            const remarkLinesHeight = splitRemark.length * 2.8;
-            pdf.text(dateInfo, margin + 238 + 1, currentY - 2.5 + remarkLinesHeight + 1);
-
-            pdf.setFont('helvetica', 'normal');
-            pdf.setFontSize(8);
-
-            if (debts.length === 1) {
-              const totalRemarkHeight = remarkLinesHeight + 5;
-              if (totalRemarkHeight > 7) {
-                rowAdvance = totalRemarkHeight;
-              }
-            }
-          }
-        } else if (i === debts.length - 1) {
-          const r = clientRemarks[client.clientName]?.[0];
-          if (r) {
-            const splitRemark = pdf.splitTextToSize(r.content, 33);
-            const totalRemarkHeight = (splitRemark.length * 2.8) + 5;
-            const groupStandardHeight = debts.length * 7;
-            if (totalRemarkHeight > groupStandardHeight) {
-              rowAdvance += (totalRemarkHeight - groupStandardHeight);
-            }
-          }
-        }
-
-        currentY += rowAdvance;
+        currentY += 7;
         globalIndex++;
       });
+
+      // --- DESSIN DE LA REMARQUE APRÈS LES LIGNES DU GROUPE ---
+      const r = clientRemarks[client.clientName]?.[0];
+      if (r) {
+        pdf.setFont('courier', 'italic');
+        pdf.setTextColor(30, 64, 175); // Bleu "encre"
+        pdf.setFontSize(7);
+        
+        let contentClean = r.content;
+        if (r.promiseDate) {
+          contentClean = contentClean.replace(/\[DATE\]/g, new Date(r.promiseDate).toLocaleDateString('fr-FR'));
+        }
+        if (r.promiseAmount) {
+          contentClean = contentClean.replace(/\[MONTANT\]/g, `${r.promiseAmount.toLocaleString('fr-FR')} TND`);
+        }
+
+        const splitRemark = pdf.splitTextToSize(contentClean, 33);
+        pdf.text(splitRemark, margin + 238 + 1, startY - 2);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(100, 116, 139);
+        pdf.setFontSize(4.5);
+        const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
+        let dateInfo = `Saisi le: ${entryDate}`;
+        if (r.promiseDate) {
+          dateInfo += ` | Prom: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}`;
+        }
+        if (r.promiseAmount) {
+          dateInfo += ` | Mont: ${r.promiseAmount.toLocaleString('fr-FR')} TND`;
+        }
+        
+        const remarkLinesHeight = splitRemark.length * 2.8;
+        pdf.text(dateInfo, margin + 238 + 1, startY - 2 + remarkLinesHeight + 1);
+
+        const totalRemarkHeight = remarkLinesHeight + 5;
+        const groupStandardHeight = currentY - startY;
+        if (totalRemarkHeight > groupStandardHeight) {
+          currentY = startY + totalRemarkHeight + 2;
+        }
+      }
 
       pdf.setDrawColor(226, 232, 240);
       pdf.line(margin, currentY - 4, pageWidth - margin, currentY - 4);
