@@ -149,7 +149,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       console.warn('Erreur chargement données sauvegardées:', e);
-      // Sauvegarder dans Firestore + localStorage
+    }
+  };
+
+  // Sauvegarder dans Firestore + localStorage
   const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions, newRemarks: Record<string, ClientRemark[]> = clientRemarks) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
