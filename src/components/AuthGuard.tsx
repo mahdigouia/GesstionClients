@@ -25,10 +25,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
     if (!user && !isPublicRoute) {
       router.push('/login');
     } else if (user && isPublicRoute) {
-      router.push('/');
-    } else if (user && userRole === 'commercial' && pathname === '/import') {
-      // Redirect commercials trying to import
-      router.push('/');
+      if (userRole === 'commercial') {
+        router.push('/clients');
+      } else {
+        router.push('/');
+      }
+    } else if (user && userRole === 'commercial' && (pathname === '/' || pathname === '/import')) {
+      // Redirect commercials trying to access dashboard or import to the clients page
+      router.push('/clients');
     }
   }, [user, loading, userRole, pathname, router]);
 
