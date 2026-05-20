@@ -421,13 +421,13 @@ Source: ${debt.sourceFile}
   }
 
   // Export de la liste des clients en Excel (Détaillé)
-  static async exportClientsToExcel(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string, onLog?: (action: string, details: string) => void): Promise<void> {
+  static async exportClientsToExcel(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string, onLog?: (action: string, details: string) => void, isCommercial?: boolean): Promise<void> {
     const rows: any[] = [];
     const columns = [
       { header: 'N°', key: 'n', width: 40 },
       { header: 'Code Client', key: 'code', width: 80 },
       { header: 'Nom Client', key: 'name', width: 250 },
-      { header: 'Rep. (Source)', key: 'rep', width: 80 },
+      ...(isCommercial ? [] : [{ header: 'Rep. (Source)', key: 'rep', width: 80 }]),
       { header: 'N° Pièce', key: 'doc', width: 100 },
       { header: 'Date', key: 'date', width: 90 },
       { header: 'Échéance', key: 'due', width: 90 },
@@ -435,7 +435,7 @@ Source: ${debt.sourceFile}
       { header: 'Montant (TND)', key: 'amount', width: 110, type: 'number' },
       { header: 'Règlement (TND)', key: 'settlement', width: 110, type: 'number' },
       { header: 'Solde (TND)', key: 'balance', width: 110, type: 'number', bold: true },
-      { header: 'Remarque', key: 'remark', width: 200 }
+      { header: 'Remarque', key: 'remark', width: isCommercial ? 280 : 200 }
     ];
     let globalCounter = 1;
     clients.forEach(client => {
@@ -629,7 +629,7 @@ Source: ${debt.sourceFile}
   }
 
   // Export de la liste des clients en PDF (Détaillé & Embelli)
-  static async exportClientsToPDF(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string, onLog?: (action: string, details: string) => void): Promise<void> {
+  static async exportClientsToPDF(clients: any[], clientRemarks: Record<string, any[]>, activeFilters?: string, onLog?: (action: string, details: string) => void, isCommercial?: boolean): Promise<void> {
     const pdf = new jsPDF('l', 'mm', 'a4'); // Mode paysage pour plus d'espace
     const pageWidth = 297;
     const pageHeight = 210;
@@ -727,19 +727,36 @@ Source: ${debt.sourceFile}
     currentY = addHeader(pageNum);
 
     // Définition des colonnes (Paysage)
-    const cols = [
-      { h: 'N°', x: margin, w: 8, align: 'center' },
-      { h: 'Code', x: margin + 8, w: 18, align: 'center' },
-      { h: 'Client', x: margin + 26, w: 52, align: 'center' },
-      { h: 'Rep.', x: margin + 78, w: 14, align: 'center' },
-      { h: 'N° Pièce', x: margin + 92, w: 30, align: 'center' },
-      { h: 'Date', x: margin + 122, w: 22, align: 'center' },
-      { h: 'Échéance', x: margin + 144, w: 22, align: 'center' },
-      { h: 'Âge', x: margin + 166, w: 12, align: 'center' },
-      { h: 'Montant', x: margin + 178, w: 30, align: 'center' },
-      { h: 'Solde', x: margin + 208, w: 30, align: 'center' },
-      { h: 'Remarque', x: margin + 238, w: 35, align: 'center' }
+    const columnDefinitions = [
+      { h: 'N°', w: 8, align: 'center', key: 'index' },
+      { h: 'Code', w: 18, align: 'center', key: 'code' },
+      { h: 'Client', w: 52, align: 'center', key: 'client' },
+      ...(!isCommercial ? [{ h: 'Rep.', w: 14, align: 'center', key: 'rep' }] : []),
+      { h: 'N° Pièce', w: 30, align: 'center', key: 'piece' },
+      { h: 'Date', w: 22, align: 'center', key: 'date' },
+      { h: 'Échéance', w: 22, align: 'center', key: 'due' },
+      { h: 'Âge', w: 12, align: 'center', key: 'age' },
+      { h: 'Montant', w: 30, align: 'center', key: 'amount' },
+      { h: 'Solde', w: 30, align: 'center', key: 'balance' },
+      { h: 'Remarque', w: isCommercial ? 49 : 35, align: 'center', key: 'remark' }
     ];
+
+    // Compute x coordinate dynamically!
+    let currentXOffset = margin;
+    const cols = columnDefinitions.map(col => {
+      const x = currentXOffset;
+      currentXOffset += col.w;
+      return { ...col, x };
+    });
+
+    const getColXCenter = (key: string) => {
+      const col = cols.find(c => c.key === key);
+      return col ? col.x + (col.w / 2) : 0;
+    };
+
+    const getCol = (key: string) => {
+      return cols.find(c => c.key === key);
+    };
 
     // Header Tableau
     const drawTableHeader = (y: number) => {
@@ -776,23 +793,27 @@ Source: ${debt.sourceFile}
         if (globalIndex % 2 === 0) {
           pdf.setFillColor(248, 250, 252);
           // Remplir uniquement la zone des créances pour ne pas écraser la remarque multilingue
-          pdf.rect(margin, currentY - 5, 238, 7, 'F');
+          const remarkCol = getCol('remark')!;
+          const backgroundWidth = remarkCol.x - margin;
+          pdf.rect(margin, currentY - 5, backgroundWidth, 7, 'F');
         }
 
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
         
-        pdf.text(client.clientCode || '?', margin + 8 + 9, currentY, { align: 'center' });
-        pdf.text((client.clientName || '').substring(0, 32), margin + 26 + 26, currentY, { align: 'center' });
+        pdf.text(client.clientCode || '?', getColXCenter('code'), currentY, { align: 'center' });
+        pdf.text((client.clientName || '').substring(0, 32), getColXCenter('client'), currentY, { align: 'center' });
         
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(debt.commercialCode || client.commercialCode || '?', margin + 78 + 7, currentY, { align: 'center' });
-        pdf.setFont('helvetica', 'normal');
+        if (!isCommercial) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(debt.commercialCode || client.commercialCode || '?', getColXCenter('rep'), currentY, { align: 'center' });
+          pdf.setFont('helvetica', 'normal');
+        }
 
-        pdf.text(String(globalIndex), margin + 4, currentY, { align: 'center' });
-        pdf.text(debt.documentNumber, margin + 92 + 15, currentY, { align: 'center' });
-        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), margin + 122 + 11, currentY, { align: 'center' });
-        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), margin + 144 + 11, currentY, { align: 'center' });
+        pdf.text(String(globalIndex), getColXCenter('index'), currentY, { align: 'center' });
+        pdf.text(debt.documentNumber, getColXCenter('piece'), currentY, { align: 'center' });
+        pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), getColXCenter('date'), currentY, { align: 'center' });
+        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), getColXCenter('due'), currentY, { align: 'center' });
         
         pdf.setFont('helvetica', 'bold');
         const age = debt.age;
@@ -801,15 +822,15 @@ Source: ${debt.sourceFile}
         else if (age <= 45) pdf.setTextColor(217, 119, 6);
         else if (age <= 60) pdf.setTextColor(234, 88, 12);
         else pdf.setTextColor(220, 38, 38);
-        pdf.text(`${age} j`, margin + 166 + 6, currentY, { align: 'center' });
+        pdf.text(`${age} j`, getColXCenter('age'), currentY, { align: 'center' });
         
         pdf.setTextColor(30, 41, 59);
         pdf.setFont('helvetica', 'normal');
-        pdf.text(formatCurrency(debt.amount), margin + 178 + 15, currentY, { align: 'center' });
+        pdf.text(formatCurrency(debt.amount), getColXCenter('amount'), currentY, { align: 'center' });
         
         pdf.setFont('helvetica', 'bold');
         if (debt.balance > 0) pdf.setTextColor(185, 28, 28);
-        pdf.text(formatCurrency(debt.balance), margin + 208 + 15, currentY, { align: 'center' });
+        pdf.text(formatCurrency(debt.balance), getColXCenter('balance'), currentY, { align: 'center' });
         
         currentY += 7;
         globalIndex++;
@@ -830,8 +851,9 @@ Source: ${debt.sourceFile}
           contentClean = contentClean.replace(/\[MONTANT\]/g, `${r.promiseAmount.toLocaleString('fr-FR')} TND`);
         }
 
-        const splitRemark = pdf.splitTextToSize(contentClean, 33);
-        pdf.text(splitRemark, margin + 238 + 1, startY - 2);
+        const remarkCol = getCol('remark')!;
+        const splitRemark = pdf.splitTextToSize(contentClean, remarkCol.w - 2);
+        pdf.text(splitRemark, remarkCol.x + 1, startY - 2);
         
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(100, 116, 139);
@@ -846,7 +868,7 @@ Source: ${debt.sourceFile}
         }
         
         const remarkLinesHeight = splitRemark.length * 2.8;
-        pdf.text(dateInfo, margin + 238 + 1, startY - 2 + remarkLinesHeight + 1);
+        pdf.text(dateInfo, remarkCol.x + 1, startY - 2 + remarkLinesHeight + 1);
 
         const totalRemarkHeight = remarkLinesHeight + 5;
         const groupStandardHeight = currentY - startY;
@@ -874,8 +896,8 @@ Source: ${debt.sourceFile}
     pdf.text("TOTAL GÉNÉRAL", margin + 5, currentY + 1.5);
     
     pdf.setTextColor(255, 255, 255);
-    pdf.text(formatCurrency(totalAmount), margin + 178 + 15, currentY + 1.5, { align: 'center' });
-    pdf.text(formatCurrency(totalBalance), margin + 208 + 15, currentY + 1.5, { align: 'center' });
+    pdf.text(formatCurrency(totalAmount), getColXCenter('amount'), currentY + 1.5, { align: 'center' });
+    pdf.text(formatCurrency(totalBalance), getColXCenter('balance'), currentY + 1.5, { align: 'center' });
 
     pdf.save(`Rapport_Portefeuille_Detaille_${new Date().toISOString().split('T')[0]}.pdf`);
 
