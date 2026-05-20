@@ -111,6 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUserRole(null);
         setCommercialCode(null);
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('commercial_landed');
+        }
         setLoading(false);
       }
     });

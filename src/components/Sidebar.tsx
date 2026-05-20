@@ -51,10 +51,8 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
   const [isHovered, setIsHovered] = useState(false);
 
   const filteredNavigation = navigation.filter(item => {
-    if (userRole === 'commercial') {
-      if (item.href === '/import' || item.href === '/') {
-        return false;
-      }
+    if (item.href === '/import' && userRole === 'commercial') {
+      return false;
     }
     return true;
   });
@@ -146,7 +144,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
           {!effectiveCollapsed && (
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <Link href={userRole === 'commercial' ? '/clients' : '/'} className="hover:opacity-80 transition-opacity cursor-pointer truncate">
+                <Link href="/" className="hover:opacity-80 transition-opacity cursor-pointer truncate">
                   <h1 className="text-lg font-bold text-white tracking-wide truncate">Gestion Clients</h1>
                 </Link>
                 <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full shadow-lg flex-shrink-0">

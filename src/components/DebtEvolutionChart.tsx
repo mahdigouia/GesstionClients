@@ -16,11 +16,15 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react';
 
+import { useAuth } from '@/lib/AuthContext';
+
 interface DebtEvolutionChartProps {
   history: HistoryPoint[];
 }
 
 export function DebtEvolutionChart({ history }: DebtEvolutionChartProps) {
+  const { userRole, commercialCode } = useAuth();
+
   if (!history || history.length < 2) {
     return (
       <Card className="w-full h-full min-h-[400px] flex items-center justify-center bg-white/50 backdrop-blur-sm border-dashed">
@@ -38,16 +42,32 @@ export function DebtEvolutionChart({ history }: DebtEvolutionChartProps) {
   }
 
   // Format data for chart
-  const chartData = history.map(point => ({
-    ...point,
-    formattedDate: format(parseISO(point.date), 'dd MMM HH:mm', { locale: fr }),
-    displayBalance: point.totalBalance,
-    displayPaid: point.totalPaid
-  }));
+  const chartData = history.map(point => {
+    let displayBalance = point.totalBalance;
+    let displayPaid = point.totalPaid;
 
-  const lastPoint = history[history.length - 1];
-  const prevPoint = history[history.length - 2];
-  const balanceDiff = lastPoint.totalBalance - prevPoint.totalBalance;
+    if (userRole === 'commercial' && commercialCode && point.commercialStats) {
+      const commStat = point.commercialStats.find((c: any) => c.code === commercialCode);
+      if (commStat) {
+        displayBalance = commStat.totalBalance;
+        displayPaid = commStat.totalPaid;
+      } else {
+        displayBalance = 0;
+        displayPaid = 0;
+      }
+    }
+
+    return {
+      ...point,
+      formattedDate: format(parseISO(point.date), 'dd MMM HH:mm', { locale: fr }),
+      displayBalance,
+      displayPaid
+    };
+  });
+
+  const lastPoint = chartData[chartData.length - 1];
+  const prevPoint = chartData[chartData.length - 2];
+  const balanceDiff = lastPoint.displayBalance - prevPoint.displayBalance;
   const isUp = balanceDiff > 0;
 
   return (
