@@ -72,8 +72,8 @@ const FIRESTORE_COLLECTION = 'shared_data';
 const FIRESTORE_DOC = 'current_debts';
 
 export function DebtProvider({ children }: { children: ReactNode }) {
-  const [debts, setDebtsState] = useState<ClientDebt[]>([]);
-  const [archiveDebts, setArchiveDebtsState] = useState<ClientDebt[]>([]);
+  const [rawDebts, setRawDebts] = useState<ClientDebt[]>([]);
+  const [rawArchiveDebts, setRawArchiveDebts] = useState<ClientDebt[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [recoveryActions, setRecoveryActions] = useState<RecoveryAction[]>([]);
   const [clientRemarks, setClientRemarks] = useState<Record<string, ClientRemark[]>>({});
@@ -82,7 +82,32 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ contentiousAgeDays: 365, retentionMin: 0.5, retentionMax: 1.5 });
   const [firestoreReady, setFirestoreReady] = useState(false);
-  const { user } = useAuth();
+  const { user, userRole, commercialCode } = useAuth();
+
+  // Liste mémoïsée et filtrée selon le rôle de l'utilisateur
+  const debts = React.useMemo(() => {
+    if (userRole === 'commercial' && commercialCode) {
+      return rawDebts.filter(d => d.commercialCode === commercialCode);
+    }
+    return rawDebts;
+  }, [rawDebts, userRole, commercialCode]);
+
+  const archiveDebts = React.useMemo(() => {
+    if (userRole === 'commercial' && commercialCode) {
+      return rawArchiveDebts.filter(d => d.commercialCode === commercialCode);
+    }
+    return rawArchiveDebts;
+  }, [rawArchiveDebts, userRole, commercialCode]);
+
+  // Analyse réactive de la liste filtrée
+  useEffect(() => {
+    if (debts.length > 0) {
+      const newAnalysis = AnalysisService.analyzeDebts(debts, settings);
+      setAnalysis(newAnalysis);
+    } else {
+      setAnalysis(null);
+    }
+  }, [debts, settings]);
 
   // Écouter les changements Firestore en temps réel (collaboratif)
   useEffect(() => {
@@ -94,25 +119,24 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         if (snapshot.exists()) {
           const data = snapshot.data();
           const firestoreDebts = data.debts || [];
-          setDebtsState(firestoreDebts);
-          setArchiveDebtsState(data.archiveDebts || []);
+          const currentSettings = data.settings || settings;
+          
+          let processed = firestoreDebts;
+          if (firestoreDebts.length > 0) {
+            const tempAnalysis = AnalysisService.analyzeDebts(firestoreDebts, currentSettings);
+            if (tempAnalysis.processedDebts) {
+              processed = tempAnalysis.processedDebts;
+            }
+          }
+          
+          setRawDebts(processed);
+          setRawArchiveDebts(data.archiveDebts || []);
           setRecoveryActions(data.recoveryActions || []);
           setClientRemarks(data.clientRemarks || {});
           setLastUpdatedBy(data.updatedBy || null);
           setReadAlertIds(data.readAlertIds || []);
           setHistory(data.history || []);
           if (data.settings) setSettings(data.settings);
-          
-          if (firestoreDebts.length > 0) {
-            const newAnalysis = AnalysisService.analyzeDebts(firestoreDebts, data.settings || settings);
-            setAnalysis(newAnalysis);
-            // Si l'analyse a produit des créances traitées (avec isContentieux corrigé), les utiliser
-            if (newAnalysis.processedDebts) {
-              setDebtsState(newAnalysis.processedDebts);
-            }
-          } else {
-            setAnalysis(null);
-          }
         } else {
           // Pas encore de données Firestore, charger depuis localStorage comme fallback
           loadFromLocalStorage();
@@ -140,10 +164,10 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const savedArchive = localStorage.getItem('gc_archive');
       const savedAnalysis = localStorage.getItem('gc_analysis');
       if (savedDebts) {
-        setDebtsState(JSON.parse(savedDebts));
+        setRawDebts(JSON.parse(savedDebts));
       }
       if (savedArchive) {
-        setArchiveDebtsState(JSON.parse(savedArchive));
+        setRawArchiveDebts(JSON.parse(savedArchive));
       }
       if (savedAnalysis) {
         setAnalysis(JSON.parse(savedAnalysis));
@@ -161,8 +185,13 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Sauvegarder dans Firestore + localStorage
-  const saveToFirestore = async (newDebts: ClientDebt[], newActions: RecoveryAction[] = recoveryActions, newRemarks: Record<string, ClientRemark[]> = clientRemarks, newArchive: ClientDebt[] = archiveDebts) => {
+  // Sauvegarder dans Firestore + localStorage (utilise toujours les données brutes globales)
+  const saveToFirestore = async (
+    newDebts: ClientDebt[] = rawDebts, 
+    newActions: RecoveryAction[] = recoveryActions, 
+    newRemarks: Record<string, ClientRemark[]> = clientRemarks, 
+    newArchive: ClientDebt[] = rawArchiveDebts
+  ) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
     localStorage.setItem('gc_actions', JSON.stringify(newActions));
@@ -203,7 +232,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     
     const updatedActions = [newAction, ...recoveryActions];
     setRecoveryActions(updatedActions);
-    saveToFirestore(debts, updatedActions);
+    saveToFirestore(rawDebts, updatedActions, clientRemarks, rawArchiveDebts);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Action de recouvrement', `Ajout d'une action pour le client ${actionData.clientName}`);
@@ -228,7 +257,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     };
 
     setClientRemarks(updatedRemarks);
-    saveToFirestore(debts, recoveryActions, updatedRemarks);
+    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Remarque Client', `Ajout d'une remarque pour le client ${clientName}`);
@@ -255,7 +284,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     };
 
     setClientRemarks(updatedRemarks);
-    saveToFirestore(debts, recoveryActions, updatedRemarks);
+    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Modification Remarque', `Modification d'une remarque pour le client ${clientName}`);
@@ -272,7 +301,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     };
 
     setClientRemarks(updatedRemarks);
-    saveToFirestore(debts, recoveryActions, updatedRemarks);
+    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`);
@@ -280,8 +309,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const setDebts = (newDebts: ClientDebt[]) => {
-    setDebtsState(newDebts);
-    saveToFirestore(newDebts, recoveryActions, clientRemarks, archiveDebts);
+    setRawDebts(newDebts);
+    saveToFirestore(newDebts, recoveryActions, clientRemarks, rawArchiveDebts);
     
     // Analyse locale
     if (newDebts.length > 0) {
@@ -290,7 +319,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       
       // Mettre à jour l'état local avec les créances enrichies (isContentieux, etc.)
       if (newAnalysis.processedDebts) {
-        setDebtsState(newAnalysis.processedDebts);
+        setRawDebts(newAnalysis.processedDebts);
       }
       
       localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
@@ -298,7 +327,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const addDebts = (newDebts: ClientDebt[]) => {
-    setDebtsState(prevDebts => {
+    setRawDebts(prevDebts => {
       const debtMap = new Map<string, ClientDebt>();
       
       // 1. Ajouter les dettes existantes
@@ -310,7 +339,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const updatedDebts = Array.from(debtMap.values());
       
       // Sauvegarder la version finale fusionnée
-      saveToFirestore(updatedDebts, recoveryActions, clientRemarks, archiveDebts);
+      saveToFirestore(updatedDebts, recoveryActions, clientRemarks, rawArchiveDebts);
 
       if (user?.email === 'moslem.gouia@gmail.com') {
         logAction('Import de masse', `Ajout de ${newDebts.length} nouvelles créances`);
@@ -333,8 +362,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     const today = new Date().toISOString();
     
     // We'll work on a copy of the debts
-    let currentTotalDebts = [...debts];
-    let currentArchiveDebts = [...archiveDebts];
+    let currentTotalDebts = [...rawDebts];
+    let currentArchiveDebts = [...rawArchiveDebts];
     
     let totalUpdated = 0;
     let totalNew = 0;
@@ -389,8 +418,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     });
 
     // Final update
-    setArchiveDebtsState(currentArchiveDebts);
-    setDebtsState(currentTotalDebts);
+    setRawArchiveDebts(currentArchiveDebts);
+    setRawDebts(currentTotalDebts);
     saveToFirestore(currentTotalDebts, recoveryActions, clientRemarks, currentArchiveDebts);
     
     // Analyse locale
@@ -398,7 +427,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const newAnalysis = AnalysisService.analyzeDebts(currentTotalDebts);
       setAnalysis(newAnalysis);
       if (newAnalysis.processedDebts) {
-        setDebtsState(newAnalysis.processedDebts);
+        setRawDebts(newAnalysis.processedDebts);
       }
       localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
     } else {
@@ -418,8 +447,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   };
 
   const clearAll = async () => {
-    setDebtsState([]);
-    setArchiveDebtsState([]);
+    setRawDebts([]);
+    setRawArchiveDebts([]);
     setAnalysis(null);
     localStorage.removeItem('gc_debts');
     localStorage.removeItem('gc_archive');
@@ -495,7 +524,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const newAnalysis = AnalysisService.analyzeDebts(debts, updated);
       setAnalysis(newAnalysis);
       if (newAnalysis.processedDebts) {
-        setDebtsState(newAnalysis.processedDebts);
+        setRawDebts(newAnalysis.processedDebts);
       }
     }
 

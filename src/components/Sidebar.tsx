@@ -45,10 +45,32 @@ interface SidebarProps {
 
 export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-  const { initials, fullName, user } = useAuth();
+  const { initials, fullName, user, userRole, commercialCode } = useAuth();
   const { analysis } = useDebtContext();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+
+  const filteredNavigation = navigation.filter(item => {
+    if (item.href === '/import' && userRole === 'commercial') {
+      return false;
+    }
+    return true;
+  });
+
+  const getRoleLabel = () => {
+    if (userRole === 'admin') return 'Administrateur';
+    if (userRole === 'gestionnaire') return 'Gestionnaire';
+    if (userRole === 'commercial') return `Commercial - ${commercialCode || 'Sans code'}`;
+    if (userRole === 'pending') return 'En attente';
+    return 'Visiteur';
+  };
+
+  const getRoleBadgeStyles = () => {
+    if (userRole === 'admin') return 'from-red-500 to-rose-600 text-white border-red-400/20';
+    if (userRole === 'gestionnaire') return 'from-amber-500 to-orange-600 text-white border-amber-400/20';
+    if (userRole === 'commercial') return 'from-emerald-500 to-teal-600 text-white border-emerald-400/20';
+    return 'from-gray-500 to-slate-600 text-white border-gray-400/20';
+  };
   
   const recoveryRate = analysis?.recoveryRate || 0;
   const currentRecoveryRate = analysis?.recoveryRateNoContentieux || 0;
@@ -91,7 +113,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       {/* Header - Dark blue professional */}
       <div className={cn(
         "flex items-center bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden flex-shrink-0 transition-all duration-300",
-        effectiveCollapsed ? "h-20 px-2 justify-center" : "h-20 px-6"
+        effectiveCollapsed ? "h-20 px-2 justify-center" : "h-24 px-6"
       )}>
         {/* Glassmorphism overlay */}
         <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
@@ -129,7 +151,15 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
                   MDS
                 </span>
               </div>
-              <p className="text-xs text-blue-200/80 truncate">{user?.email || 'Gestion des Créances'}</p>
+              <p className="text-xs text-blue-200/80 truncate mb-1">{user?.email || 'Gestion des Créances'}</p>
+              <div className="flex">
+                <span className={cn(
+                  "px-2 py-0.5 text-[9px] font-extrabold bg-gradient-to-r rounded border leading-none tracking-wider uppercase",
+                  getRoleBadgeStyles()
+                )}>
+                  {getRoleLabel()}
+                </span>
+              </div>
             </div>
           )}
           
@@ -156,7 +186,7 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
           "space-y-1",
           effectiveCollapsed ? "flex flex-col items-center" : ""
         )}>
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = pathname === item.href || (item.href === '/' && pathname === '/');
             const Icon = item.icon;
             

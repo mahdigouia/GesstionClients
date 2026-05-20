@@ -6,16 +6,50 @@ import {
   PopoverTrigger 
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Bell, AlertTriangle, Info, Clock, User, CheckCircle2 } from 'lucide-react';
+import { Bell, AlertTriangle, Info, Clock, User, CheckCircle2, UserPlus } from 'lucide-react';
 import { useDebtContext } from '@/lib/DebtContext';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/AuthContext';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
 
 export function NotificationPopover() {
   const { analysis, lastUpdatedBy, debts, readAlertIds, markAllNotificationsAsRead } = useDebtContext();
-  
+  const { user, userRole } = useAuth();
+  const router = useRouter();
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user || userRole !== 'admin') {
+      setAdminNotifications([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs: any[] = [];
+      snapshot.forEach((doc) => {
+        notifs.push({ id: doc.id, ...doc.data() });
+      });
+      // Sort by createdAt desc
+      notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setAdminNotifications(notifs);
+    }, (error) => {
+      console.error("Erreur lors de l'écoute des notifications d'inscription :", error);
+    });
+
+    return () => unsubscribe();
+  }, [user, userRole]);
+
   // Collect notifications from analysis alerts
   const alerts = analysis?.alerts || [];
   
@@ -28,10 +62,26 @@ export function NotificationPopover() {
     clientName: 'Système'
   } : null;
 
-  const allNotifications = collaborativeNotif ? [collaborativeNotif, ...alerts] : alerts;
+  // Map db new_user notifications to UI alerts
+  const dbNotifsFormatted = adminNotifications.map(n => ({
+    id: n.id,
+    type: 'new_user',
+    message: n.message,
+    severity: 'high',
+    clientName: 'Nouveau Profil',
+    createdAt: n.createdAt,
+    metadata: n.metadata,
+    isDbNotification: true
+  }));
+
+  const allNotifications = [
+    ...dbNotifsFormatted,
+    ...(collaborativeNotif ? [collaborativeNotif] : []),
+    ...alerts
+  ];
   
-  // Unread count: notifications not in readAlertIds
-  const unreadNotifications = allNotifications.filter(n => !readAlertIds.includes(n.id));
+  // Unread count: notifications not in readAlertIds (or always unread for new users until processed)
+  const unreadNotifications = allNotifications.filter(n => n.isDbNotification || !readAlertIds.includes(n.id));
   const unreadCount = unreadNotifications.length;
   const highSeverityUnreadCount = unreadNotifications.filter(a => a.severity === 'high').length;
 
@@ -65,17 +115,27 @@ export function NotificationPopover() {
           {allNotifications.length > 0 ? (
             <div className="divide-y divide-gray-100">
               {allNotifications.map((notif: any) => {
-                const isRead = readAlertIds.includes(notif.id);
+                const isRead = notif.isDbNotification ? false : readAlertIds.includes(notif.id);
                 return (
-                  <div key={notif.id} className={`p-4 hover:bg-gray-50 transition-colors cursor-default ${isRead ? 'opacity-50 grayscale-[0.5]' : ''}`}>
+                  <div 
+                    key={notif.id} 
+                    onClick={() => {
+                      if (notif.type === 'new_user') {
+                        router.push('/settings');
+                      }
+                    }}
+                    className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${isRead ? 'opacity-50 grayscale-[0.5]' : ''}`}
+                  >
                     <div className="flex gap-3">
                       <div className={`
                         mt-1 p-2 rounded-xl flex-shrink-0
-                        ${notif.severity === 'high' ? 'bg-red-100 text-red-600' : 
+                        ${notif.type === 'new_user' ? 'bg-indigo-100 text-indigo-600' :
+                          notif.severity === 'high' ? 'bg-red-100 text-red-600' : 
                           notif.type === 'collaboration' ? 'bg-blue-100 text-blue-600' :
                           'bg-amber-100 text-amber-600'}
                       `}>
-                        {notif.severity === 'high' ? <AlertTriangle className="h-4 w-4" /> :
+                        {notif.type === 'new_user' ? <UserPlus className="h-4 w-4" /> :
+                         notif.severity === 'high' ? <AlertTriangle className="h-4 w-4" /> :
                          notif.type === 'collaboration' ? <User className="h-4 w-4" /> :
                          <Clock className="h-4 w-4" />}
                       </div>
@@ -97,6 +157,11 @@ export function NotificationPopover() {
                         {notif.recommendation && (
                           <p className={`text-[11px] mt-1 font-medium p-1 rounded ${isRead ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-600'}`}>
                             💡 {notif.recommendation}
+                          </p>
+                        )}
+                        {notif.type === 'new_user' && (
+                          <p className="text-[10px] mt-1 font-bold text-indigo-600 animate-pulse">
+                            👉 Cliquer pour affecter un rôle dans les paramètres
                           </p>
                         )}
                       </div>

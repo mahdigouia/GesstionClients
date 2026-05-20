@@ -3,7 +3,7 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText, Menu } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText, Menu, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -12,8 +12,9 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { History, FileClock, FileCode, Eye } from 'lucide-react';
 import { 
   Dialog, 
@@ -26,7 +27,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function SettingsPage() {
   const { debts, analysis, clearAll, clearHistory, settings, updateSettings, logAudit } = useDebtContext();
-  const { user, initials, fullName, logout } = useAuth();
+  const { user, initials, fullName, logout, userRole } = useAuth();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -39,8 +40,11 @@ export default function SettingsPage() {
   const [rulesContent, setRulesContent] = useState('');
   const [isLoadingRules, setIsLoadingRules] = useState(false);
 
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [editingUsers, setEditingUsers] = useState<Record<string, { role: string; commercialCode: string | null }>>({});
+
   const adminEmails = ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'];
-  const isAdmin = adminEmails.includes(user?.email || '');
+  const isAdmin = adminEmails.includes(user?.email || '') || userRole === 'admin';
   const isSuperAdmin = user?.email === 'moslem.gouia@gmail.com';
 
   useEffect(() => {
@@ -57,6 +61,83 @@ export default function SettingsPage() {
       return () => unsubscribe();
     }
   }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (userRole === 'admin') {
+      const q = query(collection(db, 'users'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUsersList(usersData);
+      }, (error) => {
+        console.error("Erreur lors du chargement des utilisateurs :", error);
+      });
+      return () => unsubscribe();
+    }
+  }, [user, userRole]);
+
+  const handleRoleChange = (userId: string, role: string, currentCode: string | null) => {
+    setEditingUsers(prev => ({
+      ...prev,
+      [userId]: {
+        role,
+        commercialCode: prev[userId]?.commercialCode || currentCode || 'C01'
+      }
+    }));
+  };
+
+  const handleCodeChange = (userId: string, commercialCode: string) => {
+    setEditingUsers(prev => ({
+      ...prev,
+      [userId]: {
+        role: prev[userId]?.role || 'commercial',
+        commercialCode
+      }
+    }));
+  };
+
+  const hasChanges = (userId: string, currentRole: string, currentCode: string | null) => {
+    const edit = editingUsers[userId];
+    if (!edit) return false;
+    return edit.role !== currentRole || (edit.role === 'commercial' && edit.commercialCode !== currentCode);
+  };
+
+  const handleUpdateUserRole = async (userId: string, newRole: string, commercialCode: string | null, userEmail: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        role: newRole,
+        commercialCode: newRole === 'commercial' ? commercialCode : null
+      });
+
+      // Si le compte est promu, on résout la notification pending
+      const notifRef = doc(db, 'notifications', `new_user_${userId}`);
+      try {
+        await updateDoc(notifRef, {
+          status: 'resolved'
+        });
+      } catch (err) {
+        // La notification peut ne pas exister, non bloquant
+      }
+
+      // Log audit
+      await logAudit(
+        'Habilitation Rôle',
+        `Mise à jour du rôle de ${userEmail} vers '${newRole}'${newRole === 'commercial' ? ` (Code: ${commercialCode})` : ''}`
+      );
+
+      // Clean editing status for this user
+      setEditingUsers(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+
+      alert('Rôle mis à jour avec succès !');
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour du rôle :', err);
+      alert('Une erreur est survenue lors de la mise à jour du rôle.');
+    }
+  };
 
   const handleVersionClick = () => {
     if (!isAdmin) return;
@@ -222,6 +303,121 @@ export default function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Gestion des Rôles & Habilitations (Admin only) */}
+          {userRole === 'admin' && (
+            <Card className="border-0 shadow-xl bg-white overflow-hidden border-l-4 border-l-indigo-600">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-indigo-600" />
+                  <CardTitle className="text-lg font-bold">Gestion des Rôles & Habilitations</CardTitle>
+                </div>
+                <CardDescription>
+                  Gérez l'accès des utilisateurs et affectez les codes commerciaux pour restreindre la visibilité des données.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-3 px-4">Utilisateur</th>
+                        <th className="py-3 px-4">Date Inscription</th>
+                        <th className="py-3 px-4">Rôle</th>
+                        <th className="py-3 px-4">Code Commercial</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {usersList.map((u) => {
+                        const edit = editingUsers[u.uid];
+                        const role = edit ? edit.role : (u.role || 'pending');
+                        const code = edit ? edit.commercialCode : (u.commercialCode || null);
+                        const changed = hasChanges(u.uid, u.role || 'pending', u.commercialCode || null);
+                        
+                        return (
+                          <tr key={u.uid} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-4 px-4">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9 border border-indigo-100">
+                                  <AvatarFallback className="bg-indigo-50 text-indigo-600 font-bold text-sm">
+                                    {u.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || '??'}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-bold text-slate-800 text-sm">{u.fullName || 'Utilisateur'}</div>
+                                  <div className="text-xs text-slate-500">{u.email}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4 text-xs font-medium text-slate-500">
+                              {u.createdAt ? new Date(u.createdAt).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              }) : 'Inconnue'}
+                            </td>
+                            <td className="py-4 px-4">
+                              <select
+                                value={role}
+                                onChange={(e) => handleRoleChange(u.uid, e.target.value, u.commercialCode || null)}
+                                className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-slate-700 cursor-pointer"
+                              >
+                                <option value="pending">En attente (pending)</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="gestionnaire">Gestionnaire</option>
+                                <option value="admin">Administrateur</option>
+                              </select>
+                            </td>
+                            <td className="py-4 px-4">
+                              {role === 'commercial' ? (
+                                <select
+                                  value={code || 'C01'}
+                                  onChange={(e) => handleCodeChange(u.uid, e.target.value)}
+                                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-slate-700 cursor-pointer"
+                                >
+                                  <option value="C01">C01</option>
+                                  <option value="C02">C02</option>
+                                  <option value="C03">C03</option>
+                                  <option value="C04">C04</option>
+                                  <option value="C05">C05</option>
+                                  <option value="C07">C07</option>
+                                </select>
+                              ) : (
+                                <span className="text-xs text-slate-400 font-medium italic">Non applicable</span>
+                              )}
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                              <Button
+                                size="sm"
+                                disabled={!changed}
+                                onClick={() => handleUpdateUserRole(u.uid, role, code, u.email)}
+                                className={cn(
+                                  "text-xs font-bold px-4 py-1.5 rounded-xl h-8 transition-all duration-300",
+                                  changed
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10 scale-105"
+                                    : "bg-slate-100 text-slate-400"
+                                )}
+                              >
+                                Enregistrer
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {usersList.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-400 text-sm font-medium">
+                            Aucun utilisateur trouvé.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Configuration Dynamique (Hidden behind Secret Click + Admin) */}
           {isAdmin && showAdvanced && (
