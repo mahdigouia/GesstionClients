@@ -42,6 +42,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { DebtEvolutionChart } from './DebtEvolutionChart';
 import { CommercialAnalysis } from './CommercialAnalysis';
 import { RecoveryForecast } from './RecoveryForecast';
+import { PaymentPromisesAgenda } from './PaymentPromisesAgenda';
 import { useDebtContext } from '@/lib/DebtContext';
 
 interface DashboardProps {
@@ -187,6 +188,9 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
 
       {/* Prévisions de Recouvrement (Nouveau) */}
       <RecoveryForecast />
+
+      {/* Agenda des Promesses de Paiement (Nouveau - Tableau de Bord Commercial) */}
+      <PaymentPromisesAgenda onClientClick={onClientClick} />
 
       {/* Analyse par Commercial (Nouveau) */}
       {userRole !== 'commercial' && (
