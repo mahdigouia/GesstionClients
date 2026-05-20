@@ -87,7 +87,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Notification envoyée</h4>
               <p className="text-xs text-slate-400 mt-1 leading-normal">
-                Les administrateurs <span className="text-blue-300 font-semibold">moslem.gouia@gmail.com</span> et <span className="text-blue-300 font-semibold">mahdigouia@gmail.com</span> ont été notifiés pour valider votre compte.
+                Les administrateurs ont été notifiés pour valider votre compte.
               </p>
             </div>
           </div>

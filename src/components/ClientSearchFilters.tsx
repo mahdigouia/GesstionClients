@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,7 @@ interface ClientSearchFiltersProps {
 }
 
 export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientSearchFiltersProps) {
+  const { userRole } = useAuth();
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Extract unique commercials for dropdown
@@ -249,20 +251,24 @@ export function ClientSearchFilters({ debts, filters, onFiltersChange }: ClientS
             ))}
           </div>
 
-          <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block" />
+          {userRole !== 'commercial' && (
+            <>
+              <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block" />
 
-          {/* Commercial Selector Shortcut */}
-          <div className="flex items-center gap-2 bg-slate-100/50 border border-slate-200 rounded-lg px-2 h-8 group hover:bg-slate-100 transition-colors">
-            <Building2 className="h-3.5 w-3.5 text-slate-500" />
-            <select
-              className="bg-transparent border-none text-[10px] font-black text-slate-700 focus:ring-0 appearance-none pr-4 cursor-pointer uppercase tracking-wider"
-              value={filters.commercial}
-              onChange={(e) => updateFilter('commercial', e.target.value)}
-            >
-              <option value="">Commerciaux (Tous)</option>
-              {commercials.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
+              {/* Commercial Selector Shortcut */}
+              <div className="flex items-center gap-2 bg-slate-100/50 border border-slate-200 rounded-lg px-2 h-8 group hover:bg-slate-100 transition-colors">
+                <Building2 className="h-3.5 w-3.5 text-slate-500" />
+                <select
+                  className="bg-transparent border-none text-[10px] font-black text-slate-700 focus:ring-0 appearance-none pr-4 cursor-pointer uppercase tracking-wider"
+                  value={filters.commercial}
+                  onChange={(e) => updateFilter('commercial', e.target.value)}
+                >
+                  <option value="">Commerciaux (Tous)</option>
+                  {commercials.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </>
+          )}
         </div>
 
 

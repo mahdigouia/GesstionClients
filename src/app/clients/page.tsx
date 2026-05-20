@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useDebtContext } from '@/lib/DebtContext';
+import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { ExportService } from '@/lib/export';
 import { AnalysisService } from '@/lib/analysis';
@@ -55,6 +56,7 @@ import { ClientRemarkModal } from '@/components/ClientRemarkModal';
 
 export default function ClientsPage() {
   const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit } = useDebtContext();
+  const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCommercial, setSelectedCommercial] = useState('all');
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
@@ -485,20 +487,22 @@ export default function ClientsPage() {
                   />
                 </div>
                 
-                <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
-                  <SelectTrigger className="w-full md:w-[250px] h-11 bg-white border-slate-200 rounded-xl text-slate-700">
-                    <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                    <SelectValue placeholder="Commercial" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les commerciaux</SelectItem>
-                    {commercialOptions.map(opt => (
-                      <SelectItem key={opt.name} value={opt.name}>
-                        <span className="font-semibold">{opt.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {userRole !== 'commercial' && (
+                  <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
+                    <SelectTrigger className="w-full md:w-[250px] h-11 bg-white border-slate-200 rounded-xl text-slate-700">
+                      <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                      <SelectValue placeholder="Commercial" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les commerciaux</SelectItem>
+                      {commercialOptions.map(opt => (
+                        <SelectItem key={opt.name} value={opt.name}>
+                          <span className="font-semibold">{opt.name}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">

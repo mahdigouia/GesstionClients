@@ -38,6 +38,7 @@ import {
 import { AnalysisResult } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { useState } from 'react';
+import { useAuth } from '@/lib/AuthContext';
 import { DebtEvolutionChart } from './DebtEvolutionChart';
 import { CommercialAnalysis } from './CommercialAnalysis';
 import { RecoveryForecast } from './RecoveryForecast';
@@ -51,6 +52,7 @@ interface DashboardProps {
 
 export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardProps) {
   const { history } = useDebtContext();
+  const { userRole } = useAuth();
   const [selectedRisk, setSelectedRisk] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -187,7 +189,9 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
       <RecoveryForecast />
 
       {/* Analyse par Commercial (Nouveau) */}
-      <CommercialAnalysis analysis={analysis} history={history} />
+      {userRole !== 'commercial' && (
+        <CommercialAnalysis analysis={analysis} history={history} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Potential Liquidity Opportunities */}
