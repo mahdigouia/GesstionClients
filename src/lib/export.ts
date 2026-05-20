@@ -464,9 +464,7 @@ Source: ${debt.sourceFile}
               text = text.replace(/\[MONTANT\]/g, `${r.promiseAmount.toLocaleString('fr-FR')} TND`);
             }
             const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
-            const promiseDateText = r.promiseDate ? ` | Promesse: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}` : '';
-            const promiseAmountText = r.promiseAmount ? ` | Montant: ${r.promiseAmount.toLocaleString('fr-FR')} TND` : '';
-            return `${text}\n[Saisi le: ${entryDate}${promiseDateText}${promiseAmountText}]`;
+            return `${text}\n[Saisi le: ${entryDate}]`;
           })(),
           isFirstInGroup: index === 0,
           groupSize: rowCount
@@ -860,12 +858,6 @@ Source: ${debt.sourceFile}
         pdf.setFontSize(4.5);
         const entryDate = new Date(r.date).toLocaleDateString('fr-FR');
         let dateInfo = `Saisi le: ${entryDate}`;
-        if (r.promiseDate) {
-          dateInfo += ` | Prom: ${new Date(r.promiseDate).toLocaleDateString('fr-FR')}`;
-        }
-        if (r.promiseAmount) {
-          dateInfo += ` | Mont: ${r.promiseAmount.toLocaleString('fr-FR')} TND`;
-        }
         
         const remarkLinesHeight = splitRemark.length * 2.8;
         pdf.text(dateInfo, remarkCol.x + 1, startY - 2 + remarkLinesHeight + 1);
