@@ -373,9 +373,32 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     filesData.forEach(({ filename, debts: newDebtsForFile }) => {
       const normName = filename.toLowerCase();
       
-      // Filter existing debts for THIS specific file
-      const existingDebtsForFile = currentTotalDebts.filter(d => (d.sourceFile || '').toLowerCase() === normName);
-      const otherDebts = currentTotalDebts.filter(d => (d.sourceFile || '').toLowerCase() !== normName);
+      // Gather all commercial codes present in the new debts of this file
+      const commercialCodesToReplace = new Set<string>();
+      newDebtsForFile.forEach(d => {
+        if (d.commercialCode) {
+          commercialCodesToReplace.add(d.commercialCode.toUpperCase());
+        }
+      });
+
+      // Also try to detect a commercial code from the filename (e.g. C01, C02, etc.)
+      const fnMatch = filename.match(/\b(C\d{2})\b/i);
+      if (fnMatch) {
+        commercialCodesToReplace.add(fnMatch[1].toUpperCase());
+      }
+
+      // Filter existing debts that match either by commercial code or by exact filename
+      const existingDebtsForFile = currentTotalDebts.filter(d => {
+        const matchesFilename = (d.sourceFile || '').toLowerCase() === normName;
+        const matchesCommercial = d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase());
+        return matchesFilename || matchesCommercial;
+      });
+      
+      const otherDebts = currentTotalDebts.filter(d => {
+        const matchesFilename = (d.sourceFile || '').toLowerCase() === normName;
+        const matchesCommercial = d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase());
+        return !matchesFilename && !matchesCommercial;
+      });
       
       const debtsWithDate = newDebtsForFile.map(d => ({ 
         ...d, 
