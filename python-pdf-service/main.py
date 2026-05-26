@@ -704,8 +704,8 @@ async def extract_debts(file: UploadFile = File(...)):
                     # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
                     # Pattern: début de ligne avec 4 chiffres suivis d'un nom
                     # Accepte: lettres, chiffres, espaces, tirets, apostrophes, guillemets, esperluette, parenthèses, points
-                    # Mise à jour: Autorise le nom à commencer par un guillemet ou une lettre
-                    client_match = re.match(r'^(\d{4})\s+([A-Za-z\'"][A-Za-z0-9\s\-\'"&().]+?)(?:\s+T[eé]l|\s*$)', line)
+                    # Mise à jour: Autorise le nom à commencer par un guillemet, une lettre ou un chiffre (ex: 369 EMBALLAGE)
+                    client_match = re.match(r'^(\d{4})\s+([A-Za-z0-9\'"][A-Za-z0-9\s\-\'"&().]+?)(?:\s+T[eé]l|\s*$)', line)
                     if client_match:
                         code = client_match.group(1)
                         name = client_match.group(2).strip()
