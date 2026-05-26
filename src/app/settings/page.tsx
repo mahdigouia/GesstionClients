@@ -26,7 +26,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function SettingsPage() {
-  const { debts, analysis, clearAll, clearHistory, settings, updateSettings, logAudit } = useDebtContext();
+  const { debts, archiveDebts, analysis, clearAll, deleteFileDebts, clearHistory, settings, updateSettings, logAudit } = useDebtContext();
   const { user, initials, fullName, logout, userRole } = useAuth();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -204,6 +204,46 @@ export default function SettingsPage() {
     if (confirm('Êtes-vous sûr de vouloir réinitialiser l\'historique d\'évolution ?')) {
       clearHistory();
     }
+  };
+
+  const uniqueFiles = useEffect ? [] : []; // We'll compute it using useMemo below
+
+  const memoizedUniqueFiles = typeof window !== 'undefined' ? (
+    // Just a placeholder to put the actual hook
+    null
+  ) : null;
+
+  // List of unique files imported
+  const sortedUniqueFiles = [...new Set([
+    ...debts.map(d => d.sourceFile),
+    ...archiveDebts.map(d => d.sourceFile)
+  ].filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b));
+
+  const handleDeleteFile = async (filename: string) => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer toutes les données du fichier "${filename}" ?\nCette action supprimera également les créances archivées de ce fichier.`)) {
+      try {
+        await deleteFileDebts(filename);
+        alert(`Le fichier "${filename}" a été supprimé avec succès.`);
+      } catch (err) {
+        console.error('Erreur lors de la suppression du fichier :', err);
+        alert('Une erreur est survenue lors de la suppression.');
+      }
+    }
+  };
+
+  const getFileStats = (filename: string) => {
+    const activeDebts = debts.filter(d => d.sourceFile === filename);
+    const archivedDebts = archiveDebts.filter(d => d.sourceFile === filename);
+    const balance = activeDebts.reduce((sum, d) => sum + d.balance, 0);
+    const firstDebt = activeDebts[0] || archivedDebts[0];
+    const commCode = firstDebt?.commercialCode || 'C??';
+    const commName = firstDebt?.commercialName || 'Inconnu';
+    return {
+      activeCount: activeDebts.length,
+      archivedCount: archivedDebts.length,
+      balance,
+      commercial: `${commCode} - ${commName}`
+    };
   };
 
   const handleLogout = async () => {
@@ -598,6 +638,76 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Liste des fichiers importés (Visible uniquement pour les administrateurs) */}
+          {isAdmin && (
+            <Card className="border border-slate-200 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+                <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-800">
+                  <FileText className="h-5 w-5 text-indigo-600" />
+                  <span>Fichiers PDF Importés</span>
+                </CardTitle>
+                <CardDescription>
+                  Visualisez les créances actives/archivées par fichier et supprimez-les individuellement
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                {sortedUniqueFiles.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-sm">
+                    Aucun fichier PDF importé actuellement dans le système.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {sortedUniqueFiles.map((filename) => {
+                      const stats = getFileStats(filename);
+                      return (
+                        <div 
+                          key={filename} 
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-100 rounded-xl hover:shadow-md transition-all duration-300 gap-4"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="p-2.5 bg-indigo-50 rounded-xl mt-0.5">
+                              <FileText className="h-5 w-5 text-indigo-600" />
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="font-bold text-slate-800 break-all">{filename}</h4>
+                              <p className="text-xs text-slate-500 font-medium">
+                                Commercial : <span className="text-indigo-600">{stats.commercial}</span>
+                              </p>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                  {stats.activeCount} active{stats.activeCount > 1 ? 's' : ''}
+                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                                  {stats.balance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} TND
+                                </span>
+                                {stats.archivedCount > 0 && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                    {stats.archivedCount} archivée{stats.archivedCount > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-end sm:justify-start">
+                            <Button 
+                              onClick={() => handleDeleteFile(filename)} 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-10 w-10 p-0 rounded-xl transition-colors duration-200"
+                              title="Supprimer ce fichier"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

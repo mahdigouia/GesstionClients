@@ -33,6 +33,7 @@ interface DebtContextType {
     totalChange: number
   };
   clearAll: () => void;
+  deleteFileDebts: (filename: string) => Promise<void>;
   lastUpdatedBy: string | null;
   readAlertIds: string[];
   markAllNotificationsAsRead: () => void;
@@ -495,6 +496,42 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteFileDebts = async (filename: string) => {
+    const normName = filename.toLowerCase();
+
+    // Filtre des créances actives et archivées
+    const updatedDebts = rawDebts.filter(d => (d.sourceFile || '').toLowerCase() !== normName);
+    const updatedArchive = rawArchiveDebts.filter(d => (d.sourceFile || '').toLowerCase() !== normName);
+
+    setRawDebts(updatedDebts);
+    setRawArchiveDebts(updatedArchive);
+
+    // Recalculer l'analyse
+    let newAnalysis = null;
+    if (updatedDebts.length > 0) {
+      newAnalysis = AnalysisService.analyzeDebts(updatedDebts);
+      setAnalysis(newAnalysis);
+    } else {
+      setAnalysis(null);
+    }
+
+    // Mettre à jour localStorage pour l'analyse
+    if (newAnalysis) {
+      localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
+    } else {
+      localStorage.removeItem('gc_analysis');
+    }
+
+    // Sauvegarder dans LocalStorage et Firestore
+    await saveToFirestore(updatedDebts, recoveryActions, clientRemarks, updatedArchive);
+
+    // Journalisation de la suppression de fichier
+    await logAction(
+      'Suppression Fichier', 
+      `Suppression du fichier '${filename}' (${updatedDebts.length} créances actives restantes)`
+    );
+  };
+
   const updateHistory = (currentDebts: ClientDebt[], currentHistory: HistoryPoint[]) => {
     if (currentDebts.length === 0) return currentHistory;
     
@@ -594,6 +631,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       updateClientRemark,
       deleteClientRemark,
       clearAll, 
+      deleteFileDebts,
       lastUpdatedBy,
       readAlertIds,
       markAllNotificationsAsRead,
