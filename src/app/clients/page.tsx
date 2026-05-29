@@ -502,8 +502,8 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex flex-col md:flex-row gap-3 flex-1">
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+              <div className="flex flex-col md:flex-row gap-3 flex-1 w-full">
                 <div className="relative flex-1 md:max-w-xs">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
@@ -533,60 +533,101 @@ export default function ClientsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => allExpanded ? setExpandedClients(new Set()) : setExpandedClients(new Set(filteredClients.map((c: any) => c.clientName)))}
-                  className="rounded-xl h-11 px-4 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold whitespace-nowrap"
-                >
-                  {allExpanded ? <Shrink className="h-4 w-4 md:mr-2" /> : <Expand className="h-4 w-4 md:mr-2" />}
-                  <span className="hidden md:inline">{allExpanded ? 'Tout replier' : 'Tout déplier'}</span>
-                </Button>
-
-                <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block" />
-
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col items-start lg:items-end gap-3 w-full lg:w-auto">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide w-full lg:w-auto">
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => {
-                      const activeFilters = [
-                        searchTerm ? `Recherche: "${searchTerm}"` : '',
-                        selectedCommercial !== 'all' ? `Commercial: ${selectedCommercial}` : '',
-                        contentieuxFilter !== 'off' ? `${contentieuxFilter === 'include' ? '' : 'Non '}Contentieux` : '',
-                        retainedFilter !== 'off' ? `${retainedFilter === 'include' ? '' : 'Non '}Retenue` : '',
-                        partialFilter !== 'off' ? `${partialFilter === 'include' ? '' : 'Non '}Partiel` : '',
-                        minAmountFilter ? 'Solde ≥ 5000 TND' : '',
-                        excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
-                      ].filter(Boolean).join(' | ');
-                      ExportService.exportClientsToExcel(filteredClients, clientRemarks, activeFilters || 'Aucun', logAudit, userRole === 'commercial');
-                    }}
-                    className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-11 px-4 font-bold"
+                    onClick={() => allExpanded ? setExpandedClients(new Set()) : setExpandedClients(new Set(filteredClients.map((c: any) => c.clientName)))}
+                    className="rounded-xl h-11 px-4 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold whitespace-nowrap"
                   >
-                    <FileSpreadsheet className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">Excel</span>
+                    {allExpanded ? <Shrink className="h-4 w-4 md:mr-2" /> : <Expand className="h-4 w-4 md:mr-2" />}
+                    <span className="hidden md:inline">{allExpanded ? 'Tout replier' : 'Tout déplier'}</span>
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      const activeFilters = [
-                        searchTerm ? `Recherche: "${searchTerm}"` : '',
-                        selectedCommercial !== 'all' ? `Commercial: ${selectedCommercial}` : '',
-                        contentieuxFilter !== 'off' ? `${contentieuxFilter === 'include' ? '' : 'Non '}Contentieux` : '',
-                        retainedFilter !== 'off' ? `${retainedFilter === 'include' ? '' : 'Non '}Retenue` : '',
-                        partialFilter !== 'off' ? `${partialFilter === 'include' ? '' : 'Non '}Partiel` : '',
-                        minAmountFilter ? 'Solde ≥ 5000 TND' : '',
-                        excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
-                      ].filter(Boolean).join(' | ');
-                      ExportService.exportClientsToPDF(filteredClients, clientRemarks, activeFilters || 'Aucun', logAudit, userRole === 'commercial');
-                    }}
-                    className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-11 px-4 font-bold"
-                  >
-                    <FileText className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">PDF</span>
-                  </Button>
+
+                  <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block" />
+
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const activeFilters = [
+                          searchTerm ? `Recherche: "${searchTerm}"` : '',
+                          selectedCommercial !== 'all' ? `Commercial: ${selectedCommercial}` : '',
+                          contentieuxFilter !== 'off' ? `${contentieuxFilter === 'include' ? '' : 'Non '}Contentieux` : '',
+                          retainedFilter !== 'off' ? `${retainedFilter === 'include' ? '' : 'Non '}Retenue` : '',
+                          partialFilter !== 'off' ? `${partialFilter === 'include' ? '' : 'Non '}Partiel` : '',
+                          minAmountFilter ? 'Solde ≥ 5000 TND' : '',
+                          excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
+                        ].filter(Boolean).join(' | ');
+                        ExportService.exportClientsToExcel(filteredClients, clientRemarks, activeFilters || 'Aucun', logAudit, userRole === 'commercial');
+                      }}
+                      className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-11 px-4 font-bold"
+                    >
+                      <FileSpreadsheet className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">Excel</span>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const activeFilters = [
+                          searchTerm ? `Recherche: "${searchTerm}"` : '',
+                          selectedCommercial !== 'all' ? `Commercial: ${selectedCommercial}` : '',
+                          contentieuxFilter !== 'off' ? `${contentieuxFilter === 'include' ? '' : 'Non '}Contentieux` : '',
+                          retainedFilter !== 'off' ? `${retainedFilter === 'include' ? '' : 'Non '}Retenue` : '',
+                          partialFilter !== 'off' ? `${partialFilter === 'include' ? '' : 'Non '}Partiel` : '',
+                          minAmountFilter ? 'Solde ≥ 5000 TND' : '',
+                          excludedAgeRanges.size > 0 ? `Exclusion âge: ${Array.from(excludedAgeRanges).join(', ')}` : ''
+                        ].filter(Boolean).join(' | ');
+                        ExportService.exportClientsToPDF(filteredClients, clientRemarks, activeFilters || 'Aucun', logAudit, userRole === 'commercial');
+                      }}
+                      className="bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 rounded-xl h-11 px-4 font-bold"
+                    >
+                      <FileText className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">PDF</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Statistiques Dynamiques Compactes */}
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto">
+                  {/* Card Solde Total */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 shadow-sm flex-1 sm:flex-initial min-w-[130px] md:min-w-[140px]">
+                    <div className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-rose-600/80 truncate">Solde Restant</span>
+                      <span className="text-xs md:text-sm font-black tracking-tight text-slate-800 whitespace-nowrap">
+                        {filteredStats.totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[9px] font-bold text-slate-500">TND</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Montant Global */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 shadow-sm flex-1 sm:flex-initial min-w-[150px] md:min-w-[160px]">
+                    <div className="w-2 h-2 rounded-full bg-slate-500 flex-shrink-0" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-slate-600/80 truncate">Montant Facturé</span>
+                      <span className="text-xs md:text-sm font-black tracking-tight text-slate-800 whitespace-nowrap">
+                        {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[9px] font-bold text-slate-500">TND</span>
+                        <span className="text-[9px] text-emerald-600 font-extrabold ml-1.5">
+                          ({filteredStats.totalAmount > 0 ? ((1 - filteredStats.totalBalance / filteredStats.totalAmount) * 100).toFixed(1) : '0.0'}%)
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Moyenne d'âge */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-800 shadow-sm flex-1 sm:flex-initial min-w-[110px] md:min-w-[120px]">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[9px] font-black uppercase tracking-wider text-indigo-600/80 truncate">Moyenne d'Âge</span>
+                      <span className="text-xs md:text-sm font-black tracking-tight text-slate-800 whitespace-nowrap">
+                        {filteredStats.averageAge} <span className="text-[9px] font-bold text-slate-500">jours</span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -688,56 +729,7 @@ export default function ClientsPage() {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50/50">
           <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
-            {/* Statistiques Dynamiques en haut */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              {/* Card Solde Total */}
-              <Card className="border-0 shadow-md bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-[32px] overflow-hidden">
-                <CardContent className="p-6 md:p-8 flex flex-col justify-between h-full">
-                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80">Solde Global Restant</span>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-2xl md:text-4xl font-black tracking-tighter">
-                      {filteredStats.totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                    </span>
-                    <span className="text-xs md:text-sm font-bold ml-1.5 opacity-90">TND</span>
-                  </div>
-                  <span className="text-[9px] md:text-[11px] font-medium opacity-70 mt-3">
-                    Basé sur {filteredStats.debtCount} facture{filteredStats.debtCount > 1 ? 's' : ''} active{filteredStats.debtCount > 1 ? 's' : ''}
-                  </span>
-                </CardContent>
-              </Card>
 
-              {/* Card Montant Global */}
-              <Card className="border-0 shadow-md bg-gradient-to-br from-slate-700 to-slate-800 text-white rounded-[32px] overflow-hidden">
-                <CardContent className="p-6 md:p-8 flex flex-col justify-between h-full">
-                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80">Montant Global Facturé</span>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-2xl md:text-4xl font-black tracking-tighter">
-                      {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                    </span>
-                    <span className="text-xs md:text-sm font-bold ml-1.5 opacity-90">TND</span>
-                  </div>
-                  <span className="text-[9px] md:text-[11px] font-medium opacity-70 mt-3 text-emerald-400 font-bold">
-                    Taux de recouvrement : {filteredStats.totalAmount > 0 ? ((1 - filteredStats.totalBalance / filteredStats.totalAmount) * 100).toFixed(1) : '0.0'}%
-                  </span>
-                </CardContent>
-              </Card>
-
-              {/* Card Moyenne d'âge */}
-              <Card className="border-0 shadow-md bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-[32px] overflow-hidden">
-                <CardContent className="p-6 md:p-8 flex flex-col justify-between h-full">
-                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80">Moyenne d'Âge Créance</span>
-                  <div className="mt-2 flex items-baseline">
-                    <span className="text-2xl md:text-4xl font-black tracking-tighter">
-                      {filteredStats.averageAge}
-                    </span>
-                    <span className="text-xs md:text-sm font-bold ml-1.5 opacity-90">jours</span>
-                  </div>
-                  <span className="text-[9px] md:text-[11px] font-medium opacity-70 mt-3">
-                    Pour {filteredStats.clientCount} client{filteredStats.clientCount > 1 ? 's' : ''} filtré{filteredStats.clientCount > 1 ? 's' : ''}
-                  </span>
-                </CardContent>
-              </Card>
-            </div>
             {filteredClients.map((client: any, idx: number) => {
               const isExpanded = expandedClients.has(client.clientName);
               const clientDebts = client.filteredDebts.sort((a: any, b: any) => (a.extractIndex || 0) - (b.extractIndex || 0));
