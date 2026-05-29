@@ -31,13 +31,15 @@ import {
   Trash2,
   Pencil,
   X,
-  Check
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { ClientRemark } from '@/types/debt';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/AuthContext';
+import { useDebtContext } from '@/lib/DebtContext';
 
 interface ClientRemarkModalProps {
   isOpen: boolean;
@@ -51,6 +53,7 @@ interface ClientRemarkModalProps {
 
 export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark, onUpdateRemark, onDeleteRemark }: ClientRemarkModalProps) {
   const { user } = useAuth();
+  const { debts } = useDebtContext();
   const [newRemark, setNewRemark] = useState('');
   const [promiseDate, setPromiseDate] = useState('');
   const [promiseAmount, setPromiseAmount] = useState('');
@@ -61,6 +64,9 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const [editContent, setEditContent] = useState('');
   const [editPromiseDate, setEditPromiseDate] = useState('');
   const [editPromiseAmount, setEditPromiseAmount] = useState('');
+
+  const clientDebts = debts.filter(d => d.clientName === clientName);
+  const clientActiveDebts = clientDebts.filter(d => d.balance > 0);
 
   const handleStartEdit = (remark: ClientRemark) => {
     setEditingRemarkId(remark.id);
@@ -80,24 +86,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     setEditingRemarkId(null);
   };
 
-  const [activeCategory, setActiveCategory] = useState<'none' | 'appel' | 'visite'>('none');
-
-  const categories = [
-    { id: 'appel', label: "Appel effectué", icon: <PhoneCall className="h-3 w-3" />, color: 'blue' },
-    { id: 'visite', label: "Visite sur place", icon: <MapPin className="h-3 w-3" />, color: 'emerald' },
-    { id: 'mail', label: "Mail envoyé", icon: <Mail className="h-3 w-3" />, color: 'slate' },
-  ];
-
-  const subOptions: Record<string, { label: string, text: string }[]> = {
-    appel: [
-      { label: "Ma hazzech", text: "Appel : Kalamtou w ma hazzech." },
-      { label: "9ali ija (Date/Montant)", text: "Appel : Kalamtou w 9ali ija [DATE] pour paiement de [MONTANT]." },
-    ],
-    visite: [
-      { label: "Mal9itech Gérant", text: "Visite : Mal9itech Gérant." },
-      { label: "9ali arja3li (Date/Montant)", text: "Visite : 9ali arja3li [DATE] pour paiement de [MONTANT]." },
-    ],
-  };
+  const [selectedStatus, setSelectedStatus] = useState<'none' | 'reporte' | 'paye_partiel' | 'paye' | 'conflit'>('none');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -201,6 +190,41 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   }, [promiseAmount, lastAppliedAmount]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      setNewRemark('');
+      setPromiseDate('');
+      setPromiseAmount('');
+      setSelectedStatus('none');
+      setLastAppliedDate('[DATE]');
+      setLastAppliedAmount('[MONTANT]');
+    }
+  }, [isOpen]);
+
+  // Synchroniser automatiquement la date de prochaine visite dans le texte
+  useEffect(() => {
+    if (selectedStatus === 'reporte' && promiseDate) {
+      const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
+      setNewRemark(prev => {
+        if (prev.startsWith("Reporté : Gérant non disponible")) {
+          return `Reporté : Gérant non disponible. (Prochaine visite le ${formattedDate})`;
+        }
+        if (prev.startsWith("Reporté : Problème financier")) {
+          return `Reporté : Problème financier. (Prochaine visite le ${formattedDate})`;
+        }
+        return prev;
+      });
+    }
+  }, [promiseDate, selectedStatus]);
+
+  // Synchroniser automatiquement le montant payé dans le texte
+  useEffect(() => {
+    if (selectedStatus === 'paye_partiel' && promiseAmount) {
+      const formattedAmount = `${parseFloat(promiseAmount).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`;
+      setNewRemark(`Payé Partiellement : Versement de ${formattedAmount}.`);
+    }
+  }, [promiseAmount, selectedStatus]);
+
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
     if (promiseDate && promiseDate.length === 10) {
@@ -227,6 +251,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       setNewRemark('');
       setPromiseDate('');
       setPromiseAmount('');
+      setSelectedStatus('none');
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
       onClose();
@@ -372,92 +397,210 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
 
           {/* Saisie */}
           <div className="p-6 bg-white border-t border-slate-100 flex-shrink-0 space-y-4">
-            {/* Templates Rapides */}
+            {/* Statuts de Relance (Nouveaux Modèles) */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Modèles rapides</p>
-                {activeCategory !== 'none' && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setActiveCategory('none')}
-                    className="h-6 text-[9px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-50 gap-1 px-2"
-                  >
-                    <ArrowLeft className="h-2.5 w-2.5" /> Retour
-                  </Button>
-                )}
-              </div>
-              
-              <div className="flex flex-wrap gap-2 min-h-[32px]">
-                {activeCategory === 'none' ? (
-                  categories.map((cat) => (
-                    <Button
-                      key={cat.id}
-                      variant="outline"
-                      size="sm"
-                      className={`h-8 rounded-full border-slate-200 bg-white text-[10px] font-bold text-slate-600 hover:bg-slate-50 hover:text-blue-600 gap-1.5 shadow-sm transition-all`}
-                      onClick={() => {
-                        if (cat.id === 'mail') {
-                          handleAddTemplate("Relance par email envoyée ce jour. En attente de confirmation.");
-                        } else {
-                          setActiveCategory(cat.id as any);
-                        }
-                      }}
-                    >
-                      {cat.icon}
-                      {cat.label}
-                      {cat.id !== 'mail' && <ChevronRight className="h-3 w-3 opacity-50" />}
-                    </Button>
-                  ))
-                ) : (
-                  subOptions[activeCategory]?.map((opt, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-full border-blue-100 bg-blue-50/50 text-[10px] font-bold text-blue-700 hover:bg-blue-100 gap-1.5 shadow-sm transition-all animate-in fade-in slide-in-from-left-2"
-                      onClick={() => handleAddTemplate(opt.text)}
-                    >
-                      {opt.label}
-                    </Button>
-                  ))
-                )}
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Statut de la relance</p>
+              <div className="flex flex-wrap gap-2.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all duration-300 ${
+                    selectedStatus === 'reporte'
+                      ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600 shadow-orange-500/20'
+                      : 'bg-orange-50/70 text-orange-700 border-orange-200 hover:bg-orange-100'
+                  }`}
+                  onClick={() => {
+                    setSelectedStatus('reporte');
+                    setPromiseAmount('');
+                  }}
+                >
+                  <Clock className="h-3.5 w-3.5 mr-1.5" />
+                  Reporté
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all duration-300 ${
+                    selectedStatus === 'paye_partiel'
+                      ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-amber-500/20'
+                      : 'bg-amber-50/70 text-amber-800 border-amber-200 hover:bg-amber-100'
+                  }`}
+                  onClick={() => {
+                    setSelectedStatus('paye_partiel');
+                    setPromiseDate('');
+                  }}
+                >
+                  <Coins className="h-3.5 w-3.5 mr-1.5" />
+                  Payé Partiellement
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all duration-300 ${
+                    selectedStatus === 'paye'
+                      ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                      : 'bg-emerald-50/70 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                  onClick={() => {
+                    setSelectedStatus('paye');
+                    setPromiseDate('');
+                    const totalBal = clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
+                    setPromiseAmount(totalBal.toString());
+                    setNewRemark('Payé : Règlement total.');
+                  }}
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                  Payé
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`h-9 px-4 rounded-full font-bold text-xs shadow-sm transition-all duration-300 ${
+                    selectedStatus === 'conflit'
+                      ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                      : 'bg-rose-50/70 text-rose-700 border-rose-200 hover:bg-rose-100'
+                  }`}
+                  onClick={() => {
+                    setSelectedStatus('conflit');
+                    setPromiseDate('');
+                    setPromiseAmount('');
+                    setNewRemark('Client à Conflit : ');
+                  }}
+                >
+                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
+                  Client à Conflit
+                </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="promise-date" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Calendar className="h-3 w-3" /> Date de promesse (Optionnel)
-                </Label>
-                <Input
-                  id="promise-date"
-                  type="date"
-                  value={promiseDate}
-                  onChange={(e) => setPromiseDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="promise-amount" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Coins className="h-3 w-3" /> Montant (Optionnel)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="promise-amount"
-                    type="number"
-                    placeholder="0.000"
-                    value={promiseAmount}
-                    onChange={(e) => setPromiseAmount(e.target.value)}
-                    className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 pr-10"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">TND</span>
+            {/* Champs conditionnels selon le statut de relance */}
+            {selectedStatus === 'reporte' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <Label htmlFor="promise-date" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5 text-orange-500" />
+                      <span>Date prochaine visite</span>
+                    </Label>
+                    <Input
+                      id="promise-date"
+                      type="date"
+                      value={promiseDate}
+                      onChange={(e) => setPromiseDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 font-medium"
+                    />
+                  </div>
+                  
+                  {/* Modèles rapides de saisie textuelle pour Reporté */}
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Modèles de texte
+                    </Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm"
+                        onClick={() => {
+                          const dateSuffix = promiseDate ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})` : '';
+                          setNewRemark(`Reporté : Gérant non disponible.${dateSuffix}`);
+                        }}
+                      >
+                        Gérant non disponible
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm"
+                        onClick={() => {
+                          const dateSuffix = promiseDate ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})` : '';
+                          setNewRemark(`Reporté : Problème financier.${dateSuffix}`);
+                        }}
+                      >
+                        Problème financier
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="relative group">
+            {selectedStatus === 'paye_partiel' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                <div className="space-y-2 max-w-md">
+                  <Label htmlFor="promise-amount" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <Coins className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Montant payé</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="promise-amount"
+                      type="number"
+                      placeholder="0.000"
+                      value={promiseAmount}
+                      onChange={(e) => setPromiseAmount(e.target.value)}
+                      className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 pr-10 font-bold"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">TND</span>
+                  </div>
+                </div>
+
+                {/* Reste non encore payé par facture si > 1 */}
+                {clientActiveDebts.length > 1 && (
+                  <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-2.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      <span>Reste non payé par facture :</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {clientActiveDebts.map((d) => (
+                        <div 
+                          key={d.id} 
+                          className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white px-3 py-2 border border-amber-100/60 rounded-xl shadow-sm"
+                        >
+                          <span className="text-slate-400 font-medium">{d.documentNumber} :</span>
+                          <span className="text-amber-700">{(d.balance).toFixed(3).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ")} TND</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedStatus === 'paye' && (
+              <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in duration-300">
+                <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-emerald-800">Paiement intégral</p>
+                  <p className="text-[10px] font-medium text-emerald-600">
+                    Montant total soldé : <span className="font-bold">{clientActiveDebts.reduce((sum, d) => sum + d.balance, 0).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {selectedStatus === 'conflit' && (
+              <div className="p-4 bg-rose-50/50 border border-rose-100 rounded-2xl flex items-center gap-3 animate-in fade-in duration-300">
+                <AlertCircle className="h-6 w-6 text-rose-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-rose-800">Dossier en conflit</p>
+                  <p className="text-[10px] font-medium text-rose-600">Veuillez détailler les raisons du litige dans la remarque ci-dessous.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="relative group pt-2">
               <Textarea
                 placeholder="Écrivez votre remarque ici..."
                 className={`min-h-[120px] rounded-2xl border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm font-medium p-4 resize-none transition-all ${isListening ? 'ring-2 ring-red-500 bg-red-50/30' : 'bg-slate-50/30 hover:bg-white'}`}
@@ -466,6 +609,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
               />
               <div className="absolute right-3 bottom-3 flex items-center gap-2">
                 <Button
+                  type="button"
                   variant={isListening ? "destructive" : "outline"}
                   size="icon"
                   className={`h-10 w-10 rounded-xl transition-all ${isListening ? 'animate-pulse' : 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 shadow-sm'}`}
@@ -475,6 +619,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                   {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                 </Button>
                 <Button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={!newRemark.trim()}
                   className="h-10 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100"

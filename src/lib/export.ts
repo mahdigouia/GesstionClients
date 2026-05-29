@@ -724,7 +724,7 @@ Source: ${debt.sourceFile}
     let pageNum = 1;
     currentY = addHeader(pageNum);
 
-    // Définition des colonnes (Paysage)
+    // Définition des colonnes (Paysage) - Retrait de la colonne Échéance pour agrandir la colonne Remarque
     const columnDefinitions = [
       { h: 'N°', w: 8, align: 'center', key: 'index' },
       { h: 'Code', w: 18, align: 'center', key: 'code' },
@@ -732,11 +732,10 @@ Source: ${debt.sourceFile}
       ...(!isCommercial ? [{ h: 'Rep.', w: 14, align: 'center', key: 'rep' }] : []),
       { h: 'N° Pièce', w: 30, align: 'center', key: 'piece' },
       { h: 'Date', w: 22, align: 'center', key: 'date' },
-      { h: 'Échéance', w: 22, align: 'center', key: 'due' },
       { h: 'Âge', w: 12, align: 'center', key: 'age' },
       { h: 'Montant', w: 30, align: 'center', key: 'amount' },
       { h: 'Solde', w: 30, align: 'center', key: 'balance' },
-      { h: 'Remarque', w: isCommercial ? 49 : 35, align: 'center', key: 'remark' }
+      { h: 'Remarque', w: isCommercial ? 71 : 57, align: 'center', key: 'remark' }
     ];
 
     // Compute x coordinate dynamically!
@@ -772,20 +771,22 @@ Source: ${debt.sourceFile}
     currentY += 8;
 
     let globalIndex = 1;
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'normal');
 
     clients.forEach((client) => {
       const debts = client.filteredDebts || [];
       const startY = currentY;
       
       debts.forEach((debt: ClientDebt, i: number) => {
+        // Corriger l'hétérogénéité des tailles d'écriture (toujours forcer la taille de police standard 8 au début de chaque ligne)
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8);
+        pdf.setTextColor(30, 41, 59);
+
         if (currentY > 185) {
           pdf.addPage();
           currentY = addHeader(++pageNum);
           drawTableHeader(currentY);
           currentY += 8;
-          pdf.setFontSize(8);
         }
 
         if (globalIndex % 2 === 0) {
@@ -796,9 +797,6 @@ Source: ${debt.sourceFile}
           pdf.rect(margin, currentY - 5, backgroundWidth, 7, 'F');
         }
 
-        pdf.setTextColor(30, 41, 59);
-        pdf.setFont('helvetica', 'normal');
-        
         pdf.text(client.clientCode || '?', getColXCenter('code'), currentY, { align: 'center' });
         pdf.text((client.clientName || '').substring(0, 32), getColXCenter('client'), currentY, { align: 'center' });
         
@@ -811,7 +809,6 @@ Source: ${debt.sourceFile}
         pdf.text(String(globalIndex), getColXCenter('index'), currentY, { align: 'center' });
         pdf.text(debt.documentNumber, getColXCenter('piece'), currentY, { align: 'center' });
         pdf.text(new Date(debt.documentDate).toLocaleDateString('fr-FR'), getColXCenter('date'), currentY, { align: 'center' });
-        pdf.text(new Date(debt.dueDate).toLocaleDateString('fr-FR'), getColXCenter('due'), currentY, { align: 'center' });
         
         pdf.setFont('helvetica', 'bold');
         const age = debt.age;
