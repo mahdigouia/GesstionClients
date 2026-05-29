@@ -94,67 +94,56 @@ self.addEventListener('push', function(event) {
 // Gestionnaire de clic sur la notification
 // ============================================
 self.addEventListener('notificationclick', function(event) {
-  console.log('[SW] Notification cliquée. Action:', event.action, '| Data:', event.notification.data);
+  console.log('[SW] Click notif | action:', event.action, '| data:', event.notification.data);
   event.notification.close();
 
   // Clic sur "Fermer" → rien
   if (event.action === 'close') return;
 
-  const notifData = event.notification.data || {};
-  const relativePath = notifData.url || '/clients';
+  var notifData = event.notification.data || {};
+  var relativePath = notifData.url || '/clients';
+  // URL absolue (requis pour clients.openWindow sur Android)
+  var absoluteUrl = self.location.origin + relativePath;
 
-  // URL absolue obligatoire pour clients.openWindow() et navigate()
-  // self.location.origin = ex: https://gesstion-clients.vercel.app
-  const absoluteUrl = self.location.origin + relativePath;
-  console.log('[SW] Redirection vers:', absoluteUrl);
+  console.log('[SW] URL cible:', absoluteUrl);
 
-  event.waitUntil(
-    (async () => {
-      try {
-        const windowClients = await clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
+  var promiseChain = clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then(function(windowClients) {
+      console.log('[SW] Fenetres ouvertes:', windowClients.length);
 
-        // Chercher un onglet/fenêtre déjà ouvert sur notre domaine
-        const appClient = windowClients.find(c => {
-          try {
-            return new URL(c.url).origin === self.location.origin;
-          } catch (e) {
-            return false;
-          }
-        });
-
-        if (appClient) {
-          // ✅ Onglet existant : on le navigue puis on le met au premier plan
-          console.log('[SW] Onglet existant trouvé → navigate + focus');
-          try {
-            // navigate() retourne un WindowClient, on le focus ensuite
-            const navigated = await appClient.navigate(absoluteUrl);
-            if (navigated) {
-              await navigated.focus();
-            } else {
-              await appClient.focus();
-            }
-          } catch (navErr) {
-            // Si navigate échoue (certains Android), on focus uniquement
-            console.warn('[SW] navigate() échoué, tentative focus:', navErr);
-            try { await appClient.focus(); } catch (e) {}
-          }
-        } else {
-          // ✅ App fermée ou en arrière-plan : ouvrir un nouveau onglet
-          console.log('[SW] Aucun onglet trouvé → openWindow');
-          await clients.openWindow(absoluteUrl);
+      // Trouver une fenetre de notre domaine
+      var appWindow = null;
+      for (var i = 0; i < windowClients.length; i++) {
+        var c = windowClients[i];
+        if (c.url && c.url.indexOf(self.location.origin) === 0) {
+          appWindow = c;
+          break;
         }
-      } catch (err) {
-        // Fallback ultime si tout échoue
-        console.error('[SW] Erreur ouverture app:', err);
-        try {
-          await clients.openWindow(self.location.origin + '/clients');
-        } catch (e2) {}
       }
-    })()
-  );
+
+      if (appWindow) {
+        // ✅ App deja ouverte en arriere-plan :
+        // Envoyer un message postMessage pour naviguer via Next.js router
+        // (beaucoup plus fiable que client.navigate() sur Android)
+        console.log('[SW] App trouvee → postMessage SW_NAVIGATE + focus');
+        appWindow.postMessage({
+          type: 'SW_NAVIGATE',
+          url: relativePath
+        });
+        return appWindow.focus();
+      }
+
+      // ✅ App fermee : ouvrir directement sur la page du client
+      console.log('[SW] App fermee → openWindow', absoluteUrl);
+      return clients.openWindow(absoluteUrl);
+    })
+    .catch(function(err) {
+      console.error('[SW] Erreur click notif:', err);
+      // Fallback absolu : ouvrir l'app sur /clients sans parametres
+      return clients.openWindow(self.location.origin + '/clients');
+    });
+
+  event.waitUntil(promiseChain);
 });
 
 // ============================================

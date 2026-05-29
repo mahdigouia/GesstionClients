@@ -61,6 +61,25 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
   }, [user, userRole]);
 
+  // 🔔 Listener pour navigation depuis une notification push (mobile)
+  // Le Service Worker envoie SW_NAVIGATE via postMessage quand la notif est cliquée
+  // et qu'un onglet de l'app est déjà ouvert en arrière-plan
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'SW_NAVIGATE' && event.data.url) {
+        console.log('[AuthGuard] SW_NAVIGATE reçu:', event.data.url);
+        router.push(event.data.url);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, [router]);
+
   const handleLogout = async () => {
     await logout();
     router.push('/login');

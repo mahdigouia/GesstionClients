@@ -547,3 +547,54 @@ Pour cette raison, la lecture de `push_subscriptions` se fait **côté client** 
 ---
 
 *Ce document est le point de vérité unique pour comprendre et reprendre le développement de l'application depuis n'importe quel appareil ou IDE.*
+
+---
+
+## 🗂️ Structure du Projet — Fichiers Public (mis à jour)
+
+```
+public/
+├── sw.js                ← Service Worker push notifications
+├── manifest.json        ← Manifeste PWA
+├── badge-96x96.png      ← Badge monochrome MDS (barre statut Android)
+├── icon-192x192.png     ← Icône PWA couleur (corps notification)
+├── icon-512x512.png     ← Icône PWA grande
+└── logo.png             ← Logo principal
+```
+
+### Navigation depuis notification push (deep link)
+- URL format : `/clients?search=NOM_CLIENT&open=remark`
+- La page `/clients` lit ces paramètres via `useSearchParams()`
+- Auto-filtre + expand + ouvre le `ClientRemarkModal` du client
+- L'URL est nettoyée après avec `router.replace('/clients')`
+
+### Service Worker — Stratégie de clic mobile (postMessage)
+```
+Clic notification (mobile)
+  ↓
+SW cherche une fenêtre de l'app ouverte (matchAll)
+  ├── Fenêtre trouvée → postMessage({ type: 'SW_NAVIGATE', url })
+  │                   → AuthGuard écoute ce message → router.push(url)
+  └── Pas de fenêtre → clients.openWindow(absoluteUrl)
+```
+> `postMessage` + `router.push()` est plus fiable que `client.navigate()` sur Android Chrome.
+
+---
+
+## 📦 Changelog des Commits
+
+> Cette section est mise à jour à chaque nouveau commit poussé sur `main`.
+
+| Date | Hash | Description |
+|---|---|---|
+| 29/05/2026 | `a28dffc` | `feat(push)` : fix background notifications - skipWaiting/claim, conflit type, improved sw.js |
+| 29/05/2026 | `12124f7` | `feat(push)` : click notification redirects directly to client invoices and remark modal |
+| 29/05/2026 | `8792de0` | `fix(sw)` : fix sw.js click handler - absolute URL navigation and remove duplicate code |
+| 29/05/2026 | `d8ac105` | `docs` : add APP_REFERENCE.md - comprehensive app context for AI/Dev continuity |
+| 29/05/2026 | `b80094d` | `feat(push)` : add MDS Group monochrome badge icon for Android status bar notifications |
+| 29/05/2026 | `40166dd` | `fix(push)` : proper transparent badge PNG + async mobile notification click handler |
+| 29/05/2026 | `[next]`  | `fix(sw)` : reliable mobile click handler via postMessage + SW_NAVIGATE listener in AuthGuard |
+
+---
+
+*Ce document est le point de vérité unique pour comprendre et reprendre le développement de l'application depuis n'importe quel appareil ou IDE.*
