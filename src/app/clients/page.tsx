@@ -359,7 +359,7 @@ export default function ClientsPage() {
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 md:py-6 flex-shrink-0">
-          <div className="flex flex-col gap-6">
+          <div className="max-w-7xl mx-auto w-full flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 md:gap-4">
                 <Button
@@ -502,39 +502,136 @@ export default function ClientsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
-              <div className="flex flex-col md:flex-row gap-3 flex-1 w-full">
-                <div className="relative flex-1 md:max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Nom, code client..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl text-sm transition-all outline-none"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Filters */}
+              <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-3 w-full">
+                  <div className="relative flex-1 md:max-w-xs">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Nom, code client..."
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border-transparent focus:bg-white focus:ring-2 focus:ring-emerald-500 rounded-xl text-sm transition-all outline-none"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  {userRole !== 'commercial' && (
+                    <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
+                      <SelectTrigger className="w-full md:w-[250px] h-11 bg-white border-slate-200 rounded-xl text-slate-700">
+                        <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                        <SelectValue placeholder="Commercial" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tous les commerciaux</SelectItem>
+                        {commercialOptions.map(opt => (
+                          <SelectItem key={opt.name} value={opt.name}>
+                            <span className="font-semibold">{opt.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                
-                {userRole !== 'commercial' && (
-                  <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
-                    <SelectTrigger className="w-full md:w-[250px] h-11 bg-white border-slate-200 rounded-xl text-slate-700">
-                      <Filter className="h-4 w-4 mr-2 text-slate-400" />
-                      <SelectValue placeholder="Commercial" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous les commerciaux</SelectItem>
-                      {commercialOptions.map(opt => (
-                        <SelectItem key={opt.name} value={opt.name}>
-                          <span className="font-semibold">{opt.name}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+
+                {/* Desktop Only Advanced Filters */}
+                <div className="hidden md:flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Badge
+                      variant="outline"
+                      className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+                        contentieuxFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
+                        contentieuxFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
+                        'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setContentieuxFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
+                    >
+                      <Scale className="h-3.5 w-3.5" />
+                      {contentieuxFilter === 'exclude' ? 'Non ' : ''}Contentieux ({contentieuxFilter === 'exclude' ? stats.nonContentieux : stats.contentieux})
+                    </Badge>
+                    
+                    <Badge
+                      variant="outline"
+                      className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+                        retainedFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
+                        retainedFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
+                        'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setRetainedFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {retainedFilter === 'exclude' ? 'Non ' : ''}Retenue ({retainedFilter === 'exclude' ? stats.nonRetained : stats.retained})
+                    </Badge>
+                    
+                    <Badge
+                      variant="outline"
+                      className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+                        partialFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
+                        partialFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
+                        'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setPartialFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
+                    >
+                      <CreditCard className="h-3.5 w-3.5" />
+                      {partialFilter === 'exclude' ? 'Non ' : ''}Partiel ({partialFilter === 'exclude' ? stats.nonPartial : stats.partial})
+                    </Badge>
+
+                    <Badge
+                      variant="outline"
+                      className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+                        minAmountFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setMinAmountFilter(!minAmountFilter)}
+                    >
+                      <Target className="h-3.5 w-3.5" />
+                      Solde ≥ 5 000 TND
+                    </Badge>
+
+                    {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0 || minAmountFilter) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-slate-600 gap-1 h-8 text-[10px] uppercase font-black tracking-widest ml-auto"
+                        onClick={() => {
+                          setContentieuxFilter('off');
+                          setRetainedFilter('off');
+                          setPartialFilter('off');
+                          setExcludedAgeRanges(new Set());
+                          setMinAmountFilter(false);
+                        }}
+                      >
+                        <X className="h-3 w-3" /> Réinitialiser
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 border-t border-slate-100 pt-4">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center gap-2">
+                      <Filter className="h-3 w-3" /> Exclure par âge :
+                    </span>
+                    {ageRanges.map((range) => {
+                      const isExcluded = excludedAgeRanges.has(range.id);
+                      return (
+                        <Badge
+                          key={range.id}
+                          variant="outline"
+                          className={`cursor-pointer px-4 py-1.5 rounded-full text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 ${
+                            isExcluded ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                          }`}
+                          onClick={() => toggleAgeExclusion(range.id)}
+                        >
+                          {isExcluded && '✗ '}{range.label}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col items-start lg:items-end gap-3 w-full lg:w-auto">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide w-full lg:w-auto">
+              {/* Right Column: Actions and Statistics */}
+              <div className="lg:col-span-5 xl:col-span-4 flex flex-col items-start lg:items-end gap-4 w-full">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide w-full lg:w-auto lg:justify-end">
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -591,27 +688,27 @@ export default function ClientsPage() {
                   </div>
                 </div>
 
-                {/* Statistiques Dynamiques Compactes */}
-                <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto">
+                {/* Statistiques Dynamiques Compactes et Agrandies */}
+                <div className="flex flex-wrap items-center justify-start lg:justify-end gap-3 w-full">
                   {/* Card Solde Total */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-100 text-rose-800 shadow-sm flex-1 sm:flex-initial min-w-[130px] md:min-w-[140px]">
-                    <div className="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
+                  <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-rose-50 border border-rose-100 text-rose-800 shadow-sm flex-1 sm:flex-initial min-w-[160px] lg:min-w-[190px] transition-all hover:shadow-md">
+                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500 flex-shrink-0 animate-pulse" />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-rose-600/80 truncate">Solde Restant</span>
-                      <span className="text-xs md:text-sm font-black tracking-tight text-slate-800 whitespace-nowrap">
-                        {filteredStats.totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[9px] font-bold text-slate-500">TND</span>
+                      <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-rose-600/80 truncate">Solde Restant</span>
+                      <span className="text-sm md:text-lg lg:text-xl font-black tracking-tight text-slate-800 whitespace-nowrap">
+                        {filteredStats.totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[10px] font-bold text-slate-500">TND</span>
                       </span>
                     </div>
                   </div>
 
                   {/* Card Montant Global */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 shadow-sm flex-1 sm:flex-initial min-w-[150px] md:min-w-[160px]">
-                    <div className="w-2 h-2 rounded-full bg-slate-500 flex-shrink-0" />
+                  <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 shadow-sm flex-1 sm:flex-initial min-w-[180px] lg:min-w-[210px] transition-all hover:shadow-md">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-500 flex-shrink-0" />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-slate-600/80 truncate">Montant Facturé</span>
-                      <span className="text-xs md:text-sm font-black tracking-tight text-slate-800 whitespace-nowrap">
-                        {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[9px] font-bold text-slate-500">TND</span>
-                        <span className="text-[9px] text-emerald-600 font-extrabold ml-1.5">
+                      <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-600/80 truncate">Montant Facturé</span>
+                      <span className="text-sm md:text-lg lg:text-xl font-black tracking-tight text-slate-800 whitespace-nowrap">
+                        {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[10px] font-bold text-slate-500">TND</span>
+                        <span className="text-[10px] text-emerald-600 font-extrabold ml-1.5">
                           ({filteredStats.totalAmount > 0 ? ((1 - filteredStats.totalBalance / filteredStats.totalAmount) * 100).toFixed(1) : '0.0'}%)
                         </span>
                       </span>
@@ -619,110 +716,17 @@ export default function ClientsPage() {
                   </div>
 
                   {/* Card Moyenne d'âge */}
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-800 shadow-sm flex-1 sm:flex-initial min-w-[110px] md:min-w-[120px]">
-                    <div className="w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+                  <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-800 shadow-sm flex-1 sm:flex-initial min-w-[130px] lg:min-w-[150px] transition-all hover:shadow-md">
+                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 flex-shrink-0" />
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-indigo-600/80 truncate">Moyenne d'Âge</span>
-                      <span className="text-xs md:text-sm font-black tracking-tight text-slate-800 whitespace-nowrap">
-                        {filteredStats.averageAge} <span className="text-[9px] font-bold text-slate-500">jours</span>
+                      <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-indigo-600/80 truncate">Moyenne d'Âge</span>
+                      <span className="text-sm md:text-lg lg:text-xl font-black tracking-tight text-slate-800 whitespace-nowrap">
+                        {filteredStats.averageAge} <span className="text-[10px] font-bold text-slate-500">jours</span>
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Desktop Only Advanced Filters */}
-          <div className="hidden md:flex flex-col gap-4 mt-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge
-                variant="outline"
-                className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                  contentieuxFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
-                  contentieuxFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
-                  'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-                onClick={() => setContentieuxFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
-              >
-                <Scale className="h-3.5 w-3.5" />
-                {contentieuxFilter === 'exclude' ? 'Non ' : ''}Contentieux ({contentieuxFilter === 'exclude' ? stats.nonContentieux : stats.contentieux})
-              </Badge>
-              
-              <Badge
-                variant="outline"
-                className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                  retainedFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
-                  retainedFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
-                  'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-                onClick={() => setRetainedFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                {retainedFilter === 'exclude' ? 'Non ' : ''}Retenue ({retainedFilter === 'exclude' ? stats.nonRetained : stats.retained})
-              </Badge>
-              
-              <Badge
-                variant="outline"
-                className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                  partialFilter === 'include' ? 'bg-green-600 text-white border-green-600' :
-                  partialFilter === 'exclude' ? 'bg-red-600 text-white border-red-600' :
-                  'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-                onClick={() => setPartialFilter(prev => prev === 'off' ? 'include' : prev === 'include' ? 'exclude' : 'off')}
-              >
-                <CreditCard className="h-3.5 w-3.5" />
-                {partialFilter === 'exclude' ? 'Non ' : ''}Partiel ({partialFilter === 'exclude' ? stats.nonPartial : stats.partial})
-              </Badge>
-
-              <Badge
-                variant="outline"
-                className={`cursor-pointer px-5 py-2 rounded-full text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
-                  minAmountFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-                onClick={() => setMinAmountFilter(!minAmountFilter)}
-              >
-                <Target className="h-3.5 w-3.5" />
-                Solde ≥ 5 000 TND
-              </Badge>
-
-              {(contentieuxFilter !== 'off' || retainedFilter !== 'off' || partialFilter !== 'off' || excludedAgeRanges.size > 0 || minAmountFilter) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-400 hover:text-slate-600 gap-1 h-8 text-[10px] uppercase font-black tracking-widest ml-auto"
-                  onClick={() => {
-                    setContentieuxFilter('off');
-                    setRetainedFilter('off');
-                    setPartialFilter('off');
-                    setExcludedAgeRanges(new Set());
-                    setMinAmountFilter(false);
-                  }}
-                >
-                  <X className="h-3 w-3" /> Réinitialiser
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3 border-t border-slate-100 pt-4">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center gap-2">
-                <Filter className="h-3 w-3" /> Exclure par âge :
-              </span>
-              {ageRanges.map((range) => {
-                const isExcluded = excludedAgeRanges.has(range.id);
-                return (
-                  <Badge
-                    key={range.id}
-                    variant="outline"
-                    className={`cursor-pointer px-4 py-1.5 rounded-full text-[10px] font-bold transition-all shadow-sm flex items-center gap-2 ${
-                      isExcluded ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                    }`}
-                    onClick={() => toggleAgeExclusion(range.id)}
-                  >
-                    {isExcluded && '✗ '}{range.label}
-                  </Badge>
-                );
-              })}
             </div>
           </div>
         </header>
