@@ -12,20 +12,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Un objet d\'abonnement valide (subscription) est requis.' }, { status: 400 });
     }
 
-    // Load VAPID keys from Firestore config
-    const docRef = doc(db, 'config', 'vapid');
-    const docSnap = await getDoc(docRef);
-    
-    if (!docSnap.exists()) {
-      return NextResponse.json({ 
-        error: 'Les clés VAPID ne sont pas configurées. Veuillez d\'abord charger l\'API des clés.' 
-      }, { status: 500 });
-    }
+    // Load VAPID keys from Vercel environment OR Firestore config fallback
+    let publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    let privateKey = process.env.VAPID_PRIVATE_KEY;
+    const subject = process.env.VAPID_SUBJECT || 'mailto:moslem.gouia@gmail.com';
 
-    const { publicKey, privateKey } = docSnap.data();
+    if (!publicKey || !privateKey) {
+      console.log('[Web Push Test] Environment variables missing. Falling back to Firestore.');
+      const docRef = doc(db, 'config', 'vapid');
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        return NextResponse.json({ 
+          error: 'Les clés VAPID ne sont pas configurées dans les variables d\'environnement ni dans Firestore.' 
+        }, { status: 500 });
+      }
+
+      const firestoreData = docSnap.data();
+      publicKey = firestoreData.publicKey;
+      privateKey = firestoreData.privateKey;
+    }
     
     webpush.setVapidDetails(
-      'mailto:moslem.gouia@gmail.com',
+      subject,
       publicKey,
       privateKey
     );

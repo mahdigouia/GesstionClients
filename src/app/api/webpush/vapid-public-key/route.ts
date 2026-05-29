@@ -5,6 +5,15 @@ import webpush from 'web-push';
 
 export async function GET() {
   try {
+    // 1. Prioritize environment variable from Vercel
+    const envPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (envPublicKey) {
+      console.log('[Web Push] Public VAPID key loaded from Environment Variables.');
+      return NextResponse.json({ publicKey: envPublicKey });
+    }
+
+    // 2. Fallback to Firestore
+    console.log('[Web Push] VAPID Env Var missing, falling back to Firestore...');
     const docRef = doc(db, 'config', 'vapid');
     const docSnap = await getDoc(docRef);
     let publicKey = '';

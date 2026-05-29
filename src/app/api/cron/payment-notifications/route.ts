@@ -92,14 +92,25 @@ export async function GET(request: Request) {
 
     // 5. Broadcast Web Push notifications to all registered subscribers
     try {
-      const vapidDocRef = doc(db, 'config', 'vapid');
-      const vapidDocSnap = await getDoc(vapidDocRef);
-      
-      if (vapidDocSnap.exists()) {
-        const { publicKey, privateKey } = vapidDocSnap.data();
+      let publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      let privateKey = process.env.VAPID_PRIVATE_KEY;
+      const subject = process.env.VAPID_SUBJECT || 'mailto:moslem.gouia@gmail.com';
+
+      if (!publicKey || !privateKey) {
+        console.log('[Web Push Cron] VAPID Env vars missing. Falling back to Firestore.');
+        const vapidDocRef = doc(db, 'config', 'vapid');
+        const vapidDocSnap = await getDoc(vapidDocRef);
         
+        if (vapidDocSnap.exists()) {
+          const firestoreData = vapidDocSnap.data();
+          publicKey = firestoreData.publicKey;
+          privateKey = firestoreData.privateKey;
+        }
+      }
+
+      if (publicKey && privateKey) {
         webpush.setVapidDetails(
-          'mailto:moslem.gouia@gmail.com',
+          subject,
           publicKey,
           privateKey
         );
