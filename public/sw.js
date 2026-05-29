@@ -101,9 +101,13 @@ self.addEventListener('notificationclick', function(event) {
     return;
   }
 
-  // URL cible : toujours utiliser l'origin pour former une URL absolue valide
+  // Construire l'URL absolue cible (obligatoire pour clients.openWindow)
   const notifData = event.notification.data || {};
-  const relativePath = notifData.url || '/';
+  const relativePath = notifData.url || '/clients';
+  // self.location.origin donne ex: https://gesstion-clients.vercel.app
+  const absoluteUrl = self.location.origin + relativePath;
+
+  console.log('[SW] Navigation vers:', absoluteUrl);
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
@@ -111,18 +115,18 @@ self.addEventListener('notificationclick', function(event) {
         // Chercher si un onglet de l'app est déjà ouvert
         for (let i = 0; i < windowClients.length; i++) {
           const client = windowClients[i];
-          // Comparer uniquement l'origin pour retrouver n'importe quel onglet de l'app
           const clientUrl = new URL(client.url);
-          const swUrl = new URL(self.location.origin);
-          if (clientUrl.origin === swUrl.origin && 'focus' in client) {
-            // Naviguer vers la page cible et donner le focus
-            client.navigate(relativePath);
+          if (clientUrl.origin === self.location.origin && 'focus' in client) {
+            // Onglet trouvé : naviguer vers le client spécifique et donner le focus
+            if ('navigate' in client) {
+              client.navigate(absoluteUrl);
+            }
             return client.focus();
           }
         }
-        // Aucun onglet ouvert → ouvrir un nouveau
+        // Aucun onglet ouvert → ouvrir l'app directement sur la page du client
         if (clients.openWindow) {
-          return clients.openWindow(relativePath);
+          return clients.openWindow(absoluteUrl);
         }
       })
   );
