@@ -241,6 +241,24 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   }, [promiseAmount, paymentMethod, promiseDate, selectedStatus]);
 
+  // Synchroniser automatiquement le mode de règlement dans le texte pour Payé (total)
+  useEffect(() => {
+    if (selectedStatus === 'paye') {
+      const totalBal = clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
+      const formattedAmount = totalBal > 0 
+        ? `${totalBal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
+        : '[MONTANT]';
+
+      let methodText = 'Règlement total.';
+      if (paymentMethod === 'versement') methodText = `Règlement total par versement de ${formattedAmount}`;
+      else if (paymentMethod === 'espece') methodText = `Règlement total en espèce de ${formattedAmount}`;
+      else if (paymentMethod === 'traite') methodText = `Règlement total par traite de ${formattedAmount}`;
+      else if (paymentMethod === 'cheque') methodText = `Règlement total par chèque de ${formattedAmount}`;
+
+      setNewRemark(`Payé : ${methodText}`);
+    }
+  }, [paymentMethod, selectedStatus, debts, clientName]);
+
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
     if (promiseDate && promiseDate.length === 10) {
@@ -467,7 +485,6 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                     setPromiseDate('');
                     const totalBal = clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
                     setPromiseAmount(totalBal.toString());
-                    setNewRemark('Payé : Règlement total.');
                   }}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
@@ -520,7 +537,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                     <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                       Modèles de texte
                     </Label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -644,13 +661,45 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
             )}
 
             {selectedStatus === 'paye' && (
-              <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in duration-300">
-                <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-emerald-800">Paiement intégral</p>
-                  <p className="text-[10px] font-medium text-emerald-600">
-                    Montant total soldé : <span className="font-bold">{clientActiveDebts.reduce((sum, d) => sum + d.balance, 0).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
-                  </p>
+              <div className="space-y-4 animate-in fade-in duration-300">
+                <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-3">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-emerald-800">Paiement intégral</p>
+                    <p className="text-[10px] font-medium text-emerald-600">
+                      Montant total soldé : <span className="font-bold">{clientActiveDebts.reduce((sum, d) => sum + d.balance, 0).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mode de règlement */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                    Mode de règlement
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'versement', label: 'Versement' },
+                      { id: 'espece', label: 'Espèce' },
+                      { id: 'traite', label: 'Traite' },
+                      { id: 'cheque', label: 'Chèque' }
+                    ].map(method => (
+                      <Button
+                        key={method.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={`h-9 px-4 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                          paymentMethod === method.id
+                            ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                        onClick={() => setPaymentMethod(method.id as any)}
+                      >
+                        {method.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
