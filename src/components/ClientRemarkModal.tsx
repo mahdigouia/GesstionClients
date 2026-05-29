@@ -87,6 +87,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   };
 
   const [selectedStatus, setSelectedStatus] = useState<'none' | 'reporte' | 'paye_partiel' | 'paye' | 'conflit'>('none');
+  const [paymentMethod, setPaymentMethod] = useState<'versement' | 'espece' | 'traite' | 'cheque'>('versement');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -196,6 +197,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       setPromiseDate('');
       setPromiseAmount('');
       setSelectedStatus('none');
+      setPaymentMethod('versement');
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
     }
@@ -217,13 +219,27 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   }, [promiseDate, selectedStatus]);
 
-  // Synchroniser automatiquement le montant payé dans le texte
+  // Synchroniser automatiquement le montant payé, le mode de règlement et la date de prochaine visite dans le texte
   useEffect(() => {
-    if (selectedStatus === 'paye_partiel' && promiseAmount) {
-      const formattedAmount = `${parseFloat(promiseAmount).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`;
-      setNewRemark(`Payé Partiellement : Versement de ${formattedAmount}.`);
+    if (selectedStatus === 'paye_partiel') {
+      const amountVal = promiseAmount ? parseFloat(promiseAmount) : 0;
+      const formattedAmount = amountVal > 0 
+        ? `${amountVal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
+        : '[MONTANT]';
+
+      let methodText = '';
+      if (paymentMethod === 'versement') methodText = `Versement de ${formattedAmount}`;
+      else if (paymentMethod === 'espece') methodText = `Règlement en espèce de ${formattedAmount}`;
+      else if (paymentMethod === 'traite') methodText = `Traite de ${formattedAmount}`;
+      else if (paymentMethod === 'cheque') methodText = `Chèque de ${formattedAmount}`;
+
+      const dateSuffix = promiseDate && promiseDate.length === 10
+        ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})`
+        : '';
+
+      setNewRemark(`Payé Partiellement : ${methodText}.${dateSuffix}`);
     }
-  }, [promiseAmount, selectedStatus]);
+  }, [promiseAmount, paymentMethod, promiseDate, selectedStatus]);
 
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
@@ -537,21 +553,70 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
 
             {selectedStatus === 'paye_partiel' && (
               <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
-                <div className="space-y-2 max-w-md">
-                  <Label htmlFor="promise-amount" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                    <Coins className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Montant payé</span>
-                  </Label>
-                  <div className="relative">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Montant Payé */}
+                  <div className="space-y-2">
+                    <Label htmlFor="promise-amount" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                      <Coins className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Montant payé</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="promise-amount"
+                        type="number"
+                        placeholder="0.000"
+                        value={promiseAmount}
+                        onChange={(e) => setPromiseAmount(e.target.value)}
+                        className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 pr-10 font-bold"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">TND</span>
+                    </div>
+                  </div>
+
+                  {/* Date Prochaine Visite (Optionnel) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="promise-date" className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                      <Calendar className="h-3.5 w-3.5 text-amber-500" />
+                      <span>Date prochaine visite <span className="text-[8px] font-bold text-slate-400 lowercase italic">(Optionnel)</span></span>
+                    </Label>
                     <Input
-                      id="promise-amount"
-                      type="number"
-                      placeholder="0.000"
-                      value={promiseAmount}
-                      onChange={(e) => setPromiseAmount(e.target.value)}
-                      className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 pr-10 font-bold"
+                      id="promise-date"
+                      type="date"
+                      value={promiseDate}
+                      onChange={(e) => setPromiseDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 font-medium"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">TND</span>
+                  </div>
+                </div>
+
+                {/* Mode de règlement */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                    Mode de règlement
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'versement', label: 'Versement' },
+                      { id: 'espece', label: 'Espèce' },
+                      { id: 'traite', label: 'Traite' },
+                      { id: 'cheque', label: 'Chèque' }
+                    ].map(method => (
+                      <Button
+                        key={method.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={`h-9 px-4 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                          paymentMethod === method.id
+                            ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-amber-500/20'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                        onClick={() => setPaymentMethod(method.id as any)}
+                      >
+                        {method.label}
+                      </Button>
+                    ))}
                   </div>
                 </div>
 
@@ -569,7 +634,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                           className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white px-3 py-2 border border-amber-100/60 rounded-xl shadow-sm"
                         >
                           <span className="text-slate-400 font-medium">{d.documentNumber} :</span>
-                          <span className="text-amber-700">{(d.balance).toFixed(3).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ")} TND</span>
+                          <span className="text-amber-700">{d.balance.toFixed(3).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ")} TND</span>
                         </div>
                       ))}
                     </div>
