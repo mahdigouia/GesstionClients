@@ -52,7 +52,7 @@ interface ClientRemarkModalProps {
 }
 
 export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark, onUpdateRemark, onDeleteRemark }: ClientRemarkModalProps) {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const { debts } = useDebtContext();
   const [newRemark, setNewRemark] = useState('');
   const [promiseDate, setPromiseDate] = useState('');
@@ -302,10 +302,10 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                     const isAuthor = user?.email && remark.user && user.email.toLowerCase() === remark.user.toLowerCase();
                     const remarkTime = new Date(remark.date).getTime();
                     const isWithin24h = (Date.now() - remarkTime) < 24 * 60 * 60 * 1000;
-                    const isAdmin = user?.email && ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'].includes(user.email.toLowerCase());
+                    const isAdmin = userRole === 'admin' || (user?.email && ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'].includes(user.email.toLowerCase()));
 
                     const canDelete = isAdmin || (isAuthor && isWithin24h);
-                    const canEdit = isAuthor && isWithin24h;
+                    const canEdit = isAdmin || (isAuthor && isWithin24h);
                     const isEditing = editingRemarkId === remark.id;
 
                     return (

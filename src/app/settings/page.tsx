@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { History, FileClock, FileCode, Eye } from 'lucide-react';
 import { 
   Dialog, 
@@ -136,6 +136,31 @@ export default function SettingsPage() {
     } catch (err) {
       console.error('Erreur lors de la mise à jour du rôle :', err);
       alert('Une erreur est survenue lors de la mise à jour du rôle.');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    if (userId === user?.uid) {
+      alert("Vous ne pouvez pas supprimer votre propre compte !");
+      return;
+    }
+    
+    if (confirm(`Êtes-vous sûr de vouloir supprimer définitivement le compte de ${userEmail} ?`)) {
+      try {
+        const userRef = doc(db, 'users', userId);
+        await deleteDoc(userRef);
+        
+        // Log audit
+        await logAudit(
+          'Suppression Compte',
+          `Suppression définitive du compte de l'utilisateur ${userEmail}`
+        );
+        
+        alert('Compte supprimé avec succès !');
+      } catch (err) {
+        console.error('Erreur lors de la suppression du compte :', err);
+        alert('Une erreur est survenue lors de la suppression.');
+      }
     }
   };
 
@@ -428,19 +453,30 @@ export default function SettingsPage() {
                               )}
                             </td>
                             <td className="py-4 px-4 text-right">
-                              <Button
-                                size="sm"
-                                disabled={!changed}
-                                onClick={() => handleUpdateUserRole(u.uid, role, code, u.email)}
-                                className={cn(
-                                  "text-xs font-bold px-4 py-1.5 rounded-xl h-8 transition-all duration-300",
-                                  changed
-                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10 scale-105"
-                                    : "bg-slate-100 text-slate-400"
-                                )}
-                              >
-                                Enregistrer
-                              </Button>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  disabled={!changed}
+                                  onClick={() => handleUpdateUserRole(u.uid, role, code, u.email)}
+                                  className={cn(
+                                    "text-xs font-bold px-4 py-1.5 rounded-xl h-8 transition-all duration-300",
+                                    changed
+                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10 scale-105"
+                                      : "bg-slate-100 text-slate-400"
+                                  )}
+                                >
+                                  Enregistrer
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteUser(u.uid, u.email)}
+                                  className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl"
+                                  title="Supprimer l'utilisateur"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         );

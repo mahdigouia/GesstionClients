@@ -22,7 +22,8 @@ import {
   CreditCard,
   Target,
   Menu,
-  SlidersHorizontal
+  SlidersHorizontal,
+  MessageSquare
 } from 'lucide-react';
 import {
   Sheet,
@@ -322,6 +323,33 @@ export default function ClientsPage() {
     setRemarkClientName(name);
     setIsRemarkModalOpen(true);
   };
+
+  // Moyenne d'âge et totaux s'adaptant aux filtres
+  const filteredStats = useMemo(() => {
+    let totalBalance = 0;
+    let totalAmount = 0;
+    let ageSum = 0;
+    let debtCount = 0;
+    
+    filteredClients.forEach(c => {
+      c.filteredDebts.forEach((d: ClientDebt) => {
+        totalBalance += d.balance;
+        totalAmount += d.amount;
+        ageSum += d.age;
+        debtCount++;
+      });
+    });
+    
+    const averageAge = debtCount > 0 ? Math.round(ageSum / debtCount) : 0;
+    
+    return {
+      totalBalance,
+      totalAmount,
+      averageAge,
+      debtCount,
+      clientCount: filteredClients.length
+    };
+  }, [filteredClients]);
 
   const allExpanded = filteredClients.length > 0 && expandedClients.size === filteredClients.length;
 
@@ -660,49 +688,144 @@ export default function ClientsPage() {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50/50">
           <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
+            {/* Statistiques Dynamiques en haut */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+              {/* Card Solde Total */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-[32px] overflow-hidden">
+                <CardContent className="p-6 md:p-8 flex flex-col justify-between h-full">
+                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80">Solde Global Restant</span>
+                  <div className="mt-2 flex items-baseline">
+                    <span className="text-2xl md:text-4xl font-black tracking-tighter">
+                      {filteredStats.totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                    </span>
+                    <span className="text-xs md:text-sm font-bold ml-1.5 opacity-90">TND</span>
+                  </div>
+                  <span className="text-[9px] md:text-[11px] font-medium opacity-70 mt-3">
+                    Basé sur {filteredStats.debtCount} facture{filteredStats.debtCount > 1 ? 's' : ''} active{filteredStats.debtCount > 1 ? 's' : ''}
+                  </span>
+                </CardContent>
+              </Card>
+
+              {/* Card Montant Global */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-slate-700 to-slate-800 text-white rounded-[32px] overflow-hidden">
+                <CardContent className="p-6 md:p-8 flex flex-col justify-between h-full">
+                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80">Montant Global Facturé</span>
+                  <div className="mt-2 flex items-baseline">
+                    <span className="text-2xl md:text-4xl font-black tracking-tighter">
+                      {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                    </span>
+                    <span className="text-xs md:text-sm font-bold ml-1.5 opacity-90">TND</span>
+                  </div>
+                  <span className="text-[9px] md:text-[11px] font-medium opacity-70 mt-3 text-emerald-400 font-bold">
+                    Taux de recouvrement : {filteredStats.totalAmount > 0 ? ((1 - filteredStats.totalBalance / filteredStats.totalAmount) * 100).toFixed(1) : '0.0'}%
+                  </span>
+                </CardContent>
+              </Card>
+
+              {/* Card Moyenne d'âge */}
+              <Card className="border-0 shadow-md bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-[32px] overflow-hidden">
+                <CardContent className="p-6 md:p-8 flex flex-col justify-between h-full">
+                  <span className="text-[10px] md:text-xs font-black uppercase tracking-widest opacity-80">Moyenne d'Âge Créance</span>
+                  <div className="mt-2 flex items-baseline">
+                    <span className="text-2xl md:text-4xl font-black tracking-tighter">
+                      {filteredStats.averageAge}
+                    </span>
+                    <span className="text-xs md:text-sm font-bold ml-1.5 opacity-90">jours</span>
+                  </div>
+                  <span className="text-[9px] md:text-[11px] font-medium opacity-70 mt-3">
+                    Pour {filteredStats.clientCount} client{filteredStats.clientCount > 1 ? 's' : ''} filtré{filteredStats.clientCount > 1 ? 's' : ''}
+                  </span>
+                </CardContent>
+              </Card>
+            </div>
             {filteredClients.map((client: any, idx: number) => {
               const isExpanded = expandedClients.has(client.clientName);
               const clientDebts = client.filteredDebts.sort((a: any, b: any) => (a.extractIndex || 0) - (b.extractIndex || 0));
               
               return (
                 <Card key={idx} className="border-0 shadow-md bg-white overflow-hidden rounded-[32px] transition-all hover:shadow-xl">
-                  <div 
-                    onClick={() => toggleClient(client.clientName)}
-                    className="p-4 md:p-8 flex flex-col md:flex-row md:items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors gap-4"
-                  >
-                    <div className="flex items-center gap-4 md:gap-6">
-                      <div className="flex-shrink-0">
-                        {isExpanded ? <ChevronDown className="h-5 w-5 md:h-6 md:w-6 text-slate-400" /> : <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-slate-400" />}
-                      </div>
-                      <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-[20px] flex items-center justify-center font-black text-lg md:text-2xl shadow-inner flex-shrink-0 ${client.totalBalance > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                        {client.clientName?.[0] || '?'}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
-                          <span className="text-[9px] md:text-[11px] font-black font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 md:py-1 rounded-lg w-fit">{client.sourceFile || '?'}</span>
-                          <h4 
-                            onClick={(e) => handleOpenRemarkModal(e, client.clientName)}
-                            className="font-black text-slate-800 text-sm md:text-xl tracking-tight truncate hover:text-blue-600 hover:underline decoration-blue-300 underline-offset-4 transition-all"
-                          >
-                            {client.clientName}
-                          </h4>
+                    <div 
+                      onClick={() => toggleClient(client.clientName)}
+                      className="p-4 md:p-8 flex flex-col md:flex-row md:items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors gap-4"
+                    >
+                      <div className="flex items-center gap-4 md:gap-6 flex-1 min-w-0">
+                        <div className="flex-shrink-0">
+                          {isExpanded ? <ChevronDown className="h-5 w-5 md:h-6 md:w-6 text-slate-400" /> : <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-slate-400" />}
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] md:text-sm text-slate-500 mt-2 md:mt-3">
-                          <span className="flex items-center gap-1.5 font-bold bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[10px] md:text-xs text-slate-700 border border-slate-100 whitespace-nowrap">Code: <span className="text-blue-600 font-black">{client.clientCode}</span></span>
-                          <span className="flex items-center gap-1.5 font-semibold whitespace-nowrap"><FileText className="h-3 w-3 md:h-4 md:w-4 text-slate-400" />{client.debtCount} factures</span>
-                          <span className="text-emerald-600 font-black flex items-center gap-1.5 bg-emerald-50/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border border-emerald-100/50 whitespace-nowrap"><Users className="h-3 w-3 md:h-4 md:w-4" />{client.commercialName}</span>
+                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-[20px] flex items-center justify-center font-black text-lg md:text-2xl shadow-inner flex-shrink-0 ${client.totalBalance > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                          {client.clientName?.[0] || '?'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-3">
+                            <span className="text-[9px] md:text-[11px] font-black font-mono text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 md:py-1 rounded-lg w-fit">{client.sourceFile || '?'}</span>
+                            <h4 
+                              onClick={(e) => handleOpenRemarkModal(e, client.clientName)}
+                              className="font-black text-slate-800 text-sm md:text-xl tracking-tight truncate hover:text-blue-600 hover:underline decoration-blue-300 underline-offset-4 transition-all"
+                            >
+                              {client.clientName}
+                            </h4>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] md:text-sm text-slate-500 mt-2 md:mt-3">
+                            <span className="flex items-center gap-1.5 font-bold bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[10px] md:text-xs text-slate-700 border border-slate-100 whitespace-nowrap">Code: <span className="text-blue-600 font-black">{client.clientCode}</span></span>
+                            <span className="flex items-center gap-1.5 font-semibold whitespace-nowrap"><FileText className="h-3 w-3 md:h-4 md:w-4 text-slate-400" />{client.debtCount} factures</span>
+                            <span className="text-emerald-600 font-black flex items-center gap-1.5 bg-emerald-50/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border border-emerald-100/50 whitespace-nowrap"><Users className="h-3 w-3 md:h-4 md:w-4" />{client.commercialName}</span>
+                          </div>
+                          
+                          {/* Affichage de la remarque pour mobile */}
+                          {clientRemarks[client.clientName]?.[0] && (
+                            <div 
+                              onClick={(e) => handleOpenRemarkModal(e, client.clientName)}
+                              className="md:hidden mt-2 p-2 bg-indigo-50/30 border border-indigo-100/50 rounded-xl text-[10px] font-medium text-slate-600 flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <MessageSquare className="h-3.5 w-3.5 text-indigo-500 flex-shrink-0" />
+                                <span className="truncate">
+                                  <span className="font-bold text-slate-700">{clientRemarks[client.clientName][0].user.split('@')[0]} :</span> {clientRemarks[client.clientName][0].content}
+                                </span>
+                              </div>
+                              {clientRemarks[client.clientName].length > 1 && (
+                                <Badge className="bg-indigo-50 text-indigo-700 border-none font-bold text-[8px] px-1 py-0 shadow-none scale-90 flex-shrink-0">
+                                  +{clientRemarks[client.clientName].length - 1}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Colonne Remarque au milieu (Desktop/Tablette uniquement) */}
+                      <div 
+                        onClick={(e) => handleOpenRemarkModal(e, client.clientName)}
+                        className="hidden md:flex flex-col flex-1 max-w-sm px-6 border-l border-slate-100 min-w-0"
+                      >
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                          <MessageSquare className="h-3.5 w-3.5 text-indigo-500" />
+                          <span>Dernière Remarque</span>
+                        </span>
+                        {clientRemarks[client.clientName]?.[0] ? (
+                          <div className="text-xs font-semibold text-slate-700 hover:text-blue-600 transition-colors line-clamp-2 pr-4 relative">
+                            <span className="font-bold text-slate-500">{clientRemarks[client.clientName][0].user.split('@')[0]} : </span>
+                            {clientRemarks[client.clientName][0].content}
+                            {clientRemarks[client.clientName].length > 1 && (
+                              <span className="inline-flex items-center ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 whitespace-nowrap">
+                                +{clientRemarks[client.clientName].length - 1} hist.
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Aucune remarque</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between md:justify-end gap-6 md:gap-10 md:pr-4 border-t md:border-t-0 pt-3 md:pt-0">
+                        <div className="text-left md:text-right">
+                          <div className={`text-xl md:text-3xl font-black tracking-tighter ${client.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {(client.totalBalance ?? 0).toLocaleString('fr-FR')} <span className="text-xs md:text-base font-medium opacity-60">TND</span>
+                          </div>
+                          <div className="text-[9px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest md:tracking-[0.2em] mt-0.5 md:mt-1">Solde global</div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between md:justify-end gap-6 md:gap-10 md:pr-4 border-t md:border-t-0 pt-3 md:pt-0">
-                      <div className="text-left md:text-right">
-                        <div className={`text-xl md:text-3xl font-black tracking-tighter ${client.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {(client.totalBalance ?? 0).toLocaleString('fr-FR')} <span className="text-xs md:text-base font-medium opacity-60">TND</span>
-                        </div>
-                        <div className="text-[9px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest md:tracking-[0.2em] mt-0.5 md:mt-1">Solde global</div>
-                      </div>
-                    </div>
-                  </div>
 
                   {isExpanded && (
                     <div className="px-4 md:px-8 pb-4 md:pb-8 pt-0 border-t border-slate-50">
