@@ -6,52 +6,51 @@ import webpush from 'web-push';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { clientName, content, promiseAmount, user } = body;
+    const { clientName, content, promiseAmount, user, type = 'payment' } = body;
 
     if (!clientName || !content) {
       return NextResponse.json({ error: 'Le nom du client et le contenu sont requis.' }, { status: 400 });
     }
 
     const userShort = user ? user.split('@')[0] : 'Un utilisateur';
-    const amountStr = promiseAmount > 0 
-      ? `${promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
-      : 'Solde total';
 
-    const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
+    // Construire le message et le payload de la notification selon le type
+    let pushTitle: string;
+    let pushBody: string;
+    let pushUrl: string;
+    let webhookMessage: string;
 
-    // 1. Send webhook notification immediately
+    if (type === 'conflit') {
+      pushTitle = '⚠️ ALERTE CONFLIT CLIENT !';
+      pushBody = `${userShort} a signalé un CONFLIT avec le client ${clientName}. Action requise immédiatement !`;
+      pushUrl = '/clients';
+      webhookMessage = `⚠️ **CONFLIT** : **${userShort}** a signalé un conflit avec le client **${clientName}**.\n📝 *Détails : ${content}*`;
+    } else {
+      // type === 'payment'
+      const amountStr = promiseAmount && promiseAmount > 0
+        ? `${Number(promiseAmount).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
+        : 'Solde total';
+      pushTitle = '💰 Nouveau Paiement Recouvré !';
+      pushBody = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
+      pushUrl = '/clients';
+      webhookMessage = `💰 **${userShort}** a marqué **${clientName}** comme **PAYÉ** (Règlement de ${amountStr}).\n📝 *Remarque : ${content}*`;
+    }
+
+    // 1. Envoyer le webhook (Discord/Slack) si configuré
     const webhookUrl = process.env.PAYMENT_WEBHOOK_URL;
     if (webhookUrl) {
       try {
-        const summaryMessage = `💰 **${userShort}** a marqué **${clientName}** comme **PAYÉ** (Règlement de ${amountStr}).\n📝 *Remarque : ${content}*`;
         await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: summaryMessage,
-            content: summaryMessage
-          })
+          body: JSON.stringify({ text: webhookMessage, content: webhookMessage })
         });
       } catch (webhookErr) {
         console.error('[Web Push Notify] Webhook trigger failed:', webhookErr);
       }
     }
 
-    // 2. Add in-app collaborative notification
-    try {
-      await addDoc(collection(db, 'notifications'), {
-        type: 'payment',
-        message: messageText,
-        severity: 'low',
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-        metadata: { clientName }
-      });
-    } catch (dbErr) {
-      console.error('[Web Push Notify] Failed to save in-app notification:', dbErr);
-    }
-
-    // 3. Load VAPID keys (Vercel env vars prioritized)
+    // 2. Charger les clés VAPID (variables d'environnement en priorité)
     let publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     let privateKey = process.env.VAPID_PRIVATE_KEY;
     const subject = process.env.VAPID_SUBJECT || 'mailto:moslem.gouia@gmail.com';
@@ -61,7 +60,6 @@ export async function POST(request: Request) {
       try {
         const vapidDocRef = doc(db, 'config', 'vapid');
         const vapidDocSnap = await getDoc(vapidDocRef);
-        
         if (vapidDocSnap.exists()) {
           const firestoreData = vapidDocSnap.data();
           publicKey = firestoreData.publicKey;
@@ -73,27 +71,30 @@ export async function POST(request: Request) {
     }
 
     if (!publicKey || !privateKey) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Paiement enregistré, mais les notifications push ne sont pas configurées.' 
+      console.warn('[Web Push Notify] No VAPID keys available. Push not sent.');
+      return NextResponse.json({
+        success: true,
+        message: 'Événement enregistré, mais les notifications push ne sont pas configurées.'
       });
     }
 
-    // 4. Broadcast push notifications to all subscribers
+    // 3. Configurer web-push avec les clés VAPID
     try {
       webpush.setVapidDetails(subject, publicKey, privateKey);
     } catch (vapidErr: any) {
       console.error('[Web Push Notify] Failed to set VAPID details:', vapidErr);
-      return NextResponse.json({ 
-        error: `Configuration VAPID invalide: ${vapidErr.message}` 
+      return NextResponse.json({
+        error: `Configuration VAPID invalide: ${vapidErr.message}`
       }, { status: 500 });
     }
 
-    // Support receiving subscriptions directly in the request body to avoid Firestore backend read permission issues
+    // 4. Récupérer les abonnements
+    // Priorité : abonnements passés dans le body (côté client authentifié)
+    // Fallback : tenter de lire Firestore (peut échouer si non authentifié côté serveur)
     let subscriptions = body.subscriptions;
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log('[Web Push Notify] No subscriptions passed in body. Attempting Firestore fallback.');
+      console.log('[Web Push Notify] No subscriptions in body. Attempting Firestore fallback.');
       try {
         const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
         if (!subsSnapshot.empty) {
@@ -103,52 +104,67 @@ export async function POST(request: Request) {
           }));
         }
       } catch (dbErr) {
-        console.warn('[Web Push Notify] Failed to read subscriptions from Firestore (likely permissions error):', dbErr);
+        console.warn('[Web Push Notify] Firestore subscriptions read failed (permissions):', dbErr);
         subscriptions = [];
       }
     }
 
-    if (subscriptions && subscriptions.length > 0) {
-      const pushPayload = JSON.stringify({
-        title: 'Nouveau Paiement Recouvré ! 💰',
-        body: messageText,
-        icon: '/logo.png',
-        badge: '/logo.png',
-        url: '/clients'
-      });
-
-      const pushPromises = subscriptions.map((subItem: any) => {
-        const subscription = subItem.subscription;
-        const subId = subItem.id;
-
-        if (!subscription || !subscription.endpoint) {
-          console.warn(`[Web Push Notify] Skipping invalid subscription:`, subItem);
-          return Promise.resolve();
-        }
-
-        return webpush.sendNotification(subscription, pushPayload)
-          .catch(async (err: any) => {
-            console.error(`[Web Push Notify] Error sending push to ${subId || 'unknown'}:`, err);
-            
-            // Prune invalid or expired subscription (404 or 410)
-            if (subId && (err.statusCode === 404 || err.statusCode === 410)) {
-              console.log(`[Web Push Notify] Pruning expired subscription: ${subId}`);
-              try {
-                const { deleteDoc } = await import('firebase/firestore');
-                await deleteDoc(doc(db, 'push_subscriptions', subId));
-              } catch (pruneErr) {
-                console.error(`[Web Push Notify] Failed to prune subscription:`, pruneErr);
-              }
-            }
-          });
-      });
-
-      await Promise.all(pushPromises);
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('[Web Push Notify] No subscriptions found. Push not sent.');
+      return NextResponse.json({ success: true, message: 'Aucun abonnement push enregistré.' });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Notification push et webhook diffusés.' 
+    // 5. Construire le payload push avec le type pour le service worker
+    const pushPayload = JSON.stringify({
+      title: pushTitle,
+      body: pushBody,
+      icon: '/icon-192x192.png',
+      badge: '/icon-192x192.png',
+      url: pushUrl,
+      type,
+      clientName,
+      vibrate: type === 'conflit' ? [300, 100, 300, 100, 300, 100, 300] : [200, 100, 200],
+      tag: `gc-${type}-${clientName}-${Date.now()}`,
+      timestamp: Date.now()
+    });
+
+    console.log(`[Web Push Notify] Envoi de ${subscriptions.length} notification(s) de type "${type}" pour le client "${clientName}"`);
+
+    // 6. Envoyer les notifications à tous les abonnés
+    const pushPromises = subscriptions.map((subItem: any) => {
+      const subscription = subItem.subscription;
+      const subId = subItem.id;
+
+      if (!subscription || !subscription.endpoint) {
+        console.warn(`[Web Push Notify] Abonnement invalide ignoré:`, subItem);
+        return Promise.resolve();
+      }
+
+      return webpush.sendNotification(subscription, pushPayload)
+        .then(() => {
+          console.log(`[Web Push Notify] ✅ Push envoyé à ${subId || 'inconnu'}`);
+        })
+        .catch(async (err: any) => {
+          console.error(`[Web Push Notify] ❌ Échec envoi push à ${subId || 'inconnu'}:`, err.statusCode, err.message);
+
+          // Supprimer l'abonnement expiré ou invalide (404 ou 410)
+          if (subId && (err.statusCode === 404 || err.statusCode === 410)) {
+            console.log(`[Web Push Notify] Suppression abonnement expiré: ${subId}`);
+            try {
+              const { deleteDoc } = await import('firebase/firestore');
+              await deleteDoc(doc(db, 'push_subscriptions', subId));
+            } catch (pruneErr) {
+              console.error(`[Web Push Notify] Échec suppression abonnement:`, pruneErr);
+            }
+          }
+        });
+    });
+
+    await Promise.all(pushPromises);
+
+    return NextResponse.json({
+      success: true,
+      message: `Notification push "${type}" diffusée à ${subscriptions.length} abonné(s).`
     });
 
   } catch (error: any) {

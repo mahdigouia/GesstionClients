@@ -280,73 +280,75 @@ function cleanUndefined(obj: any): any {
     setClientRemarks(updatedRemarks);
     saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
 
-    // Enregistrer le paiement en attente dans Firestore si la remarque est "Payé" (commence par "Payé :")
-    if (content.startsWith('Payé :')) {
+    // Fonction d'assistance pour envoyer les notifications push
+    const sendNotification = async (type: 'payment' | 'conflit', messageText: string) => {
       try {
-        addDoc(collection(db, 'pending_payments'), {
-          clientName,
-          content,
-          promiseAmount: promiseAmount || 0,
-          user: user?.email || 'Utilisateur inconnu',
-          createdAt: new Date().toISOString(),
-          status: 'pending'
+        // Récupérer les abonnements client-side (utilisateur authentifié)
+        const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
+        const subscriptions = subsSnapshot.docs.map(subDoc => ({
+          id: subDoc.id,
+          subscription: subDoc.data().subscription
+        }));
+        // Déclencher la notification push via l'API
+        await fetch('/api/webpush/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientName, content, promiseAmount, user: user?.email, type, subscriptions })
         });
-
-        // Générer le message de notification collaborative in-app et l'enregistrer client-side
-        const userShort = user?.email ? user.email.split('@')[0] : 'Un utilisateur';
-        const amountStr = promiseAmount && promiseAmount > 0 
-          ? `${promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
-          : 'Solde total';
-        const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
-
-        addDoc(collection(db, 'notifications'), {
-          type: 'payment',
-          message: messageText,
-          severity: 'low',
-          createdAt: new Date().toISOString(),
-          status: 'pending',
-          metadata: { clientName }
-        }).catch(err => console.error("Erreur d'enregistrement de la notification collaborative in-app :", err));
-
-        // Récupérer les abonnements de notification client-side pour contourner les restrictions Firestore sur le serveur
-        getDocs(collection(db, 'push_subscriptions'))
-          .then(subsSnapshot => {
-            const subscriptions = subsSnapshot.docs.map(subDoc => ({
-              id: subDoc.id,
-              subscription: subDoc.data().subscription
-            }));
-
-            // Déclencher IMMÉDIATEMENT la notification push et le webhook en temps réel via l'API !
-            fetch('/api/webpush/notify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                clientName,
-                content,
-                promiseAmount: promiseAmount || 0,
-                user: user?.email || 'Utilisateur inconnu',
-                subscriptions
-              })
-            }).catch(err => console.error("Erreur lors de la diffusion en temps réel de la notification :", err));
-          })
-          .catch(subErr => {
-            console.error("Erreur lors de la récupération des abonnements client-side :", subErr);
-            // Fallback sans abonnements (l'API tentera de récupérer ou fera juste le webhook)
-            fetch('/api/webpush/notify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                clientName,
-                content,
-                promiseAmount: promiseAmount || 0,
-                user: user?.email || 'Utilisateur inconnu'
-              })
-            }).catch(err => console.error("Erreur lors du fallback de notification :", err));
-          });
-
       } catch (e) {
-        console.error("Erreur lors de l'enregistrement du paiement en attente dans pending_payments :", e);
+        console.error(`[DebtContext] Erreur notification ${type}:`, e);
       }
+    };
+
+    // ✅ Notification Push pour "Payé" (commence par "Payé :")
+    if (content.startsWith('Payé :')) {
+      // Enregistrer le paiement en attente dans Firestore
+      addDoc(collection(db, 'pending_payments'), {
+        clientName,
+        content,
+        promiseAmount: promiseAmount || 0,
+        user: user?.email || 'Utilisateur inconnu',
+        createdAt: new Date().toISOString(),
+        status: 'pending'
+      }).catch(e => console.error('[DebtContext] Erreur pending_payments:', e));
+
+      const userShort = user?.email?.split('@')[0] || 'Un utilisateur';
+      const amountStr = promiseAmount && promiseAmount > 0
+        ? `${promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
+        : 'Solde total';
+      const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
+
+      // Notification collaborative in-app
+      addDoc(collection(db, 'notifications'), {
+        type: 'payment',
+        message: messageText,
+        severity: 'low',
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        metadata: { clientName }
+      }).catch(e => console.error('[DebtContext] Erreur notification in-app payment:', e));
+
+      // Notification push en arrière-plan
+      sendNotification('payment', messageText);
+    }
+
+    // ⚠️ Notification Push pour "Client à Conflit"
+    if (content.startsWith('Client à Conflit :') || content.startsWith('Client à Conflit:')) {
+      const userShort = user?.email?.split('@')[0] || 'Un utilisateur';
+      const conflitMessage = `⚠️ ${userShort} a signalé un CONFLIT avec le client ${clientName} !`;
+
+      // Notification collaborative in-app
+      addDoc(collection(db, 'notifications'), {
+        type: 'conflit',
+        message: conflitMessage,
+        severity: 'high',
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        metadata: { clientName }
+      }).catch(e => console.error('[DebtContext] Erreur notification in-app conflit:', e));
+
+      // Notification push en arrière-plan
+      sendNotification('conflit', conflitMessage);
     }
     
     if (user?.email === 'moslem.gouia@gmail.com') {
