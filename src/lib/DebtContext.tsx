@@ -271,6 +271,19 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString(),
           status: 'pending'
         });
+
+        // Déclencher IMMÉDIATEMENT la notification push et le webhook en temps réel !
+        fetch('/api/webpush/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName,
+            content,
+            promiseAmount: promiseAmount || 0,
+            user: user?.email || 'Utilisateur inconnu'
+          })
+        }).catch(err => console.error("Erreur lors de la diffusion en temps réel de la notification :", err));
+
       } catch (e) {
         console.error("Erreur lors de l'enregistrement du paiement en attente dans pending_payments :", e);
       }
