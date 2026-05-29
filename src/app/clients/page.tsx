@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
@@ -58,6 +59,8 @@ import { ClientRemarkModal } from '@/components/ClientRemarkModal';
 export default function ClientsPage() {
   const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit } = useDebtContext();
   const { userRole } = useAuth();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCommercial, setSelectedCommercial] = useState('all');
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
@@ -66,6 +69,30 @@ export default function ClientsPage() {
   // State for Remark Modal
   const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
   const [remarkClientName, setRemarkClientName] = useState('');
+
+  // 🔔 Auto-navigation depuis une notification push
+  // URL format: /clients?search=NOM_CLIENT&open=remark
+  useEffect(() => {
+    const searchFromNotif = searchParams?.get('search');
+    const openParam = searchParams?.get('open');
+    if (searchFromNotif) {
+      // Appliquer la recherche pour filtrer sur ce client
+      setSearchTerm(searchFromNotif);
+      // Développer automatiquement les factures du client
+      setExpandedClients(prev => {
+        const next = new Set(prev);
+        next.add(searchFromNotif);
+        return next;
+      });
+      // Si le paramètre open=remark, ouvrir aussi le modal de remarques
+      if (openParam === 'remark') {
+        setRemarkClientName(searchFromNotif);
+        setIsRemarkModalOpen(true);
+      }
+      // Nettoyer l'URL sans rechargement (enlever les paramètres de navigation)
+      router.replace('/clients', { scroll: false });
+    }
+  }, [searchParams, router]);
   
   // Tristate filters
   const [contentieuxFilter, setContentieuxFilter] = useState<'off' | 'include' | 'exclude'>('off');

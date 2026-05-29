@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (type === 'conflit') {
       pushTitle = '⚠️ ALERTE CONFLIT CLIENT !';
       pushBody = `${userShort} a signalé un CONFLIT avec le client ${clientName}. Action requise immédiatement !`;
-      pushUrl = '/clients';
+      pushUrl = `/clients?search=${encodeURIComponent(clientName)}&open=remark`;
       webhookMessage = `⚠️ **CONFLIT** : **${userShort}** a signalé un conflit avec le client **${clientName}**.\n📝 *Détails : ${content}*`;
     } else {
       // type === 'payment'
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
         : 'Solde total';
       pushTitle = '💰 Nouveau Paiement Recouvré !';
       pushBody = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
-      pushUrl = '/clients';
+      pushUrl = `/clients?search=${encodeURIComponent(clientName)}&open=remark`;
       webhookMessage = `💰 **${userShort}** a marqué **${clientName}** comme **PAYÉ** (Règlement de ${amountStr}).\n📝 *Remarque : ${content}*`;
     }
 
