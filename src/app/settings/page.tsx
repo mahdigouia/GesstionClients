@@ -95,6 +95,7 @@ export default function SettingsPage() {
         console.error("Erreur lors du chargement des utilisateurs :", error);
       });
       return () => unsubscribe();
+    }
   }, [user, userRole]);
 
   useEffect(() => {
