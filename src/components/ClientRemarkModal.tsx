@@ -32,7 +32,8 @@ import {
   Pencil,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { ClientRemark } from '@/types/debt';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +41,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/AuthContext';
 import { useDebtContext } from '@/lib/DebtContext';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
 interface ClientRemarkModalProps {
   isOpen: boolean;
@@ -67,6 +70,37 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
 
   const clientDebts = debts.filter(d => d.clientName === clientName);
   const clientActiveDebts = clientDebts.filter(d => d.balance > 0);
+
+  const adminEmails = ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'];
+  const isAdmin = adminEmails.includes(user?.email || '') || userRole === 'admin';
+
+  const handleResetPayments = async () => {
+    if (confirm("Voulez-vous vraiment réinitialiser le statut 'Payé' pour ce client ? Cela supprimera toutes les remarques de paiement de l'historique et les notifications en attente.")) {
+      try {
+        // 1. Delete all remarks starting with "Payé" or "Payé Partiellement"
+        const remarksToDelete = remarks.filter(r => r.content.startsWith('Payé') || r.content.startsWith('Payé Partiellement'));
+        if (onDeleteRemark) {
+          for (const r of remarksToDelete) {
+            onDeleteRemark(clientName, r.id);
+          }
+        }
+
+        // 2. Delete pending payments from Firestore
+        const q = query(
+          collection(db, 'pending_payments'),
+          where('clientName', '==', clientName)
+        );
+        const snapshot = await getDocs(q);
+        const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'pending_payments', docSnap.id)));
+        await Promise.all(deletePromises);
+
+        alert("Paiements et remarques réinitialisés avec succès !");
+      } catch (err: any) {
+        console.error("Erreur lors de la réinitialisation :", err);
+        alert("Erreur : " + err.message);
+      }
+    }
+  };
 
   const handleStartEdit = (remark: ClientRemark) => {
     setEditingRemarkId(remark.id);
@@ -317,9 +351,24 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <History className="h-3 w-3" /> Historique des remarques
               </h3>
-              <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200">
-                {remarks.length} entrée{remarks.length > 1 ? 's' : ''}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {isAdmin && remarks.some(r => r.content.startsWith('Payé')) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-[10px] font-black text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg px-2 flex items-center gap-1 border border-rose-100 transition-all shadow-sm"
+                    onClick={handleResetPayments}
+                    title="Réinitialiser tous les paiements et remarques 'Payé' de ce client"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Réinitialiser Paiements
+                  </Button>
+                )}
+                <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200">
+                  {remarks.length} entrée{remarks.length > 1 ? 's' : ''}
+                </Badge>
+              </div>
             </div>
             
             <ScrollArea className="flex-1 p-6">
