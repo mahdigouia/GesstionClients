@@ -5,7 +5,7 @@ import { ClientDebt, AnalysisResult, RecoveryAction } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { doc, setDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 
 interface DebtContextType {
   debts: ClientDebt[];
@@ -259,6 +259,22 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
     setClientRemarks(updatedRemarks);
     saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
+
+    // Enregistrer le paiement en attente dans Firestore si la remarque est "Payé" (commence par "Payé :")
+    if (content.startsWith('Payé :')) {
+      try {
+        addDoc(collection(db, 'pending_payments'), {
+          clientName,
+          content,
+          promiseAmount: promiseAmount || 0,
+          user: user?.email || 'Utilisateur inconnu',
+          createdAt: new Date().toISOString(),
+          status: 'pending'
+        });
+      } catch (e) {
+        console.error("Erreur lors de l'enregistrement du paiement en attente dans pending_payments :", e);
+      }
+    }
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Remarque Client', `Ajout d'une remarque pour le client ${clientName}`);
