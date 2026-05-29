@@ -52,7 +52,8 @@ self.addEventListener('push', function(event) {
   const options = {
     body: data.body || '',
     icon: data.icon || '/icon-192x192.png',
-    badge: data.badge || '/icon-192x192.png',
+    // badge : icône monochrome MDS Group affichée dans la barre de statut Android (à côté batterie)
+    badge: '/badge-96x96.png',
     vibrate: data.vibrate || [200, 100, 200, 100, 200],
     // requireInteraction: la notification reste visible jusqu'à ce que l'utilisateur interagisse
     requireInteraction: true,

@@ -119,7 +119,8 @@ export async function POST(request: Request) {
       title: pushTitle,
       body: pushBody,
       icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png',
+      // Badge monochrome MDS Group (affiché dans la barre de statut Android)
+      badge: '/badge-96x96.png',
       url: pushUrl,
       type,
       clientName,

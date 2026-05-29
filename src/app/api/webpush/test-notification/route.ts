@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       title: 'Notification de Test 🔔',
       body: 'Félicitations ! Vos notifications en arrière-plan fonctionnent correctement même en veille.',
       icon: '/logo.png',
-      badge: '/logo.png',
+      badge: '/badge-96x96.png',
       url: '/settings',
       vibrate: [100, 50, 100]
     });
