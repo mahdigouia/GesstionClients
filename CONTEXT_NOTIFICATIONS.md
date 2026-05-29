@@ -20,8 +20,9 @@ sequenceDiagram
     Navigateur->>DB: Sauvegarde l'abonnement (endpoint, keys)
     Note over DB: Collection: push_subscriptions
     
-    Note over Vercel: Un paiement est validé (Statut Payé)
-    Vercel->>DB: Récupère tous les abonnements actifs
+    Note over Navigateur: Un paiement est validé (Statut Payé)
+    Navigateur->>DB: Récupère tous les abonnements (client connecté)
+    Navigateur->>Vercel: Appelle /api/webpush/notify en passant les abonnements
     Vercel->>Google: Envoie les notifications Web Push (chiffrées avec VAPID)
     Google->>Navigateur: Réception Push en tâche de fond (Service Worker)
     Navigateur->>Navigateur: Affiche la bannière native de l'OS
