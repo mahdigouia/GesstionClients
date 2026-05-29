@@ -5,7 +5,7 @@ import { ClientDebt, AnalysisResult, RecoveryAction } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
-import { doc, setDoc, onSnapshot, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, serverTimestamp, collection, addDoc, getDocs } from 'firebase/firestore';
 
 interface DebtContextType {
   debts: ClientDebt[];
@@ -292,17 +292,57 @@ function cleanUndefined(obj: any): any {
           status: 'pending'
         });
 
-        // Déclencher IMMÉDIATEMENT la notification push et le webhook en temps réel !
-        fetch('/api/webpush/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientName,
-            content,
-            promiseAmount: promiseAmount || 0,
-            user: user?.email || 'Utilisateur inconnu'
+        // Générer le message de notification collaborative in-app et l'enregistrer client-side
+        const userShort = user?.email ? user.email.split('@')[0] : 'Un utilisateur';
+        const amountStr = promiseAmount && promiseAmount > 0 
+          ? `${promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
+          : 'Solde total';
+        const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
+
+        addDoc(collection(db, 'notifications'), {
+          type: 'payment',
+          message: messageText,
+          severity: 'low',
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+          metadata: { clientName }
+        }).catch(err => console.error("Erreur d'enregistrement de la notification collaborative in-app :", err));
+
+        // Récupérer les abonnements de notification client-side pour contourner les restrictions Firestore sur le serveur
+        getDocs(collection(db, 'push_subscriptions'))
+          .then(subsSnapshot => {
+            const subscriptions = subsSnapshot.docs.map(subDoc => ({
+              id: subDoc.id,
+              subscription: subDoc.data().subscription
+            }));
+
+            // Déclencher IMMÉDIATEMENT la notification push et le webhook en temps réel via l'API !
+            fetch('/api/webpush/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientName,
+                content,
+                promiseAmount: promiseAmount || 0,
+                user: user?.email || 'Utilisateur inconnu',
+                subscriptions
+              })
+            }).catch(err => console.error("Erreur lors de la diffusion en temps réel de la notification :", err));
           })
-        }).catch(err => console.error("Erreur lors de la diffusion en temps réel de la notification :", err));
+          .catch(subErr => {
+            console.error("Erreur lors de la récupération des abonnements client-side :", subErr);
+            // Fallback sans abonnements (l'API tentera de récupérer ou fera juste le webhook)
+            fetch('/api/webpush/notify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientName,
+                content,
+                promiseAmount: promiseAmount || 0,
+                user: user?.email || 'Utilisateur inconnu'
+              })
+            }).catch(err => console.error("Erreur lors du fallback de notification :", err));
+          });
 
       } catch (e) {
         console.error("Erreur lors de l'enregistrement du paiement en attente dans pending_payments :", e);

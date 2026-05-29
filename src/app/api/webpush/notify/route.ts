@@ -58,13 +58,17 @@ export async function POST(request: Request) {
 
     if (!publicKey || !privateKey) {
       console.log('[Web Push Notify] VAPID Env vars missing. Falling back to Firestore.');
-      const vapidDocRef = doc(db, 'config', 'vapid');
-      const vapidDocSnap = await getDoc(vapidDocRef);
-      
-      if (vapidDocSnap.exists()) {
-        const firestoreData = vapidDocSnap.data();
-        publicKey = firestoreData.publicKey;
-        privateKey = firestoreData.privateKey;
+      try {
+        const vapidDocRef = doc(db, 'config', 'vapid');
+        const vapidDocSnap = await getDoc(vapidDocRef);
+        
+        if (vapidDocSnap.exists()) {
+          const firestoreData = vapidDocSnap.data();
+          publicKey = firestoreData.publicKey;
+          privateKey = firestoreData.privateKey;
+        }
+      } catch (vapidDbErr) {
+        console.error('[Web Push Notify] Failed to fetch VAPID keys from Firestore:', vapidDbErr);
       }
     }
 
@@ -85,9 +89,26 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
-    
-    if (!subsSnapshot.empty) {
+    // Support receiving subscriptions directly in the request body to avoid Firestore backend read permission issues
+    let subscriptions = body.subscriptions;
+
+    if (!subscriptions || subscriptions.length === 0) {
+      console.log('[Web Push Notify] No subscriptions passed in body. Attempting Firestore fallback.');
+      try {
+        const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
+        if (!subsSnapshot.empty) {
+          subscriptions = subsSnapshot.docs.map(subDoc => ({
+            id: subDoc.id,
+            subscription: subDoc.data().subscription
+          }));
+        }
+      } catch (dbErr) {
+        console.warn('[Web Push Notify] Failed to read subscriptions from Firestore (likely permissions error):', dbErr);
+        subscriptions = [];
+      }
+    }
+
+    if (subscriptions && subscriptions.length > 0) {
       const pushPayload = JSON.stringify({
         title: 'Nouveau Paiement Recouvré ! 💰',
         body: messageText,
@@ -96,25 +117,25 @@ export async function POST(request: Request) {
         url: '/clients'
       });
 
-      const pushPromises = subsSnapshot.docs.map(subDoc => {
-        const subData = subDoc.data();
-        const subscription = subData.subscription;
+      const pushPromises = subscriptions.map((subItem: any) => {
+        const subscription = subItem.subscription;
+        const subId = subItem.id;
 
         if (!subscription || !subscription.endpoint) {
-          console.warn(`[Web Push Notify] Skipping invalid subscription in doc: ${subDoc.id}`);
+          console.warn(`[Web Push Notify] Skipping invalid subscription:`, subItem);
           return Promise.resolve();
         }
 
         return webpush.sendNotification(subscription, pushPayload)
           .catch(async (err: any) => {
-            console.error(`[Web Push Notify] Error sending push to ${subDoc.id}:`, err);
+            console.error(`[Web Push Notify] Error sending push to ${subId || 'unknown'}:`, err);
             
             // Prune invalid or expired subscription (404 or 410)
-            if (err.statusCode === 404 || err.statusCode === 410) {
-              console.log(`[Web Push Notify] Pruning expired subscription: ${subDoc.id}`);
+            if (subId && (err.statusCode === 404 || err.statusCode === 410)) {
+              console.log(`[Web Push Notify] Pruning expired subscription: ${subId}`);
               try {
                 const { deleteDoc } = await import('firebase/firestore');
-                await deleteDoc(doc(db, 'push_subscriptions', subDoc.id));
+                await deleteDoc(doc(db, 'push_subscriptions', subId));
               } catch (pruneErr) {
                 console.error(`[Web Push Notify] Failed to prune subscription:`, pruneErr);
               }
@@ -127,7 +148,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Notification push et webhook diffusés en temps réel.' 
+      message: 'Notification push et webhook diffusés.' 
     });
 
   } catch (error: any) {
