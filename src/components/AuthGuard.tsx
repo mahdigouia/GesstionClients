@@ -48,6 +48,19 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
   }, [user, loading, userRole, pathname, router]);
 
+  // Register Service Worker for push notifications when authenticated
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && user && userRole && userRole !== 'pending') {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('[Service Worker] Registration successful with scope:', registration.scope);
+        })
+        .catch((error) => {
+          console.error('[Service Worker] Registration failed:', error);
+        });
+    }
+  }, [user, userRole]);
+
   const handleLogout = async () => {
     await logout();
     router.push('/login');

@@ -3,7 +3,7 @@
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText, Menu, Users } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, User, LogOut, Mail, Shield, TrendingUp, FileText, Menu, Users, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -14,8 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { History, FileClock, FileCode, Eye } from 'lucide-react';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { History, FileClock, FileCode, Eye, Bell, BellOff, Smartphone, ShieldCheck } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -24,6 +24,22 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
+// Helper to convert base64 VAPID public key to Uint8Array for push subscription
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 export default function SettingsPage() {
   const { debts, archiveDebts, analysis, clearAll, deleteFileDebts, clearHistory, settings, updateSettings, logAudit } = useDebtContext();
@@ -34,6 +50,13 @@ export default function SettingsPage() {
   const [localSettings, setLocalSettings] = useState(settings);
   const [logs, setLogs] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Push Notifications States
+  const [isPushSupported, setIsPushSupported] = useState(false);
+  const [isPushEnabled, setIsPushEnabled] = useState(false);
+  const [isPushLoading, setIsPushLoading] = useState(false);
+  const [pushSubscription, setPushSubscription] = useState<any>(null);
+  const [pushStatusMsg, setPushStatusMsg] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [clickCount, setClickCount] = useState(0);
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -72,8 +95,110 @@ export default function SettingsPage() {
         console.error("Erreur lors du chargement des utilisateurs :", error);
       });
       return () => unsubscribe();
-    }
   }, [user, userRole]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window;
+      setIsPushSupported(supported);
+      if (supported) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.pushManager.getSubscription().then((subscription) => {
+            setIsPushEnabled(!!subscription);
+            setPushSubscription(subscription);
+          }).catch(err => {
+            console.error('Error getting push subscription:', err);
+          });
+        });
+      }
+    }
+  }, [user]);
+
+  const handleTogglePush = async () => {
+    if (!isPushSupported) return;
+    setIsPushLoading(true);
+    setPushStatusMsg('');
+
+    try {
+      if (isPushEnabled) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+          const endpointHash = btoa(subscription.endpoint).replace(/[^a-zA-Z0-9]/g, '').slice(-50);
+          const docId = `${user?.uid}_${endpointHash}`;
+          await deleteDoc(doc(db, 'push_subscriptions', docId));
+          
+          await logAudit('Push Notification', `Désactivation des notifications sur cet appareil`);
+        }
+        setIsPushEnabled(false);
+        setPushSubscription(null);
+        setPushStatusMsg('Notifications désactivées.');
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('Vous devez autoriser les notifications pour activer cette fonctionnalité.');
+          setIsPushLoading(false);
+          return;
+        }
+
+        const response = await fetch('/api/webpush/vapid-public-key');
+        if (!response.ok) {
+          throw new Error('Impossible de charger la clé publique de notification.');
+        }
+        const { publicKey } = await response.json();
+
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+
+        const endpointHash = btoa(subscription.endpoint).replace(/[^a-zA-Z0-9]/g, '').slice(-50);
+        const docId = `${user?.uid}_${endpointHash}`;
+        
+        await setDoc(doc(db, 'push_subscriptions', docId), {
+          uid: user?.uid,
+          email: user?.email || 'unknown',
+          subscription: JSON.parse(JSON.stringify(subscription)),
+          userAgent: navigator.userAgent,
+          createdAt: new Date().toISOString()
+        });
+
+        await logAudit('Push Notification', `Activation des notifications sur cet appareil`);
+        setIsPushEnabled(true);
+        setPushSubscription(subscription);
+        setPushStatusMsg('Notifications activées avec succès !');
+      }
+    } catch (err: any) {
+      console.error('Error toggling push notifications:', err);
+      setPushStatusMsg(`Erreur : ${err.message}`);
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    if (!pushSubscription) return;
+    setIsPushLoading(true);
+    try {
+      const response = await fetch('/api/webpush/test-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: pushSubscription })
+      });
+      if (response.ok) {
+        setPushStatusMsg('Notification de test envoyée. Vérifiez votre appareil.');
+      } else {
+        const errData = await response.json();
+        setPushStatusMsg(`Erreur d'envoi : ${errData.error}`);
+      }
+    } catch (err: any) {
+      setPushStatusMsg(`Erreur réseau : ${err.message}`);
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
 
   const handleRoleChange = (userId: string, role: string, currentCode: string | null) => {
     setEditingUsers(prev => ({
@@ -366,6 +491,100 @@ export default function SettingsPage() {
                 <LogOut className="h-4 w-4 mr-2" />
                 Se déconnecter
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Notifications Push */}
+          <Card className="border-0 shadow-xl bg-white overflow-hidden border-l-4 border-l-blue-600 animate-in fade-in slide-in-from-bottom-3 duration-355">
+            <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+              <CardTitle className="flex items-center gap-2 text-slate-800">
+                <Bell className="h-5 w-5 text-blue-600" />
+                Notifications Push sur cet appareil
+              </CardTitle>
+              <CardDescription>
+                Recevez des notifications en temps réel en arrière-plan (même si le téléphone est en veille)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              {!isPushSupported ? (
+                <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100 text-amber-800">
+                  <Smartphone className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-sm">Notifications non supportées</h4>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Votre navigateur ou appareil ne prend pas en charge l'API Web Push (certains navigateurs iOS requièrent d'ajouter l'application à l'écran d'accueil).
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50/50 border border-slate-100">
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "p-2.5 rounded-xl flex items-center justify-center flex-shrink-0",
+                        isPushEnabled ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
+                      )}>
+                        {isPushEnabled ? <Bell className="h-5 w-5 animate-bounce" /> : <BellOff className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-sm text-slate-800">Statut des notifications</h4>
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider",
+                            isPushEnabled ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-slate-200 text-slate-700"
+                          )}>
+                            {isPushEnabled ? 'Activées' : 'Désactivées'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Recevez des alertes immédiates dès qu'un recouvrement de client est marqué comme payé.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleTogglePush}
+                      disabled={isPushLoading}
+                      variant={isPushEnabled ? "outline" : "default"}
+                      className={cn(
+                        "rounded-xl font-bold text-xs px-6 py-2.5 shadow-sm transition-all flex items-center gap-2",
+                        isPushEnabled 
+                          ? "border-slate-200 text-red-600 hover:bg-red-50 hover:text-red-700" 
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      )}
+                    >
+                      {isPushLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {isPushEnabled ? 'Désactiver sur cet appareil' : 'Activer sur cet appareil'}
+                    </Button>
+                  </div>
+
+                  {isPushEnabled && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
+                      <Button
+                        onClick={handleTestPush}
+                        disabled={isPushLoading}
+                        variant="outline"
+                        className="rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50 font-bold text-xs flex items-center gap-2 w-full sm:w-auto"
+                      >
+                        {isPushLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        <Smartphone className="h-4 w-4" />
+                        Tester la notification push
+                      </Button>
+                    </div>
+                  )}
+
+                  {pushStatusMsg && (
+                    <p className={cn(
+                      "text-xs font-bold px-3 py-2 rounded-xl mt-2 border",
+                      pushStatusMsg.startsWith('Erreur') 
+                        ? "bg-red-50 border-red-100 text-red-600" 
+                        : "bg-blue-50 border-blue-100 text-blue-600"
+                    )}>
+                      {pushStatusMsg}
+                    </p>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 

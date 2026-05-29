@@ -394,20 +394,6 @@ export default function ClientsPage() {
                   </div>
                 </div>
 
-                {/* Card Montant Global */}
-                <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-800 shadow-sm min-w-[180px] lg:min-w-[210px] transition-all hover:shadow-md">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-500 flex-shrink-0" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-600/80 truncate">Montant Facturé</span>
-                    <span className="text-sm md:text-lg lg:text-xl font-black tracking-tight text-slate-800 whitespace-nowrap">
-                      {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[10px] font-bold text-slate-500">TND</span>
-                      <span className="text-[10px] text-emerald-600 font-extrabold ml-1.5">
-                        ({filteredStats.totalAmount > 0 ? ((1 - filteredStats.totalBalance / filteredStats.totalAmount) * 100).toFixed(1) : '0.0'}%)
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
                 {/* Card Moyenne d'âge */}
                 <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-800 shadow-sm min-w-[130px] lg:min-w-[150px] transition-all hover:shadow-md">
                   <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 flex-shrink-0" />
@@ -738,20 +724,6 @@ export default function ClientsPage() {
                   <span className="text-[8px] font-black uppercase tracking-wider text-rose-600/80">Solde Restant</span>
                   <span className="text-xs font-black tracking-tight text-slate-800">
                     {filteredStats.totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[8px] font-bold text-slate-500">TND</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Card Montant Global */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 shadow-sm flex-shrink-0 min-w-[150px]">
-                <div className="w-1.5 h-1.5 rounded-full bg-slate-500 flex-shrink-0" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[8px] font-black uppercase tracking-wider text-slate-600/80">Facturé</span>
-                  <span className="text-xs font-black tracking-tight text-slate-800">
-                    {filteredStats.totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} <span className="text-[8px] font-bold text-slate-500">TND</span>
-                    <span className="text-[8px] text-emerald-600 font-extrabold ml-1">
-                      ({filteredStats.totalAmount > 0 ? ((1 - filteredStats.totalBalance / filteredStats.totalAmount) * 100).toFixed(1) : '0.0'}%)
-                    </span>
                   </span>
                 </div>
               </div>
