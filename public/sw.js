@@ -94,42 +94,66 @@ self.addEventListener('push', function(event) {
 // Gestionnaire de clic sur la notification
 // ============================================
 self.addEventListener('notificationclick', function(event) {
-  console.log('[SW] Notification clicked. Action:', event.action, 'Data:', event.notification.data);
+  console.log('[SW] Notification cliquée. Action:', event.action, '| Data:', event.notification.data);
   event.notification.close();
 
-  // Si l'utilisateur clique sur "Fermer", on ne fait rien
-  if (event.action === 'close') {
-    return;
-  }
+  // Clic sur "Fermer" → rien
+  if (event.action === 'close') return;
 
-  // Construire l'URL absolue cible (obligatoire pour clients.openWindow)
   const notifData = event.notification.data || {};
   const relativePath = notifData.url || '/clients';
-  // self.location.origin donne ex: https://gesstion-clients.vercel.app
-  const absoluteUrl = self.location.origin + relativePath;
 
-  console.log('[SW] Navigation vers:', absoluteUrl);
+  // URL absolue obligatoire pour clients.openWindow() et navigate()
+  // self.location.origin = ex: https://gesstion-clients.vercel.app
+  const absoluteUrl = self.location.origin + relativePath;
+  console.log('[SW] Redirection vers:', absoluteUrl);
 
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(function(windowClients) {
-        // Chercher si un onglet de l'app est déjà ouvert
-        for (let i = 0; i < windowClients.length; i++) {
-          const client = windowClients[i];
-          const clientUrl = new URL(client.url);
-          if (clientUrl.origin === self.location.origin && 'focus' in client) {
-            // Onglet trouvé : naviguer vers le client spécifique et donner le focus
-            if ('navigate' in client) {
-              client.navigate(absoluteUrl);
-            }
-            return client.focus();
+    (async () => {
+      try {
+        const windowClients = await clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        });
+
+        // Chercher un onglet/fenêtre déjà ouvert sur notre domaine
+        const appClient = windowClients.find(c => {
+          try {
+            return new URL(c.url).origin === self.location.origin;
+          } catch (e) {
+            return false;
           }
+        });
+
+        if (appClient) {
+          // ✅ Onglet existant : on le navigue puis on le met au premier plan
+          console.log('[SW] Onglet existant trouvé → navigate + focus');
+          try {
+            // navigate() retourne un WindowClient, on le focus ensuite
+            const navigated = await appClient.navigate(absoluteUrl);
+            if (navigated) {
+              await navigated.focus();
+            } else {
+              await appClient.focus();
+            }
+          } catch (navErr) {
+            // Si navigate échoue (certains Android), on focus uniquement
+            console.warn('[SW] navigate() échoué, tentative focus:', navErr);
+            try { await appClient.focus(); } catch (e) {}
+          }
+        } else {
+          // ✅ App fermée ou en arrière-plan : ouvrir un nouveau onglet
+          console.log('[SW] Aucun onglet trouvé → openWindow');
+          await clients.openWindow(absoluteUrl);
         }
-        // Aucun onglet ouvert → ouvrir l'app directement sur la page du client
-        if (clients.openWindow) {
-          return clients.openWindow(absoluteUrl);
-        }
-      })
+      } catch (err) {
+        // Fallback ultime si tout échoue
+        console.error('[SW] Erreur ouverture app:', err);
+        try {
+          await clients.openWindow(self.location.origin + '/clients');
+        } catch (e2) {}
+      }
+    })()
   );
 });
 
