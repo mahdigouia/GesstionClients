@@ -76,7 +76,15 @@ export async function POST(request: Request) {
     }
 
     // 4. Broadcast push notifications to all subscribers
-    webpush.setVapidDetails(subject, publicKey, privateKey);
+    try {
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+    } catch (vapidErr: any) {
+      console.error('[Web Push Notify] Failed to set VAPID details:', vapidErr);
+      return NextResponse.json({ 
+        error: `Configuration VAPID invalide: ${vapidErr.message}` 
+      }, { status: 500 });
+    }
+
     const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
     
     if (!subsSnapshot.empty) {
@@ -89,11 +97,28 @@ export async function POST(request: Request) {
       });
 
       const pushPromises = subsSnapshot.docs.map(subDoc => {
-        const subscription = subDoc.data().subscription;
+        const subData = subDoc.data();
+        const subscription = subData.subscription;
+
+        if (!subscription || !subscription.endpoint) {
+          console.warn(`[Web Push Notify] Skipping invalid subscription in doc: ${subDoc.id}`);
+          return Promise.resolve();
+        }
+
         return webpush.sendNotification(subscription, pushPayload)
-          .catch(err => {
+          .catch(async (err: any) => {
             console.error(`[Web Push Notify] Error sending push to ${subDoc.id}:`, err);
-            // Optional: prune if status is 404 or 410
+            
+            // Prune invalid or expired subscription (404 or 410)
+            if (err.statusCode === 404 || err.statusCode === 410) {
+              console.log(`[Web Push Notify] Pruning expired subscription: ${subDoc.id}`);
+              try {
+                const { deleteDoc } = await import('firebase/firestore');
+                await deleteDoc(doc(db, 'push_subscriptions', subDoc.id));
+              } catch (pruneErr) {
+                console.error(`[Web Push Notify] Failed to prune subscription:`, pruneErr);
+              }
+            }
           });
       });
 

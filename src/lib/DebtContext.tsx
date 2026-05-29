@@ -186,6 +186,25 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   };
 
+// Helper to clean undefined properties from objects recursively before writing to Firestore
+function cleanUndefined(obj: any): any {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefined);
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj[key] !== undefined) {
+        cleaned[key] = cleanUndefined(obj[key]);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
+}
+
   // Sauvegarder dans Firestore + localStorage (utilise toujours les données brutes globales)
   const saveToFirestore = async (
     newDebts: ClientDebt[] = rawDebts, 
@@ -201,7 +220,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
-      await setDoc(docRef, {
+      const payload = cleanUndefined({
         debts: newDebts,
         archiveDebts: newArchive,
         recoveryActions: newActions,
@@ -211,7 +230,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         debtCount: newDebts.length,
         readAlertIds: readAlertIds,
         history: updateHistory(newDebts, history)
-      }, { merge: true });
+      });
+      await setDoc(docRef, payload, { merge: true });
       console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances et ${newActions.length} actions dans Firestore par ${user?.email}`);
       
       // Journalisation pour l'utilisateur spécifique
