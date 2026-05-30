@@ -73,6 +73,7 @@ class ExtractionContext:
     current_commercial: Optional[Dict[str, str]] = None
     current_client: Optional[Dict[str, str]] = None
     debts: List[DebtData] = None
+    commercial_confirmed: bool = False  # True si trouvé via ligne "Représentant :"
     
     def __post_init__(self):
         if self.debts is None:
@@ -464,15 +465,31 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
 
 
 def detect_commercial(row: List[Any]) -> Optional[Dict[str, str]]:
-    """Détecte le commercial dans une ligne"""
+    """Détecte le commercial dans une ligne.
+    Retourne un dict avec 'code', 'name' et 'confirmed' (True si trouvé via 'Représentant :').
+    """
     row_text = ' '.join(str(cell or '') for cell in row)
     
-    # Pattern: C## NOM COMMERCIAL
+    # PRIORITÉ 1: Ligne "Représentant : C## NOM" — source officielle du commercial
+    representant_match = re.search(
+        r'Repr[eé]sentant\s*:\s*(C\d{2})\s+([A-Z][A-Z\s\-]{2,})',
+        row_text, re.IGNORECASE
+    )
+    if representant_match:
+        return {
+            "code": representant_match.group(1),
+            "name": representant_match.group(2).strip(),
+            "confirmed": True
+        }
+    
+    # PRIORITÉ 2: Pattern générique C## NOM (ex: en-tête de section)
+    # Ne doit PAS écraser un commercial déjà confirmé (géré par l'appelant)
     match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]{3,})', row_text)
     if match:
         return {
             "code": match.group(1),
-            "name": match.group(2).strip()
+            "name": match.group(2).strip(),
+            "confirmed": False
         }
     return None
 
@@ -528,7 +545,13 @@ async def extract_pdf(file: UploadFile = File(...)):
                                 # Détecter commercial
                                 commercial = detect_commercial(row)
                                 if commercial:
-                                    context.current_commercial = commercial
+                                    # Mettre à jour seulement si:
+                                    # - trouvé via "Représentant :" (source officielle), OU
+                                    # - aucun commercial confirmé n'existe encore
+                                    if commercial.get("confirmed") or not context.commercial_confirmed:
+                                        context.current_commercial = commercial
+                                        if commercial.get("confirmed"):
+                                            context.commercial_confirmed = True
                                     continue
                                 
                                 # Ignorer lignes d'en-tête
@@ -691,15 +714,29 @@ async def extract_debts(file: UploadFile = File(...)):
                         print(f"[PDF Extract] Sample ligne: {line[:100]}")
                         sample_logged = True
                     
-                    # Détecter commercial (ex: C01 MED AMINE BEN ZAARA)
-                    match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]+)', line)
-                    if match:
-                        print(f"[PDF Extract] Commercial trouvé: {match.group(1)} - {match.group(2).strip()[:30]}")
-                        context.current_commercial = {
-                            "code": match.group(1),
-                            "name": match.group(2).strip()
-                        }
+                    # PRIORITÉ 1: Ligne "Représentant : C## NOM" — source officielle
+                    representant_match = re.search(
+                        r'Repr[eé]sentant\s*:\s*(C\d{2})\s+([A-Z][A-Z\s\-]+)',
+                        line, re.IGNORECASE
+                    )
+                    if representant_match:
+                        code = representant_match.group(1)
+                        name = representant_match.group(2).strip()
+                        print(f"[PDF Extract] Commercial (Représentant) confirmé: {code} - {name[:30]}")
+                        context.current_commercial = {"code": code, "name": name}
+                        context.commercial_confirmed = True
                         continue
+
+                    # PRIORITÉ 2: Pattern générique C## NOM (peut être un en-tête de section)
+                    # N'écrase PAS un commercial déjà confirmé via "Représentant :"
+                    if not context.commercial_confirmed:
+                        generic_match = re.search(r'(C\d{2})\s+([A-Z][A-Z\s\-]+)', line)
+                        if generic_match:
+                            code = generic_match.group(1)
+                            name = generic_match.group(2).strip()
+                            print(f"[PDF Extract] Commercial (générique) trouvé: {code} - {name[:30]}")
+                            context.current_commercial = {"code": code, "name": name}
+                            continue
                     
                     # Détecter client: code 4 chiffres + nom (ex: 0424 LA MANGEARIA)
                     # Pattern: début de ligne avec 4 chiffres suivis d'un nom
