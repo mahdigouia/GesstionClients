@@ -86,6 +86,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [manualContentiousInvoices, setManualContentiousInvoices] = useState<Record<string, boolean>>({});
   const [firestoreReady, setFirestoreReady] = useState(false);
   const isLocalUpdateRef = useRef(false); // Guard: skip onSnapshot during local imports
+  const saveFailedRef = useRef(false); // Track if last save failed
   const { user, userRole, commercialCode } = useAuth();
 
   // Liste mémoïsée et filtrée selon le rôle de l'utilisateur
@@ -125,7 +126,16 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       unsubscribe = onSnapshot(docRef, (snapshot) => {
         // Skip Firestore echo during local import to prevent old data from flashing back
         if (isLocalUpdateRef.current) {
-          console.log('[DebtContext] Skipping onSnapshot during local update');
+          console.log('[DebtContext] Skipping onSnapshot during local update (guard active)');
+          setFirestoreReady(true);
+          return;
+        }
+
+        // If last save failed, prefer localStorage data over stale Firestore data
+        if (saveFailedRef.current) {
+          console.warn('[DebtContext] Last save failed, loading from localStorage instead of Firestore');
+          loadFromLocalStorage();
+          saveFailedRef.current = false;
           setFirestoreReady(true);
           return;
         }
@@ -227,7 +237,6 @@ function cleanUndefined(obj: any): any {
   return obj;
 }
 
-  // Sauvegarder dans Firestore + localStorage (utilise toujours les données brutes globales)
   const saveToFirestore = async (
     newDebts: ClientDebt[] = rawDebts, 
     newActions: RecoveryAction[] = recoveryActions, 
@@ -235,36 +244,53 @@ function cleanUndefined(obj: any): any {
     newArchive: ClientDebt[] = rawArchiveDebts,
     newManual: Record<string, boolean> = manualContentiousInvoices
   ) => {
+    // 🔒 Tronquer les archives pour éviter de dépasser la limite Firestore (1 MB)
+    const truncatedArchive = newArchive.slice(-200);
+    
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
     localStorage.setItem('gc_actions', JSON.stringify(newActions));
     localStorage.setItem('gc_remarks', JSON.stringify(newRemarks));
-    localStorage.setItem('gc_archive', JSON.stringify(newArchive));
+    localStorage.setItem('gc_archive', JSON.stringify(truncatedArchive));
     localStorage.setItem('gc_manual_contentious', JSON.stringify(newManual));
     
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       const payload = cleanUndefined({
         debts: newDebts,
-        archiveDebts: newArchive,
+        archiveDebts: truncatedArchive,
         recoveryActions: newActions,
         clientRemarks: newRemarks,
         manualContentiousInvoices: newManual,
+        settings: settings,
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: newDebts.length,
         readAlertIds: readAlertIds,
         history: updateHistory(newDebts, history)
       });
-      await setDoc(docRef, payload, { merge: true });
-      console.log(`[DebtContext] Sauvegardé ${newDebts.length} créances et ${newActions.length} actions dans Firestore par ${user?.email}`);
       
-      // Journalisation pour l'utilisateur spécifique
+      // Estimation de la taille du payload
+      const payloadSize = JSON.stringify(payload).length;
+      console.log(`[DebtContext] Taille payload: ${(payloadSize / 1024).toFixed(1)} KB (${newDebts.length} créances, ${truncatedArchive.length} archives)`);
+      
+      if (payloadSize > 900000) {
+        console.warn('[DebtContext] ⚠️ Payload proche de la limite Firestore (1MB)! Troncature supplémentaire...');
+        payload.archiveDebts = truncatedArchive.slice(-50);
+      }
+      
+      // Remplacer TOUT le document (pas de merge) pour garantir la cohérence
+      await setDoc(docRef, payload);
+      saveFailedRef.current = false;
+      console.log(`[DebtContext] ✅ Sauvegardé ${newDebts.length} créances dans Firestore par ${user?.email}`);
+      
       if (user?.email === 'moslem.gouia@gmail.com') {
         logAction('Sync Firestore', `Mise à jour de ${newDebts.length} créances`);
       }
-    } catch (error) {
-      console.warn('[DebtContext] Erreur sauvegarde Firestore:', error);
+    } catch (error: any) {
+      saveFailedRef.current = true;
+      console.error('[DebtContext] ❌ ERREUR sauvegarde Firestore:', error?.message || error);
+      console.warn('[DebtContext] Les données sont sauvegardées localement. Elles seront re-synchronisées.');
     }
   };
 
@@ -645,13 +671,19 @@ function cleanUndefined(obj: any): any {
     // Sauvegarder dans Firestore (async) puis libérer le guard
     saveToFirestore(processedDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices)
       .then(() => {
-        console.log('[Import] Sauvegarde Firestore terminée, libération du guard onSnapshot');
+        console.log('[Import] ✅ Sauvegarde Firestore terminée, guard maintenu 5s...');
+        // Délai de 5s pour laisser Firestore propager et éviter que onSnapshot ramène des données obsolètes
         setTimeout(() => {
           isLocalUpdateRef.current = false;
-        }, 2000);
+          console.log('[Import] Guard onSnapshot libéré');
+        }, 5000);
       })
-      .catch(() => {
-        isLocalUpdateRef.current = false;
+      .catch((err) => {
+        console.error('[Import] ❌ Sauvegarde Firestore échouée:', err);
+        // Même en cas d'erreur, garder le guard 5s pour éviter que les vieilles données reviennent
+        setTimeout(() => {
+          isLocalUpdateRef.current = false;
+        }, 5000);
       });
 
     return {
