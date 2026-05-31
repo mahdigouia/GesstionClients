@@ -845,7 +845,7 @@ export default function ClientsPage() {
                             <span className="flex items-center gap-1.5 font-semibold whitespace-nowrap"><FileText className="h-3 w-3 md:h-4 md:w-4 text-slate-400" />{client.debtCount} factures</span>
                             
                             {/* Visually distinguishable average age badge */}
-                            {clientDebts.length > 1 && (
+                            {(clientDebts.length > 1 || (clientDebts.length === 1 && !isExpanded)) && (
                               <span className={`flex items-center gap-1.5 font-black px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border text-[10px] md:text-xs whitespace-nowrap shadow-sm transition-all ${
                                 averageAge <= 15 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-emerald-50/40' :
                                 averageAge <= 30 ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-blue-50/40' :
