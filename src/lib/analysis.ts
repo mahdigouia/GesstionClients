@@ -22,10 +22,19 @@ function generateAlerts(debts: ClientDebt[]): Alert[] {
 }
 
 export const AnalysisService = {
-  analyzeDebts(debts: ClientDebt[], config?: { contentiousAgeDays: number, retentionMin: number, retentionMax: number }): AnalysisResult {
+  analyzeDebts(
+    debts: ClientDebt[], 
+    config?: { 
+      contentiousAgeDays: number; 
+      retentionMin: number; 
+      retentionMax: number;
+      manualContentiousInvoices?: Record<string, boolean>;
+    }
+  ): AnalysisResult {
     const contentiousThreshold = config?.contentiousAgeDays || 365;
     const minRet = config?.retentionMin !== undefined ? config.retentionMin : 0.5;
     const maxRet = config?.retentionMax !== undefined ? config.retentionMax : 1.5;
+    const manualContentious = config?.manualContentiousInvoices || {};
 
     try {
       const processedDebts = debts.map(d => {
@@ -37,13 +46,17 @@ export const AnalysisService = {
         const ratio = amount > 0 ? (balance / amount) * 100 : 0;
         const isRetention = ratio >= minRet && ratio <= maxRet;
 
+        // Contentieux manuel ou par règle d'âge
+        const manualStatus = manualContentious[d.documentNumber];
+        const isContentieux = manualStatus !== undefined ? manualStatus : (age > contentiousThreshold);
+
         return {
           ...d,
           amount,
           settlement: Number(d.settlement || 0),
           balance,
           age,
-          isContentieux: age > contentiousThreshold,
+          isContentieux,
           isRetention
         };
       });

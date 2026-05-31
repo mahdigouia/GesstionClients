@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useDebtContext } from '@/lib/DebtContext';
+import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
 import { FileText, Search, Filter, Download, ChevronRight, TrendingUp, PhoneCall, ShieldAlert, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +19,8 @@ import {
 } from 'lucide-react';
 
 export default function InvoicesPage() {
-  const { debts, archiveDebts, analysis, settings, logAudit } = useDebtContext();
+  const { debts, archiveDebts, analysis, settings, logAudit, toggleManualContentious } = useDebtContext();
+  const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -92,7 +94,20 @@ export default function InvoicesPage() {
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
+            <input
+              type="checkbox"
+              checked={!!debt.isContentieux}
+              disabled={userRole !== 'admin' && userRole !== 'gestionnaire'}
+              onClick={(e) => e.stopPropagation()}
+              onChange={() => toggleManualContentious(debt.documentNumber)}
+              className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+              title={
+                userRole === 'admin' || userRole === 'gestionnaire'
+                  ? "Marquer/Démarquer comme contentieux manuel"
+                  : "Statut contentieux"
+              }
+            />
             <span className="font-black text-slate-900 group-hover:text-blue-600 transition-colors text-sm md:text-base">
               {debt.documentNumber}
             </span>

@@ -42,6 +42,7 @@ interface DebtContextType {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   logAudit: (action: string, details: string) => Promise<void>;
+  toggleManualContentious: (documentNumber: string) => Promise<void>;
 }
 
 export interface AppSettings {
@@ -82,6 +83,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [readAlertIds, setReadAlertIds] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [settings, setSettings] = useState<AppSettings>({ contentiousAgeDays: 365, retentionMin: 0.5, retentionMax: 1.5 });
+  const [manualContentiousInvoices, setManualContentiousInvoices] = useState<Record<string, boolean>>({});
   const [firestoreReady, setFirestoreReady] = useState(false);
   const { user, userRole, commercialCode } = useAuth();
 
@@ -103,12 +105,15 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   // Analyse réactive de la liste filtrée
   useEffect(() => {
     if (debts.length > 0) {
-      const newAnalysis = AnalysisService.analyzeDebts(debts, settings);
+      const newAnalysis = AnalysisService.analyzeDebts(debts, {
+        ...settings,
+        manualContentiousInvoices
+      });
       setAnalysis(newAnalysis);
     } else {
       setAnalysis(null);
     }
-  }, [debts, settings]);
+  }, [debts, settings, manualContentiousInvoices]);
 
   // Écouter les changements Firestore en temps réel (collaboratif)
   useEffect(() => {
@@ -121,10 +126,14 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           const data = snapshot.data();
           const firestoreDebts = data.debts || [];
           const currentSettings = data.settings || settings;
+          const manualContentious = data.manualContentiousInvoices || {};
           
           let processed = firestoreDebts;
           if (firestoreDebts.length > 0) {
-            const tempAnalysis = AnalysisService.analyzeDebts(firestoreDebts, currentSettings);
+            const tempAnalysis = AnalysisService.analyzeDebts(firestoreDebts, {
+              ...currentSettings,
+              manualContentiousInvoices: manualContentious
+            });
             if (tempAnalysis.processedDebts) {
               processed = tempAnalysis.processedDebts;
             }
@@ -138,6 +147,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           setReadAlertIds(data.readAlertIds || []);
           setHistory(data.history || []);
           if (data.settings) setSettings(data.settings);
+          setManualContentiousInvoices(manualContentious);
         } else {
           // Pas encore de données Firestore, charger depuis localStorage comme fallback
           loadFromLocalStorage();
@@ -164,6 +174,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const savedDebts = localStorage.getItem('gc_debts');
       const savedArchive = localStorage.getItem('gc_archive');
       const savedAnalysis = localStorage.getItem('gc_analysis');
+      const savedManual = localStorage.getItem('gc_manual_contentious');
       if (savedDebts) {
         setRawDebts(JSON.parse(savedDebts));
       }
@@ -180,6 +191,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       const savedRemarks = localStorage.getItem('gc_remarks');
       if (savedRemarks) {
         setClientRemarks(JSON.parse(savedRemarks));
+      }
+      if (savedManual) {
+        setManualContentiousInvoices(JSON.parse(savedManual));
       }
     } catch (e) {
       console.warn('Erreur chargement données sauvegardées:', e);
@@ -210,13 +224,15 @@ function cleanUndefined(obj: any): any {
     newDebts: ClientDebt[] = rawDebts, 
     newActions: RecoveryAction[] = recoveryActions, 
     newRemarks: Record<string, ClientRemark[]> = clientRemarks, 
-    newArchive: ClientDebt[] = rawArchiveDebts
+    newArchive: ClientDebt[] = rawArchiveDebts,
+    newManual: Record<string, boolean> = manualContentiousInvoices
   ) => {
     // Toujours sauvegarder en local comme fallback
     localStorage.setItem('gc_debts', JSON.stringify(newDebts));
     localStorage.setItem('gc_actions', JSON.stringify(newActions));
     localStorage.setItem('gc_remarks', JSON.stringify(newRemarks));
     localStorage.setItem('gc_archive', JSON.stringify(newArchive));
+    localStorage.setItem('gc_manual_contentious', JSON.stringify(newManual));
     
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
@@ -225,6 +241,7 @@ function cleanUndefined(obj: any): any {
         archiveDebts: newArchive,
         recoveryActions: newActions,
         clientRemarks: newRemarks,
+        manualContentiousInvoices: newManual,
         updatedAt: serverTimestamp(),
         updatedBy: user?.email || 'unknown',
         debtCount: newDebts.length,
@@ -253,7 +270,7 @@ function cleanUndefined(obj: any): any {
     
     const updatedActions = [newAction, ...recoveryActions];
     setRecoveryActions(updatedActions);
-    saveToFirestore(rawDebts, updatedActions, clientRemarks, rawArchiveDebts);
+    saveToFirestore(rawDebts, updatedActions, clientRemarks, rawArchiveDebts, manualContentiousInvoices);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Action de recouvrement', `Ajout d'une action pour le client ${actionData.clientName}`);
@@ -278,7 +295,7 @@ function cleanUndefined(obj: any): any {
     };
 
     setClientRemarks(updatedRemarks);
-    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
+    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts, manualContentiousInvoices);
 
     // Fonction d'assistance pour envoyer les notifications push
     const sendNotification = async (type: 'payment' | 'conflit', messageText: string) => {
@@ -376,7 +393,7 @@ function cleanUndefined(obj: any): any {
     };
 
     setClientRemarks(updatedRemarks);
-    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
+    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts, manualContentiousInvoices);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Modification Remarque', `Modification d'une remarque pour le client ${clientName}`);
@@ -393,7 +410,7 @@ function cleanUndefined(obj: any): any {
     };
 
     setClientRemarks(updatedRemarks);
-    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts);
+    saveToFirestore(rawDebts, recoveryActions, updatedRemarks, rawArchiveDebts, manualContentiousInvoices);
     
     if (user?.email === 'moslem.gouia@gmail.com') {
       logAction('Suppression Remarque', `Suppression d'une remarque pour le client ${clientName}`);
@@ -402,11 +419,14 @@ function cleanUndefined(obj: any): any {
 
   const setDebts = (newDebts: ClientDebt[]) => {
     setRawDebts(newDebts);
-    saveToFirestore(newDebts, recoveryActions, clientRemarks, rawArchiveDebts);
+    saveToFirestore(newDebts, recoveryActions, clientRemarks, rawArchiveDebts, manualContentiousInvoices);
     
     // Analyse locale
     if (newDebts.length > 0) {
-      const newAnalysis = AnalysisService.analyzeDebts(newDebts);
+      const newAnalysis = AnalysisService.analyzeDebts(newDebts, {
+        ...settings,
+        manualContentiousInvoices
+      });
       setAnalysis(newAnalysis);
       
       // Mettre à jour l'état local avec les créances enrichies (isContentieux, etc.)
@@ -431,7 +451,7 @@ function cleanUndefined(obj: any): any {
       const updatedDebts = Array.from(debtMap.values());
       
       // Sauvegarder la version finale fusionnée
-      saveToFirestore(updatedDebts, recoveryActions, clientRemarks, rawArchiveDebts);
+      saveToFirestore(updatedDebts, recoveryActions, clientRemarks, rawArchiveDebts, manualContentiousInvoices);
 
       if (user?.email === 'moslem.gouia@gmail.com') {
         logAction('Import de masse', `Ajout de ${newDebts.length} nouvelles créances`);
@@ -439,7 +459,10 @@ function cleanUndefined(obj: any): any {
       
       // Analyse locale
       if (updatedDebts.length > 0) {
-        const newAnalysis = AnalysisService.analyzeDebts(updatedDebts);
+        const newAnalysis = AnalysisService.analyzeDebts(updatedDebts, {
+          ...settings,
+          manualContentiousInvoices
+        });
         setAnalysis(newAnalysis);
         if (newAnalysis.processedDebts) {
           return newAnalysis.processedDebts;
@@ -535,11 +558,14 @@ function cleanUndefined(obj: any): any {
     // Final update
     setRawArchiveDebts(currentArchiveDebts);
     setRawDebts(currentTotalDebts);
-    saveToFirestore(currentTotalDebts, recoveryActions, clientRemarks, currentArchiveDebts);
+    saveToFirestore(currentTotalDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices);
     
     // Analyse locale
     if (currentTotalDebts.length > 0) {
-      const newAnalysis = AnalysisService.analyzeDebts(currentTotalDebts);
+      const newAnalysis = AnalysisService.analyzeDebts(currentTotalDebts, {
+        ...settings,
+        manualContentiousInvoices
+      });
       setAnalysis(newAnalysis);
       if (newAnalysis.processedDebts) {
         setRawDebts(newAnalysis.processedDebts);
@@ -597,10 +623,13 @@ function cleanUndefined(obj: any): any {
     setRawDebts(updatedDebts);
     setRawArchiveDebts(updatedArchive);
 
-    // Recalculer l'analyse
+    // Recalculer l'état local
     let newAnalysis = null;
     if (updatedDebts.length > 0) {
-      newAnalysis = AnalysisService.analyzeDebts(updatedDebts);
+      newAnalysis = AnalysisService.analyzeDebts(updatedDebts, {
+        ...settings,
+        manualContentiousInvoices
+      });
       setAnalysis(newAnalysis);
     } else {
       setAnalysis(null);
@@ -614,7 +643,7 @@ function cleanUndefined(obj: any): any {
     }
 
     // Sauvegarder dans LocalStorage et Firestore
-    await saveToFirestore(updatedDebts, recoveryActions, clientRemarks, updatedArchive);
+    await saveToFirestore(updatedDebts, recoveryActions, clientRemarks, updatedArchive, manualContentiousInvoices);
 
     // Journalisation de la suppression de fichier
     await logAction(
@@ -672,7 +701,10 @@ function cleanUndefined(obj: any): any {
 
     // Déclencher une nouvelle analyse avec les nouveaux paramètres
     if (debts.length > 0) {
-      const newAnalysis = AnalysisService.analyzeDebts(debts, updated);
+      const newAnalysis = AnalysisService.analyzeDebts(debts, {
+        ...updated,
+        manualContentiousInvoices
+      });
       setAnalysis(newAnalysis);
       if (newAnalysis.processedDebts) {
         setRawDebts(newAnalysis.processedDebts);
@@ -705,6 +737,46 @@ function cleanUndefined(obj: any): any {
     }
   };
 
+  const toggleManualContentious = async (documentNumber: string) => {
+    const debt = rawDebts.find(d => d.documentNumber === documentNumber);
+    if (!debt) return;
+
+    const currentManualState = manualContentiousInvoices[documentNumber];
+    let nextManualState: boolean;
+
+    if (currentManualState === undefined) {
+      // Toggle from default
+      const defaultState = debt.age > settings.contentiousAgeDays;
+      nextManualState = !defaultState;
+    } else {
+      nextManualState = !currentManualState;
+    }
+
+    const updatedManual = {
+      ...manualContentiousInvoices,
+      [documentNumber]: nextManualState
+    };
+
+    setManualContentiousInvoices(updatedManual);
+
+    // Update rawDebts locally first to react immediately in the UI
+    const updatedDebts = rawDebts.map(d => {
+      if (d.documentNumber === documentNumber) {
+        return {
+          ...d,
+          isContentieux: nextManualState
+        };
+      }
+      return d;
+    });
+
+    setRawDebts(updatedDebts);
+    
+    // Save
+    await saveToFirestore(updatedDebts, recoveryActions, clientRemarks, rawArchiveDebts, updatedManual);
+    await logAction('Override Contentieux', `Facture ${documentNumber} marquée comme ${nextManualState ? 'contentieuse' : 'non contentieuse'}`);
+  };
+
   return (
     <DebtContext.Provider value={{ 
       debts, 
@@ -730,7 +802,8 @@ function cleanUndefined(obj: any): any {
       clearHistory,
       settings,
       updateSettings,
-      logAudit: logAction
+      logAudit: logAction,
+      toggleManualContentious
     }}>
       {children}
     </DebtContext.Provider>

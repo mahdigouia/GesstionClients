@@ -97,7 +97,7 @@ const getClientTheme = (clientName: string) => {
 };
 
 export default function ClientsPage() {
-  const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit } = useDebtContext();
+  const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit, toggleManualContentious } = useDebtContext();
   const { userRole } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -919,7 +919,23 @@ export default function ClientsPage() {
                               const paymentRatio = debt.amount > 0 ? (debt.settlement / debt.amount) * 100 : 0;
                               return (
                                 <TableRow key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/30 transition-colors group">
-                                  <TableCell className="font-mono text-xs md:sm font-bold text-slate-700 py-3 md:py-5 px-4 md:px-6">{debt.documentNumber}</TableCell>
+                                  <TableCell className="font-mono text-xs md:sm font-bold text-slate-700 py-3 md:py-5 px-4 md:px-6">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={!!debt.isContentieux}
+                                        disabled={userRole !== 'admin' && userRole !== 'gestionnaire'}
+                                        onChange={() => toggleManualContentious(debt.documentNumber)}
+                                        className="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                                        title={
+                                          userRole === 'admin' || userRole === 'gestionnaire'
+                                            ? "Marquer/Démarquer comme contentieux manuel"
+                                            : "Statut contentieux"
+                                        }
+                                      />
+                                      <span>{debt.documentNumber}</span>
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-xs md:text-sm font-medium text-slate-600 py-3 md:py-5 whitespace-nowrap">{new Date(debt.documentDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</TableCell>
                                   <TableCell className="hidden lg:table-cell text-[10px] md:text-xs font-semibold text-slate-500 py-3 md:py-5 italic max-w-[150px] truncate">{debt.description || '-'}</TableCell>
                                   <TableCell className="text-xs md:text-sm font-bold text-slate-800 text-right py-3 md:py-5">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</TableCell>
@@ -959,7 +975,21 @@ export default function ClientsPage() {
                               {/* Row 1: Invoice number & Age in large characters */}
                               <div className="flex justify-between items-start gap-2">
                                 <div className="flex flex-col min-w-0">
-                                  <span className="font-mono text-sm font-bold text-slate-800 truncate">{debt.documentNumber}</span>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!debt.isContentieux}
+                                      disabled={userRole !== 'admin' && userRole !== 'gestionnaire'}
+                                      onChange={() => toggleManualContentious(debt.documentNumber)}
+                                      className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                                      title={
+                                        userRole === 'admin' || userRole === 'gestionnaire'
+                                          ? "Marquer/Démarquer comme contentieux manuel"
+                                          : "Statut contentieux"
+                                      }
+                                    />
+                                    <span className="font-mono text-sm font-bold text-slate-800 truncate">{debt.documentNumber}</span>
+                                  </div>
                                   {debt.description && (
                                     <span className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]" title={debt.description}>
                                       {debt.description}
