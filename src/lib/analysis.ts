@@ -49,6 +49,7 @@ export const AnalysisService = {
         // Contentieux manuel ou par règle d'âge
         const manualStatus = manualContentious[d.documentNumber];
         const isContentieux = manualStatus !== undefined ? manualStatus : (age > contentiousThreshold);
+        const isManualContentieux = manualStatus !== undefined;
 
         return {
           ...d,
@@ -57,6 +58,7 @@ export const AnalysisService = {
           balance,
           age,
           isContentieux,
+          isManualContentieux,
           isRetention
         };
       });

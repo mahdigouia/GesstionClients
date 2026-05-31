@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useDebtContext } from '@/lib/DebtContext';
 import { useAuth } from '@/lib/AuthContext';
 import { Sidebar } from '@/components/Sidebar';
-import { FileText, Search, Filter, Download, ChevronRight, TrendingUp, PhoneCall, ShieldAlert, Clock, AlertCircle } from 'lucide-react';
+import { FileText, Search, Filter, Download, ChevronRight, TrendingUp, PhoneCall, ShieldAlert, Clock, AlertCircle, Star } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ExportService } from '@/lib/export';
@@ -108,6 +108,9 @@ export default function InvoicesPage() {
                   : "Statut contentieux"
               }
             />
+            {debt.isManualContentieux && (
+              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500 flex-shrink-0 animate-pulse" title="Modifié manuellement (ne suit pas les règles d'âge)" />
+            )}
             <span className="font-black text-slate-900 group-hover:text-blue-600 transition-colors text-sm md:text-base">
               {debt.documentNumber}
             </span>

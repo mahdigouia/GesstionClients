@@ -24,7 +24,8 @@ import {
   Target,
   Menu,
   SlidersHorizontal,
-  MessageSquare
+  MessageSquare,
+  Star
 } from 'lucide-react';
 import {
   Sheet,
@@ -931,6 +932,9 @@ export default function ClientsPage() {
                                             : "Statut contentieux"
                                         }
                                       />
+                                      {debt.isManualContentieux && (
+                                        <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500 flex-shrink-0 animate-pulse" title="Modifié manuellement (ne suit pas les règles d'âge)" />
+                                      )}
                                       <span>{debt.documentNumber}</span>
                                     </div>
                                   </TableCell>
@@ -986,6 +990,9 @@ export default function ClientsPage() {
                                           : "Statut contentieux"
                                       }
                                     />
+                                    {debt.isManualContentieux && (
+                                      <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500 flex-shrink-0 animate-pulse" title="Modifié manuellement (ne suit pas les règles d'âge)" />
+                                    )}
                                     <span className="font-mono text-sm font-bold text-slate-800 truncate">{debt.documentNumber}</span>
                                   </div>
                                   {debt.description && (

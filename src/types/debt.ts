@@ -53,6 +53,7 @@ export interface ClientDebt {
   commercialName?: string;
   // Contentieux flag
   isContentieux?: boolean;
+  isManualContentieux?: boolean;
   // Tracking
   lastImportDate?: string;
   isRecentlyUpdated?: boolean;

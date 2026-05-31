@@ -764,7 +764,8 @@ function cleanUndefined(obj: any): any {
       if (d.documentNumber === documentNumber) {
         return {
           ...d,
-          isContentieux: nextManualState
+          isContentieux: nextManualState,
+          isManualContentieux: true
         };
       }
       return d;
