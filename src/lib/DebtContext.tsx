@@ -450,14 +450,8 @@ function cleanUndefined(obj: any): any {
       
       const updatedDebts = Array.from(debtMap.values());
       
-      // Sauvegarder la version finale fusionnée
-      saveToFirestore(updatedDebts, recoveryActions, clientRemarks, rawArchiveDebts, manualContentiousInvoices);
-
-      if (user?.email === 'moslem.gouia@gmail.com') {
-        logAction('Import de masse', `Ajout de ${newDebts.length} nouvelles créances`);
-      }
-      
-      // Analyse locale
+      // Analyse locale et application des surcharges manuelles
+      let processedDebts = updatedDebts;
       if (updatedDebts.length > 0) {
         const newAnalysis = AnalysisService.analyzeDebts(updatedDebts, {
           ...settings,
@@ -465,11 +459,20 @@ function cleanUndefined(obj: any): any {
         });
         setAnalysis(newAnalysis);
         if (newAnalysis.processedDebts) {
-          return newAnalysis.processedDebts;
+          processedDebts = newAnalysis.processedDebts;
         }
+      } else {
+        setAnalysis(null);
       }
       
-      return updatedDebts;
+      // Sauvegarder la version finale fusionnée et analysée dans Firestore & LocalStorage
+      saveToFirestore(processedDebts, recoveryActions, clientRemarks, rawArchiveDebts, manualContentiousInvoices);
+
+      if (user?.email === 'moslem.gouia@gmail.com') {
+        logAction('Import de masse', `Ajout de ${newDebts.length} nouvelles créances`);
+      }
+      
+      return processedDebts;
     });
   };
 
@@ -557,10 +560,9 @@ function cleanUndefined(obj: any): any {
 
     // Final update
     setRawArchiveDebts(currentArchiveDebts);
-    setRawDebts(currentTotalDebts);
-    saveToFirestore(currentTotalDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices);
     
-    // Analyse locale
+    // Analyse et application des surcharges manuelles
+    let processedDebts = currentTotalDebts;
     if (currentTotalDebts.length > 0) {
       const newAnalysis = AnalysisService.analyzeDebts(currentTotalDebts, {
         ...settings,
@@ -568,12 +570,15 @@ function cleanUndefined(obj: any): any {
       });
       setAnalysis(newAnalysis);
       if (newAnalysis.processedDebts) {
-        setRawDebts(newAnalysis.processedDebts);
+        processedDebts = newAnalysis.processedDebts;
       }
       localStorage.setItem('gc_analysis', JSON.stringify(newAnalysis));
     } else {
       setAnalysis(null);
     }
+
+    setRawDebts(processedDebts);
+    saveToFirestore(processedDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices);
 
     return {
       updated: totalUpdated,
