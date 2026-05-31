@@ -56,6 +56,46 @@ import { ClientDebt } from '@/types/debt';
 import { Progress } from "@/components/ui/progress";
 import { ClientRemarkModal } from '@/components/ClientRemarkModal';
 
+// Helper to generate a dynamic and beautiful color theme for client cards based on a name hash
+const getClientTheme = (clientName: string) => {
+  const hash = (clientName || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const themes = [
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-blue-50/30 border-l-4 border-blue-400 hover:to-blue-50/50',
+      avatarBg: 'bg-blue-50 text-blue-600 border border-blue-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-purple-50/30 border-l-4 border-purple-400 hover:to-purple-50/50',
+      avatarBg: 'bg-purple-50 text-purple-600 border border-purple-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-emerald-50/30 border-l-4 border-emerald-400 hover:to-emerald-50/50',
+      avatarBg: 'bg-emerald-50 text-emerald-600 border border-emerald-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-amber-50/30 border-l-4 border-amber-400 hover:to-amber-50/50',
+      avatarBg: 'bg-amber-50 text-amber-600 border border-amber-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-rose-50/30 border-l-4 border-rose-400 hover:to-rose-50/50',
+      avatarBg: 'bg-rose-50 text-rose-600 border border-rose-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-sky-50/30 border-l-4 border-sky-400 hover:to-sky-50/50',
+      avatarBg: 'bg-sky-50 text-sky-600 border border-sky-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-indigo-50/30 border-l-4 border-indigo-400 hover:to-indigo-50/50',
+      avatarBg: 'bg-indigo-50 text-indigo-600 border border-indigo-100/50',
+    },
+    {
+      cardClass: 'bg-gradient-to-br from-white via-white to-teal-50/30 border-l-4 border-teal-400 hover:to-teal-50/50',
+      avatarBg: 'bg-teal-50 text-teal-600 border border-teal-100/50',
+    }
+  ];
+  return themes[hash % themes.length];
+};
+
 export default function ClientsPage() {
   const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit } = useDebtContext();
   const { userRole } = useAuth();
@@ -770,9 +810,10 @@ export default function ClientsPage() {
             {filteredClients.map((client: any, idx: number) => {
               const isExpanded = expandedClients.has(client.clientName);
               const clientDebts = client.filteredDebts.sort((a: any, b: any) => (a.extractIndex || 0) - (b.extractIndex || 0));
+              const theme = getClientTheme(client.clientName);
               
               return (
-                <Card key={idx} className="border-0 shadow-md bg-white overflow-hidden rounded-[32px] transition-all hover:shadow-xl">
+                <Card key={idx} className={`border-0 shadow-md ${theme.cardClass} overflow-hidden rounded-[32px] transition-all hover:shadow-xl`}>
                     <div 
                       onClick={() => toggleClient(client.clientName)}
                       className="p-4 md:p-8 flex flex-col md:flex-row md:items-center justify-between cursor-pointer hover:bg-slate-50/50 transition-colors gap-4"
@@ -781,7 +822,7 @@ export default function ClientsPage() {
                         <div className="flex-shrink-0">
                           {isExpanded ? <ChevronDown className="h-5 w-5 md:h-6 md:w-6 text-slate-400" /> : <ChevronRight className="h-5 w-5 md:h-6 md:w-6 text-slate-400" />}
                         </div>
-                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-[20px] flex items-center justify-center font-black text-lg md:text-2xl shadow-inner flex-shrink-0 ${client.totalBalance > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-[20px] flex items-center justify-center font-black text-lg md:text-2xl shadow-inner flex-shrink-0 ${theme.avatarBg}`}>
                           {client.clientName?.[0] || '?'}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -858,7 +899,8 @@ export default function ClientsPage() {
 
                   {isExpanded && (
                     <div className="px-4 md:px-8 pb-4 md:pb-8 pt-0 border-t border-slate-50">
-                      <div className="bg-white rounded-2xl md:rounded-[24px] overflow-x-auto border border-slate-200 shadow-inner scrollbar-hide">
+                      {/* Desktop/Tablet Table View */}
+                      <div className="hidden md:block bg-white rounded-2xl md:rounded-[24px] overflow-x-auto border border-slate-200 shadow-inner scrollbar-hide">
                         <Table>
                           <TableHeader>
                             <TableRow className="bg-slate-50/80 border-b border-slate-100 hover:bg-slate-50/80">
@@ -906,6 +948,78 @@ export default function ClientsPage() {
                             })}
                           </TableBody>
                         </Table>
+                      </div>
+
+                      {/* Mobile-Optimized List View (No horizontal scrolling!) */}
+                      <div className="md:hidden space-y-3">
+                        {clientDebts.map((debt, i) => {
+                          const paymentRatio = debt.amount > 0 ? (debt.settlement / debt.amount) * 100 : 0;
+                          return (
+                            <div key={i} className="bg-slate-50/50 border border-slate-150 rounded-2xl p-4 transition-all hover:bg-slate-50 flex flex-col gap-3">
+                              {/* Row 1: Invoice number & Age in large characters */}
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-mono text-sm font-bold text-slate-800 truncate">{debt.documentNumber}</span>
+                                  {debt.description && (
+                                    <span className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]" title={debt.description}>
+                                      {debt.description}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-center">
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider mb-0.5">Âge</span>
+                                  <Badge className={`font-black px-3.5 py-1.5 rounded-xl text-lg shadow-sm border ${
+                                    debt.age <= 15 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
+                                    debt.age <= 30 ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                    debt.age <= 45 ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                    debt.age <= 60 ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                    'bg-rose-100 text-rose-700 border-rose-200'
+                                  }`}>{debt.age} j</Badge>
+                                </div>
+                              </div>
+
+                              {/* Row 2: Date & Solde */}
+                              <div className="flex justify-between items-baseline">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Date</span>
+                                  <span className="text-xs font-semibold text-slate-600">
+                                    {new Date(debt.documentDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                  </span>
+                                </div>
+                                <div className="flex flex-col text-right">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Solde restant</span>
+                                  <span className="text-base font-black text-rose-600">
+                                    {(debt.balance ?? 0).toLocaleString('fr-FR')} <span className="text-[10px] font-normal text-slate-500">TND</span>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Divider */}
+                              <div className="h-px bg-slate-200/60" />
+
+                              {/* Row 3: Montant total, Réglé, and Progress */}
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Montant Initial</span>
+                                  <span className="font-bold text-slate-700">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Réglé</span>
+                                  <span className="font-bold text-emerald-600">{(debt.settlement ?? 0).toLocaleString('fr-FR')} TND</span>
+                                </div>
+                              </div>
+
+                              {/* Progress Bar */}
+                              <div className="flex flex-col gap-1 mt-1">
+                                <div className="flex justify-between items-center text-[9px] font-black text-slate-500">
+                                  <span>Progression du règlement</span>
+                                  <span>{paymentRatio.toFixed(0)}%</span>
+                                </div>
+                                <Progress value={paymentRatio} className="h-1 bg-slate-200" />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
