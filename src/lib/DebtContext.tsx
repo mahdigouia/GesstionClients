@@ -502,45 +502,68 @@ function cleanUndefined(obj: any): any {
     filesData.forEach(({ filename, debts: newDebtsForFile }) => {
       const normName = filename.toLowerCase();
       
-      // Gather all commercial codes present in the new debts of this file
+      // ═══════════════════════════════════════════════════════════════════
+      // ÉTAPE 1: Construire les critères d'identification pour CE fichier
+      // ═══════════════════════════════════════════════════════════════════
+      
+      // 1a. Codes commerciaux (ex: "C01", "C02")
       const commercialCodesToReplace = new Set<string>();
       newDebtsForFile.forEach(d => {
         if (d.commercialCode) {
           commercialCodesToReplace.add(d.commercialCode.toUpperCase());
         }
       });
-
-      // Also try to detect a commercial code from the filename (e.g. C01, C02, etc.)
+      // Aussi depuis le nom du fichier
       const fnMatch = filename.match(/\b(C\d{2})\b/i);
       if (fnMatch) {
         commercialCodesToReplace.add(fnMatch[1].toUpperCase());
       }
 
-      console.log(`[Import] Remplacement fichier '${filename}', codes commerciaux détectés: [${Array.from(commercialCodesToReplace).join(', ')}]`);
-
-      // Filter existing debts that match either by commercial code or by exact filename
-      // Also match by filename pattern (e.g. old "C01.pdf" vs new "C01_v2.pdf")
-      const existingDebtsForFile = currentTotalDebts.filter(d => {
-        const matchesFilename = (d.sourceFile || '').toLowerCase() === normName;
-        const matchesCommercial = d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase());
-        // Also match if the old file's name contains the same commercial code pattern
-        const oldFileMatch = (d.sourceFile || '').match(/\b(C\d{2})\b/i);
-        const matchesFileCommercialCode = oldFileMatch && commercialCodesToReplace.has(oldFileMatch[1].toUpperCase());
-        return matchesFilename || matchesCommercial || matchesFileCommercialCode;
-      });
-      
-      const otherDebts = currentTotalDebts.filter(d => {
-        const matchesFilename = (d.sourceFile || '').toLowerCase() === normName;
-        const matchesCommercial = d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase());
-        const oldFileMatch = (d.sourceFile || '').match(/\b(C\d{2})\b/i);
-        const matchesFileCommercialCode = oldFileMatch && commercialCodesToReplace.has(oldFileMatch[1].toUpperCase());
-        return !matchesFilename && !matchesCommercial && !matchesFileCommercialCode;
+      // 1b. Noms commerciaux (ex: "MED AMINE BEN ZAARA")
+      const commercialNamesToReplace = new Set<string>();
+      newDebtsForFile.forEach(d => {
+        if (d.commercialName) {
+          commercialNamesToReplace.add(d.commercialName.toUpperCase().trim());
+        }
       });
 
-      console.log(`[Import] ${existingDebtsForFile.length} anciennes créances trouvées à remplacer, ${otherDebts.length} créances non concernées`);
+      console.log(`[Import] Remplacement fichier '${filename}'`);
+      console.log(`[Import]   Codes commerciaux: [${Array.from(commercialCodesToReplace).join(', ')}]`);
+      console.log(`[Import]   Noms commerciaux: [${Array.from(commercialNamesToReplace).join(', ')}]`);
+      console.log(`[Import]   Créances actuelles en mémoire: ${currentTotalDebts.length}`);
+
+      // ═══════════════════════════════════════════════════════════════════
+      // ÉTAPE 2: Identifier TOUTES les anciennes créances à remplacer
+      // Un match sur N'IMPORTE QUEL critère suffit pour identifier une
+      // ancienne créance du même commercial
+      // ═══════════════════════════════════════════════════════════════════
+      const isOldDebtForThisFile = (d: ClientDebt): boolean => {
+        // Critère 1: Même nom de fichier exact
+        if ((d.sourceFile || '').toLowerCase() === normName) return true;
+        
+        // Critère 2: Même code commercial (C01, C02, etc.)
+        if (d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase())) return true;
+        
+        // Critère 3: L'ancien fichier contient le même pattern C## dans son nom
+        const oldFileMatch = (d.sourceFile || '').match(/\b(C\d{2})\b/i);
+        if (oldFileMatch && commercialCodesToReplace.has(oldFileMatch[1].toUpperCase())) return true;
+        
+        // Critère 4: Même nom de commercial (ex: "MED AMINE BEN ZAARA")
+        if (d.commercialName && commercialNamesToReplace.has(d.commercialName.toUpperCase().trim())) return true;
+        
+        return false;
+      };
+
+      const existingDebtsForFile = currentTotalDebts.filter(d => isOldDebtForThisFile(d));
+      const otherDebts = currentTotalDebts.filter(d => !isOldDebtForThisFile(d));
+
+      console.log(`[Import]   → ${existingDebtsForFile.length} anciennes créances IDENTIFIÉES à remplacer`);
+      console.log(`[Import]   → ${otherDebts.length} créances d'autres commerciaux (conservées)`);
       
-      // Préparer les nouvelles créances avec métadonnées d'import
-      // ET transférer le flag isManualContentieux depuis le dictionnaire persistant
+      // ═══════════════════════════════════════════════════════════════════
+      // ÉTAPE 3: Préparer les NOUVELLES créances
+      // Transférer les flags manuels (contentieux) depuis le dictionnaire
+      // ═══════════════════════════════════════════════════════════════════
       const debtsWithDate = newDebtsForFile.map(d => {
         const manualState = manualContentiousInvoices[d.documentNumber];
         return { 
@@ -548,12 +571,13 @@ function cleanUndefined(obj: any): any {
           sourceFile: filename,
           lastImportDate: today,
           isRecentlyUpdated: true,
-          // Appliquer le contentieux manuel si un override existe pour ce numéro de facture
           ...(manualState !== undefined ? { isContentieux: manualState, isManualContentieux: true } : {})
         };
       });
 
-      // Calculate stats for this file
+      // ═══════════════════════════════════════════════════════════════════
+      // ÉTAPE 4: Statistiques
+      // ═══════════════════════════════════════════════════════════════════
       debtsWithDate.forEach(newDebt => {
         const existing = existingDebtsForFile.find(d => d.documentNumber === newDebt.documentNumber);
         if (existing) {
@@ -567,28 +591,33 @@ function cleanUndefined(obj: any): any {
         }
       });
 
-      // Compter les factures qui existaient avant mais ne sont plus dans le nouveau fichier
+      // Factures qui existaient mais ne sont plus dans le nouveau fichier (clients qui ont payé)
       const removedDebts = existingDebtsForFile.filter(ed => !newDebtsForFile.some(nd => nd.documentNumber === ed.documentNumber));
       totalRemoved += removedDebts.length;
+      console.log(`[Import]   → ${removedDebts.length} factures disparues (clients ayant payé)`);
+      console.log(`[Import]   → ${totalNew} nouvelles factures, ${totalUpdated} mises à jour`);
       
-      // Archiver les anciennes créances de ce fichier au lieu de les écraser
+      // ═══════════════════════════════════════════════════════════════════
+      // ÉTAPE 5: Archiver les anciennes créances
+      // ═══════════════════════════════════════════════════════════════════
       if (existingDebtsForFile.length > 0) {
         const archivedOfThisFile = existingDebtsForFile.map(d => ({ 
           ...d, 
           isArchived: true, 
           archiveDate: today 
         }));
-        // On fusionne avec currentArchiveDebts en évitant les doublons stricts d'identifiants
         const existingArchiveFiltered = currentArchiveDebts.filter(ad => !archivedOfThisFile.some(newAd => newAd.id === ad.id));
         currentArchiveDebts = [...existingArchiveFiltered, ...archivedOfThisFile];
       }
 
-      // Re-assemble currentTotalDebts for the next iteration
-      // IMPORTANT: les anciennes créances du même commercial sont ENTIÈREMENT remplacées
+      // ═══════════════════════════════════════════════════════════════════
+      // ÉTAPE 6: Assembler le résultat final
+      // SEULES les nouvelles créances + les créances d'autres commerciaux
+      // ═══════════════════════════════════════════════════════════════════
       const otherDebtsReset = otherDebts.map(d => ({ ...d, isRecentlyUpdated: false }));
       currentTotalDebts = [...otherDebtsReset, ...debtsWithDate];
       
-      console.log(`[Import] Après remplacement: ${currentTotalDebts.length} créances actives totales`);
+      console.log(`[Import]   ✅ Résultat: ${currentTotalDebts.length} créances actives totales`);
     });
 
     // Final update
@@ -617,7 +646,6 @@ function cleanUndefined(obj: any): any {
     saveToFirestore(processedDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices)
       .then(() => {
         console.log('[Import] Sauvegarde Firestore terminée, libération du guard onSnapshot');
-        // Petit délai pour laisser Firestore propager la mise à jour
         setTimeout(() => {
           isLocalUpdateRef.current = false;
         }, 2000);
