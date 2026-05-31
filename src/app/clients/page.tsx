@@ -25,7 +25,8 @@ import {
   Menu,
   SlidersHorizontal,
   MessageSquare,
-  Star
+  Star,
+  Clock
 } from 'lucide-react';
 import {
   Sheet,
@@ -811,6 +812,11 @@ export default function ClientsPage() {
               const clientDebts = client.filteredDebts.sort((a: any, b: any) => (a.extractIndex || 0) - (b.extractIndex || 0));
               const theme = getClientTheme(client.clientName);
               
+              // Calculate average client age
+              const averageAge = clientDebts.length > 0
+                ? Math.round(clientDebts.reduce((sum: number, d: any) => sum + (d.age || 0), 0) / clientDebts.length)
+                : 0;
+              
               return (
                 <Card key={idx} className={`border-0 shadow-md ${theme.cardClass} overflow-hidden rounded-[32px] transition-all hover:shadow-xl`}>
                     <div 
@@ -837,6 +843,19 @@ export default function ClientsPage() {
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] md:text-sm text-slate-500 mt-2 md:mt-3">
                             <span className="flex items-center gap-1.5 font-bold bg-slate-50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl text-[10px] md:text-xs text-slate-700 border border-slate-100 whitespace-nowrap">Code: <span className="text-blue-600 font-black">{client.clientCode}</span></span>
                             <span className="flex items-center gap-1.5 font-semibold whitespace-nowrap"><FileText className="h-3 w-3 md:h-4 md:w-4 text-slate-400" />{client.debtCount} factures</span>
+                            
+                            {/* Visually distinguishable average age badge */}
+                            <span className={`flex items-center gap-1.5 font-black px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border text-[10px] md:text-xs whitespace-nowrap shadow-sm transition-all ${
+                              averageAge <= 15 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-emerald-50/40' :
+                              averageAge <= 30 ? 'bg-blue-50 text-blue-700 border-blue-200 shadow-blue-50/40' :
+                              averageAge <= 45 ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-amber-50/40' :
+                              averageAge <= 60 ? 'bg-orange-50 text-orange-700 border-orange-200 shadow-orange-50/40' :
+                              'bg-rose-50 text-rose-700 border-rose-200 shadow-rose-50/40'
+                            }`} title="Âge moyen des factures de ce client">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>Âge moyen: <span className="font-extrabold underline decoration-2 underline-offset-2">{averageAge} j</span></span>
+                            </span>
+
                             <span className="text-emerald-600 font-black flex items-center gap-1.5 bg-emerald-50/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border border-emerald-100/50 whitespace-nowrap"><Users className="h-3 w-3 md:h-4 md:w-4" />{client.commercialName}</span>
                           </div>
                           
