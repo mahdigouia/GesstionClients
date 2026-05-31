@@ -170,9 +170,7 @@ export default function ClientsPage() {
 
   // Business logic for filters
   const isContentieux = (d: ClientDebt) => {
-    const age = typeof d.age === 'number' ? d.age : parseInt(String(d.age).replace(/[^0-9]/g, '')) || 0;
-    const balance = typeof d.balance === 'number' ? d.balance : parseFloat(String(d.balance).replace(/[^\d.,-]/g, '').replace(',', '.')) || 0;
-    return age > 365 && balance > 0;
+    return !!d.isContentieux;
   };
 
   const isRetained = (debt: ClientDebt) => {
