@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { ClientDebt, AnalysisResult, RecoveryAction } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { db } from '@/lib/firebase';
@@ -85,6 +85,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({ contentiousAgeDays: 365, retentionMin: 0.5, retentionMax: 1.5 });
   const [manualContentiousInvoices, setManualContentiousInvoices] = useState<Record<string, boolean>>({});
   const [firestoreReady, setFirestoreReady] = useState(false);
+  const isLocalUpdateRef = useRef(false); // Guard: skip onSnapshot during local imports
   const { user, userRole, commercialCode } = useAuth();
 
   // Liste mémoïsée et filtrée selon le rôle de l'utilisateur
@@ -122,6 +123,13 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     try {
       const docRef = doc(db, FIRESTORE_COLLECTION, FIRESTORE_DOC);
       unsubscribe = onSnapshot(docRef, (snapshot) => {
+        // Skip Firestore echo during local import to prevent old data from flashing back
+        if (isLocalUpdateRef.current) {
+          console.log('[DebtContext] Skipping onSnapshot during local update');
+          setFirestoreReady(true);
+          return;
+        }
+
         if (snapshot.exists()) {
           const data = snapshot.data();
           const firestoreDebts = data.debts || [];
@@ -479,6 +487,9 @@ function cleanUndefined(obj: any): any {
   const updateDebtsFromFiles = (filesData: { filename: string, debts: ClientDebt[] }[]) => {
     const today = new Date().toISOString();
     
+    // 🛡️ Guard: empêcher onSnapshot d'écraser l'état local pendant l'import
+    isLocalUpdateRef.current = true;
+    
     // We'll work on a copy of the debts
     let currentTotalDebts = [...rawDebts];
     let currentArchiveDebts = [...rawArchiveDebts];
@@ -505,25 +516,42 @@ function cleanUndefined(obj: any): any {
         commercialCodesToReplace.add(fnMatch[1].toUpperCase());
       }
 
+      console.log(`[Import] Remplacement fichier '${filename}', codes commerciaux détectés: [${Array.from(commercialCodesToReplace).join(', ')}]`);
+
       // Filter existing debts that match either by commercial code or by exact filename
+      // Also match by filename pattern (e.g. old "C01.pdf" vs new "C01_v2.pdf")
       const existingDebtsForFile = currentTotalDebts.filter(d => {
         const matchesFilename = (d.sourceFile || '').toLowerCase() === normName;
         const matchesCommercial = d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase());
-        return matchesFilename || matchesCommercial;
+        // Also match if the old file's name contains the same commercial code pattern
+        const oldFileMatch = (d.sourceFile || '').match(/\b(C\d{2})\b/i);
+        const matchesFileCommercialCode = oldFileMatch && commercialCodesToReplace.has(oldFileMatch[1].toUpperCase());
+        return matchesFilename || matchesCommercial || matchesFileCommercialCode;
       });
       
       const otherDebts = currentTotalDebts.filter(d => {
         const matchesFilename = (d.sourceFile || '').toLowerCase() === normName;
         const matchesCommercial = d.commercialCode && commercialCodesToReplace.has(d.commercialCode.toUpperCase());
-        return !matchesFilename && !matchesCommercial;
+        const oldFileMatch = (d.sourceFile || '').match(/\b(C\d{2})\b/i);
+        const matchesFileCommercialCode = oldFileMatch && commercialCodesToReplace.has(oldFileMatch[1].toUpperCase());
+        return !matchesFilename && !matchesCommercial && !matchesFileCommercialCode;
       });
+
+      console.log(`[Import] ${existingDebtsForFile.length} anciennes créances trouvées à remplacer, ${otherDebts.length} créances non concernées`);
       
-      const debtsWithDate = newDebtsForFile.map(d => ({ 
-        ...d, 
-        sourceFile: filename,
-        lastImportDate: today,
-        isRecentlyUpdated: true
-      }));
+      // Préparer les nouvelles créances avec métadonnées d'import
+      // ET transférer le flag isManualContentieux depuis le dictionnaire persistant
+      const debtsWithDate = newDebtsForFile.map(d => {
+        const manualState = manualContentiousInvoices[d.documentNumber];
+        return { 
+          ...d, 
+          sourceFile: filename,
+          lastImportDate: today,
+          isRecentlyUpdated: true,
+          // Appliquer le contentieux manuel si un override existe pour ce numéro de facture
+          ...(manualState !== undefined ? { isContentieux: manualState, isManualContentieux: true } : {})
+        };
+      });
 
       // Calculate stats for this file
       debtsWithDate.forEach(newDebt => {
@@ -539,7 +567,9 @@ function cleanUndefined(obj: any): any {
         }
       });
 
-      totalRemoved += Math.max(0, existingDebtsForFile.length - (newDebtsForFile.length - (debtsWithDate.filter(nd => !existingDebtsForFile.some(ed => ed.documentNumber === nd.documentNumber)).length)));
+      // Compter les factures qui existaient avant mais ne sont plus dans le nouveau fichier
+      const removedDebts = existingDebtsForFile.filter(ed => !newDebtsForFile.some(nd => nd.documentNumber === ed.documentNumber));
+      totalRemoved += removedDebts.length;
       
       // Archiver les anciennes créances de ce fichier au lieu de les écraser
       if (existingDebtsForFile.length > 0) {
@@ -554,8 +584,11 @@ function cleanUndefined(obj: any): any {
       }
 
       // Re-assemble currentTotalDebts for the next iteration
+      // IMPORTANT: les anciennes créances du même commercial sont ENTIÈREMENT remplacées
       const otherDebtsReset = otherDebts.map(d => ({ ...d, isRecentlyUpdated: false }));
       currentTotalDebts = [...otherDebtsReset, ...debtsWithDate];
+      
+      console.log(`[Import] Après remplacement: ${currentTotalDebts.length} créances actives totales`);
     });
 
     // Final update
@@ -577,8 +610,21 @@ function cleanUndefined(obj: any): any {
       setAnalysis(null);
     }
 
+    // Appliquer l'état local immédiatement
     setRawDebts(processedDebts);
-    saveToFirestore(processedDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices);
+    
+    // Sauvegarder dans Firestore (async) puis libérer le guard
+    saveToFirestore(processedDebts, recoveryActions, clientRemarks, currentArchiveDebts, manualContentiousInvoices)
+      .then(() => {
+        console.log('[Import] Sauvegarde Firestore terminée, libération du guard onSnapshot');
+        // Petit délai pour laisser Firestore propager la mise à jour
+        setTimeout(() => {
+          isLocalUpdateRef.current = false;
+        }, 2000);
+      })
+      .catch(() => {
+        isLocalUpdateRef.current = false;
+      });
 
     return {
       updated: totalUpdated,
