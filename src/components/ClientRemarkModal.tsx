@@ -330,7 +330,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl h-[90vh] md:h-auto md:max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white border-0 shadow-2xl rounded-[32px]">
-        <DialogHeader className="p-6 md:p-8 bg-slate-900 text-white flex-shrink-0">
+        <DialogHeader className="p-5 md:p-8 bg-slate-900 text-white flex-shrink-0">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/20">
               <MessageSquare className="h-6 w-6 text-white" />
@@ -344,10 +344,10 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
           </div>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden">
           {/* Historique */}
-          <div className="flex-1 overflow-hidden flex flex-col bg-slate-50/50">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div className="flex-shrink-0 md:flex-1 md:overflow-hidden flex flex-col bg-slate-50/50">
+            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between bg-white">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <History className="h-3 w-3" /> Historique des remarques
               </h3>
@@ -371,7 +371,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
               </div>
             </div>
             
-            <ScrollArea className="flex-1 p-6">
+            <ScrollArea className="flex-1 max-h-[250px] md:max-h-none p-4 md:p-6">
               {remarks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                   <div className="p-4 bg-slate-100 rounded-full mb-4">
@@ -479,7 +479,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
           </div>
 
           {/* Saisie */}
-          <div className="p-6 bg-white border-t border-slate-100 flex-shrink-0 space-y-4">
+          <div className="p-4 md:p-6 bg-white border-t border-slate-100 flex-shrink-0 space-y-4">
             {/* Statuts de Relance (Nouveaux Modèles) */}
             <div className="space-y-3">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Statut de la relance</p>
@@ -801,7 +801,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
           </div>
         </div>
 
-        <DialogFooter className="p-4 md:p-6 border-t border-slate-50 bg-slate-50 flex flex-row justify-end items-center gap-3">
+        <DialogFooter className="p-3 md:p-6 border-t border-slate-50 bg-slate-50 flex flex-row justify-end items-center gap-3">
           <Button 
             variant="ghost" 
             onClick={onClose} 
