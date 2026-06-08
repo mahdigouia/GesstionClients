@@ -344,7 +344,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
           </div>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col overflow-y-auto md:overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-y-auto">
           {/* Historique */}
           <div className="flex-shrink-0 md:flex-1 md:overflow-hidden flex flex-col bg-slate-50/50">
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between bg-white">
@@ -693,7 +693,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                       <AlertCircle className="h-3.5 w-3.5" />
                       <span>Reste non payé par facture :</span>
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
                       {clientActiveDebts.map((d) => (
                         <div 
                           key={d.id} 
