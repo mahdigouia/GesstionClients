@@ -43,7 +43,9 @@ export async function GET(request: Request) {
       const amountStr = n.promiseAmount > 0 
         ? `${n.promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
         : 'Solde total';
-      return `💰 **${userShort}** a marqué **${n.clientName}** comme **PAYÉ** (Règlement de ${amountStr}).`;
+      const invoiceMatch = n.content ? n.content.match(/facture\s+([A-Z0-9_\-\/]+)/i) : null;
+      const invoiceDetails = invoiceMatch ? ` (Facture n° ${invoiceMatch[1]})` : '';
+      return `💰 **${userShort}** a marqué **${n.clientName}** comme **PAYÉ**${invoiceDetails} (Règlement de ${amountStr}).`;
     });
 
     const summaryMessage = `🔔 **Notification de Recouvrement**\n\n${messageLines.join('\n')}`;
@@ -77,10 +79,12 @@ export async function GET(request: Request) {
       const amountStr = n.promiseAmount > 0 
         ? `${n.promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
         : 'Solde total';
+      const invoiceMatch = n.content ? n.content.match(/facture\s+([A-Z0-9_\-\/]+)/i) : null;
+      const invoiceDetails = invoiceMatch ? ` (Facture n° ${invoiceMatch[1]})` : '';
       
       return addDoc(collection(db, 'notifications'), {
         type: 'payment',
-        message: `${userShort} a marqué le client ${n.clientName} comme PAYÉ (${amountStr}).`,
+        message: `${userShort} a marqué le client ${n.clientName} comme PAYÉ${invoiceDetails} (${amountStr}).`,
         severity: 'low',
         createdAt: new Date().toISOString(),
         status: 'pending', // Visible as notification in popover
@@ -131,10 +135,12 @@ export async function GET(request: Request) {
               const amountStr = n.promiseAmount > 0 
                 ? `${n.promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
                 : 'Solde total';
+              const invoiceMatch = n.content ? n.content.match(/facture\s+([A-Z0-9_\-\/]+)/i) : null;
+              const invoiceDetails = invoiceMatch ? ` (Facture n° ${invoiceMatch[1]})` : '';
                 
               const pushPayload = JSON.stringify({
                 title: 'Nouveau Paiement Recouvré ! 💰',
-                body: `${userShort} a marqué le client ${n.clientName} comme PAYÉ (${amountStr}).`,
+                body: `${userShort} a marqué le client ${n.clientName} comme PAYÉ${invoiceDetails} (${amountStr}).`,
                 icon: '/logo.png',
                 badge: '/logo.png',
                 url: '/clients'

@@ -15,14 +15,25 @@ import { Badge } from '@/components/ui/badge';
 import { 
   CheckCircle2,
   CalendarDays,
-  Menu
+  Menu,
+  Check
 } from 'lucide-react';
+import { ContentiousConfirmModal } from '@/components/ContentiousConfirmModal';
+import { PaymentConfirmModal } from '@/components/PaymentConfirmModal';
 
 export default function InvoicesPage() {
-  const { debts, archiveDebts, analysis, settings, logAudit, toggleManualContentious } = useDebtContext();
+  const { debts, archiveDebts, analysis, settings, logAudit, toggleManualContentious, markInvoiceAsPaid } = useDebtContext();
   const { userRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  const [pendingContentiousDoc, setPendingContentiousDoc] = useState<string | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<{
+    type: 'invoice';
+    name: string;
+    amount: number;
+    docNumber?: string;
+  } | null>(null);
   
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
@@ -100,7 +111,13 @@ export default function InvoicesPage() {
               checked={!!debt.isContentieux}
               disabled={userRole !== 'admin' && userRole !== 'gestionnaire'}
               onClick={(e) => e.stopPropagation()}
-              onChange={() => toggleManualContentious(debt.documentNumber)}
+              onChange={() => {
+                if (!debt.isContentieux) {
+                  setPendingContentiousDoc(debt.documentNumber);
+                } else {
+                  toggleManualContentious(debt.documentNumber);
+                }
+              }}
               className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               title={
                 userRole === 'admin' || userRole === 'gestionnaire'
@@ -130,8 +147,29 @@ export default function InvoicesPage() {
         <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 border-t md:border-t-0 pt-3 md:pt-0">
           <div className="text-left md:text-right">
             <div className="text-[9px] md:text-[10px] text-slate-400 font-bold uppercase">Solde restant</div>
-            <div className="text-base md:text-lg font-black text-slate-900">
-              {debt.balance.toLocaleString('fr-FR')} <span className="text-[10px] md:text-xs">TND</span>
+            <div className="flex items-center justify-start md:justify-end gap-2">
+              {debt.balance > 0 && (userRole === 'admin' || userRole === 'gestionnaire') && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPaymentTarget({
+                      type: 'invoice',
+                      name: debt.clientName,
+                      amount: debt.balance,
+                      docNumber: debt.documentNumber
+                    });
+                  }}
+                  className="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md p-0"
+                  title="Marquer cette facture comme payée"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <div className="text-base md:text-lg font-black text-slate-900">
+                {debt.balance.toLocaleString('fr-FR')} <span className="text-[10px] md:text-xs">TND</span>
+              </div>
             </div>
             <div className="text-[9px] md:text-[10px] text-green-600 font-medium">
               Règl: {debt.settlement.toLocaleString('fr-FR')} / {debt.amount.toLocaleString('fr-FR')}
@@ -328,6 +366,31 @@ export default function InvoicesPage() {
         onClose={() => setIsHistoryModalOpen(false)}
         clientName={selectedClientName}
         clientDebts={clientHistoryDebts}
+      />
+
+      <ContentiousConfirmModal
+        isOpen={pendingContentiousDoc !== null}
+        onClose={() => setPendingContentiousDoc(null)}
+        onConfirm={() => {
+          if (pendingContentiousDoc) {
+            toggleManualContentious(pendingContentiousDoc);
+          }
+        }}
+        invoiceNumber={pendingContentiousDoc || undefined}
+      />
+
+      <PaymentConfirmModal
+        isOpen={paymentTarget !== null}
+        onClose={() => setPaymentTarget(null)}
+        onConfirm={(method) => {
+          if (paymentTarget && paymentTarget.docNumber) {
+            markInvoiceAsPaid(paymentTarget.docNumber, method);
+          }
+        }}
+        title="Règlement de la facture"
+        amount={paymentTarget?.amount || 0}
+        targetName={paymentTarget?.docNumber || ''}
+        isInvoice={true}
       />
     </div>
   );

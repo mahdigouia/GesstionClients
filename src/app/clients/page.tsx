@@ -26,8 +26,12 @@ import {
   SlidersHorizontal,
   MessageSquare,
   Star,
-  Clock
+  Clock,
+  Check,
+  CheckCircle2
 } from 'lucide-react';
+import { ContentiousConfirmModal } from '@/components/ContentiousConfirmModal';
+import { PaymentConfirmModal } from '@/components/PaymentConfirmModal';
 import {
   Sheet,
   SheetContent,
@@ -99,7 +103,18 @@ const getClientTheme = (clientName: string) => {
 };
 
 export default function ClientsPage() {
-  const { debts, analysis, clientRemarks, addClientRemark, updateClientRemark, deleteClientRemark, logAudit, toggleManualContentious } = useDebtContext();
+  const { 
+    debts, 
+    analysis, 
+    clientRemarks, 
+    addClientRemark, 
+    updateClientRemark, 
+    deleteClientRemark, 
+    logAudit, 
+    toggleManualContentious,
+    markInvoiceAsPaid,
+    markClientAsPaid
+  } = useDebtContext();
   const { userRole } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -111,6 +126,14 @@ export default function ClientsPage() {
   // State for Remark Modal
   const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
   const [remarkClientName, setRemarkClientName] = useState('');
+
+  const [pendingContentiousDoc, setPendingContentiousDoc] = useState<string | null>(null);
+  const [paymentTarget, setPaymentTarget] = useState<{
+    type: 'client' | 'invoice';
+    name: string;
+    amount: number;
+    docNumber?: string;
+  } | null>(null);
 
   // 🔔 Auto-navigation depuis une notification push
   // URL format: /clients?search=NOM_CLIENT&open=remark
@@ -908,6 +931,25 @@ export default function ClientsPage() {
                       </div>
 
                       <div className="flex items-center justify-between md:justify-end gap-6 md:gap-10 md:pr-4 border-t md:border-t-0 pt-3 md:pt-0">
+                        {client.totalBalance > 0 && (userRole === 'admin' || userRole === 'gestionnaire') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPaymentTarget({
+                                type: 'client',
+                                name: client.clientName,
+                                amount: client.totalBalance
+                              });
+                            }}
+                            className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 rounded-xl h-10 px-3.5 font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                            title="Marquer tout le client comme payé"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            <span className="hidden sm:inline text-xs">Régler</span>
+                          </Button>
+                        )}
                         <div className="text-left md:text-right">
                           <div className={`text-xl md:text-3xl font-black tracking-tighter ${client.totalBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                             {(client.totalBalance ?? 0).toLocaleString('fr-FR')} <span className="text-xs md:text-base font-medium opacity-60">TND</span>
@@ -945,7 +987,13 @@ export default function ClientsPage() {
                                         type="checkbox"
                                         checked={!!debt.isContentieux}
                                         disabled={userRole !== 'admin' && userRole !== 'gestionnaire'}
-                                        onChange={() => toggleManualContentious(debt.documentNumber)}
+                                        onChange={() => {
+                                          if (!debt.isContentieux) {
+                                            setPendingContentiousDoc(debt.documentNumber);
+                                          } else {
+                                            toggleManualContentious(debt.documentNumber);
+                                          }
+                                        }}
                                         className="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                                         title={
                                           userRole === 'admin' || userRole === 'gestionnaire'
@@ -963,7 +1011,27 @@ export default function ClientsPage() {
                                   <TableCell className="hidden lg:table-cell text-[10px] md:text-xs font-semibold text-slate-500 py-3 md:py-5 italic max-w-[150px] truncate">{debt.description || '-'}</TableCell>
                                   <TableCell className="text-xs md:text-sm font-bold text-slate-800 text-right py-3 md:py-5">{(debt.amount ?? 0).toLocaleString('fr-FR')} TND</TableCell>
                                   <TableCell className="hidden md:table-cell text-xs md:text-sm font-bold text-emerald-600 text-right py-3 md:py-5">{(debt.settlement ?? 0).toLocaleString('fr-FR')} TND</TableCell>
-                                  <TableCell className="text-sm md:text-base font-black text-rose-600 text-right py-3 md:py-5">{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</TableCell>
+                                  <TableCell className="text-sm md:text-base font-black text-rose-600 text-right py-3 md:py-5">
+                                    <div className="flex items-center justify-end gap-2 group/solde">
+                                      <span>{(debt.balance ?? 0).toLocaleString('fr-FR')} TND</span>
+                                      {debt.balance > 0 && (userRole === 'admin' || userRole === 'gestionnaire') && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => setPaymentTarget({
+                                            type: 'invoice',
+                                            name: debt.clientName,
+                                            amount: debt.balance,
+                                            docNumber: debt.documentNumber
+                                          })}
+                                          className="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md p-0 opacity-0 group-hover/solde:opacity-100 transition-opacity"
+                                          title="Marquer cette facture comme payée"
+                                        >
+                                          <Check className="h-3.5 w-3.5" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-center py-3 md:py-5">
                                     <Badge className={`font-black px-3 py-1 md:px-4 md:py-1.5 rounded-xl text-xs md:text-sm shadow-sm border ${
                                       debt.age <= 15 ? 'bg-emerald-100 text-emerald-700 border-emerald-200' :
@@ -1003,7 +1071,13 @@ export default function ClientsPage() {
                                       type="checkbox"
                                       checked={!!debt.isContentieux}
                                       disabled={userRole !== 'admin' && userRole !== 'gestionnaire'}
-                                      onChange={() => toggleManualContentious(debt.documentNumber)}
+                                      onChange={() => {
+                                        if (!debt.isContentieux) {
+                                          setPendingContentiousDoc(debt.documentNumber);
+                                        } else {
+                                          toggleManualContentious(debt.documentNumber);
+                                        }
+                                      }}
                                       className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                                       title={
                                         userRole === 'admin' || userRole === 'gestionnaire'
@@ -1044,9 +1118,27 @@ export default function ClientsPage() {
                                 </div>
                                 <div className="flex flex-col text-right">
                                   <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Solde restant</span>
-                                  <span className="text-base font-black text-rose-600">
-                                    {(debt.balance ?? 0).toLocaleString('fr-FR')} <span className="text-[10px] font-normal text-slate-500">TND</span>
-                                  </span>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-base font-black text-rose-600">
+                                      {(debt.balance ?? 0).toLocaleString('fr-FR')} <span className="text-[10px] font-normal text-slate-500">TND</span>
+                                    </span>
+                                    {debt.balance > 0 && (userRole === 'admin' || userRole === 'gestionnaire') && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setPaymentTarget({
+                                          type: 'invoice',
+                                          name: debt.clientName,
+                                          amount: debt.balance,
+                                          docNumber: debt.documentNumber
+                                        })}
+                                        className="h-6 w-6 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md p-0"
+                                        title="Marquer cette facture comme payée"
+                                      >
+                                        <Check className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
@@ -1094,6 +1186,35 @@ export default function ClientsPage() {
         onAddRemark={addClientRemark}
         onUpdateRemark={updateClientRemark}
         onDeleteRemark={deleteClientRemark}
+      />
+
+      <ContentiousConfirmModal
+        isOpen={pendingContentiousDoc !== null}
+        onClose={() => setPendingContentiousDoc(null)}
+        onConfirm={() => {
+          if (pendingContentiousDoc) {
+            toggleManualContentious(pendingContentiousDoc);
+          }
+        }}
+        invoiceNumber={pendingContentiousDoc || undefined}
+      />
+
+      <PaymentConfirmModal
+        isOpen={paymentTarget !== null}
+        onClose={() => setPaymentTarget(null)}
+        onConfirm={(method) => {
+          if (paymentTarget) {
+            if (paymentTarget.type === 'client') {
+              markClientAsPaid(paymentTarget.name, method);
+            } else if (paymentTarget.type === 'invoice' && paymentTarget.docNumber) {
+              markInvoiceAsPaid(paymentTarget.docNumber, method);
+            }
+          }
+        }}
+        title={paymentTarget?.type === 'client' ? "Règlement complet du client" : "Règlement de la facture"}
+        amount={paymentTarget?.amount || 0}
+        targetName={paymentTarget?.type === 'client' ? paymentTarget.name : (paymentTarget?.docNumber || '')}
+        isInvoice={paymentTarget?.type === 'invoice'}
       />
     </div>
   );

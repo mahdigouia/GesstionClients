@@ -43,6 +43,8 @@ interface DebtContextType {
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   logAudit: (action: string, details: string) => Promise<void>;
   toggleManualContentious: (documentNumber: string) => Promise<void>;
+  markInvoiceAsPaid: (documentNumber: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => Promise<void>;
+  markClientAsPaid: (clientName: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => Promise<void>;
 }
 
 export interface AppSettings {
@@ -367,7 +369,10 @@ function cleanUndefined(obj: any): any {
       const amountStr = promiseAmount && promiseAmount > 0
         ? `${promiseAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
         : 'Solde total';
-      const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
+      
+      const invoiceMatch = content.match(/facture\s+([A-Z0-9_\-\/]+)/i);
+      const invoiceDetails = invoiceMatch ? ` (Facture n° ${invoiceMatch[1]})` : '';
+      const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ${invoiceDetails} (${amountStr}).`;
 
       // Notification collaborative in-app
       addDoc(collection(db, 'notifications'), {
@@ -889,6 +894,207 @@ function cleanUndefined(obj: any): any {
     await logAction('Override Contentieux', `Facture ${documentNumber} marquée comme ${nextManualState ? 'contentieuse' : 'non contentieuse'}`);
   };
 
+  const markInvoiceAsPaid = async (documentNumber: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => {
+    const debt = rawDebts.find(d => d.documentNumber === documentNumber);
+    if (!debt) return;
+
+    const amount = debt.balance;
+    if (amount <= 0) return;
+
+    // 1. Update the debt in rawDebts
+    const updatedDebts = rawDebts.map(d => {
+      if (d.documentNumber === documentNumber) {
+        return {
+          ...d,
+          settlement: d.amount,
+          balance: 0,
+          paymentStatus: 'paid' as const,
+          riskLevel: 'healthy' as const
+        };
+      }
+      return d;
+    });
+
+    setRawDebts(updatedDebts);
+
+    // 2. Add client remark
+    const methodLabels: Record<string, string> = {
+      versement: 'versement',
+      espece: 'espèce',
+      traite: 'traite',
+      cheque: 'chèque'
+    };
+    const methodLabel = methodLabels[paymentMethod] || paymentMethod;
+    const content = `Payé : Règlement total de la facture ${documentNumber} par ${methodLabel} de ${amount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`;
+
+    const newRemark: ClientRemark = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      clientName: debt.clientName,
+      content,
+      date: new Date().toISOString(),
+      user: user?.email || 'Utilisateur inconnu',
+      promiseAmount: amount
+    };
+
+    const currentRemarks = clientRemarks[debt.clientName] || [];
+    const updatedRemarks = {
+      ...clientRemarks,
+      [debt.clientName]: [newRemark, ...currentRemarks].slice(0, 50)
+    };
+
+    setClientRemarks(updatedRemarks);
+
+    // 3. Save to Firestore
+    await saveToFirestore(updatedDebts, recoveryActions, updatedRemarks, rawArchiveDebts, manualContentiousInvoices);
+
+    // 4. Notifications
+    const sendNotification = async (type: 'payment', messageText: string) => {
+      try {
+        const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
+        const subscriptions = subsSnapshot.docs.map(subDoc => ({
+          id: subDoc.id,
+          subscription: subDoc.data().subscription
+        }));
+        await fetch('/api/webpush/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientName: debt.clientName, content, promiseAmount: amount, user: user?.email, type, subscriptions })
+        });
+      } catch (e) {
+        console.error(`[DebtContext] Erreur notification payment:`, e);
+      }
+    };
+
+    // Save pending payment to Firestore
+    addDoc(collection(db, 'pending_payments'), {
+      clientName: debt.clientName,
+      content,
+      promiseAmount: amount,
+      user: user?.email || 'Utilisateur inconnu',
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    }).catch(e => console.error('[DebtContext] Erreur pending_payments:', e));
+
+    const userShort = user?.email?.split('@')[0] || 'Un utilisateur';
+    const messageText = `${userShort} a marqué la facture ${documentNumber} de ${debt.clientName} comme PAYÉE (${amount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND).`;
+
+    // Collaborative in-app notification
+    addDoc(collection(db, 'notifications'), {
+      type: 'payment',
+      message: messageText,
+      severity: 'low',
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      metadata: { clientName: debt.clientName }
+    }).catch(e => console.error('[DebtContext] Erreur notification in-app payment:', e));
+
+    // Send push notification
+    sendNotification('payment', messageText);
+
+    // 5. Audit log
+    await logAction('Paiement Facture', `Facture ${documentNumber} marquée comme payée (${amount} TND) via ${methodLabel}`);
+  };
+
+  const markClientAsPaid = async (clientName: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => {
+    const clientActiveDebts = rawDebts.filter(d => d.clientName === clientName && d.balance > 0);
+    if (clientActiveDebts.length === 0) return;
+
+    const totalBalance = clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
+
+    // 1. Update all active debts of client in rawDebts
+    const updatedDebts = rawDebts.map(d => {
+      if (d.clientName === clientName && d.balance > 0) {
+        return {
+          ...d,
+          settlement: d.amount,
+          balance: 0,
+          paymentStatus: 'paid' as const,
+          riskLevel: 'healthy' as const
+        };
+      }
+      return d;
+    });
+
+    setRawDebts(updatedDebts);
+
+    // 2. Add client remark
+    const methodLabels: Record<string, string> = {
+      versement: 'versement',
+      espece: 'espèce',
+      traite: 'traite',
+      cheque: 'chèque'
+    };
+    const methodLabel = methodLabels[paymentMethod] || paymentMethod;
+    const content = `Payé : Règlement total du client par ${methodLabel} de ${totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`;
+
+    const newRemark: ClientRemark = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      clientName,
+      content,
+      date: new Date().toISOString(),
+      user: user?.email || 'Utilisateur inconnu',
+      promiseAmount: totalBalance
+    };
+
+    const currentRemarks = clientRemarks[clientName] || [];
+    const updatedRemarks = {
+      ...clientRemarks,
+      [clientName]: [newRemark, ...currentRemarks].slice(0, 50)
+    };
+
+    setClientRemarks(updatedRemarks);
+
+    // 3. Save to Firestore
+    await saveToFirestore(updatedDebts, recoveryActions, updatedRemarks, rawArchiveDebts, manualContentiousInvoices);
+
+    // 4. Notifications
+    const sendNotification = async (type: 'payment', messageText: string) => {
+      try {
+        const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
+        const subscriptions = subsSnapshot.docs.map(subDoc => ({
+          id: subDoc.id,
+          subscription: subDoc.data().subscription
+        }));
+        await fetch('/api/webpush/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientName, content, promiseAmount: totalBalance, user: user?.email, type, subscriptions })
+        });
+      } catch (e) {
+        console.error(`[DebtContext] Erreur notification payment:`, e);
+      }
+    };
+
+    // Save pending payment to Firestore
+    addDoc(collection(db, 'pending_payments'), {
+      clientName,
+      content,
+      promiseAmount: totalBalance,
+      user: user?.email || 'Utilisateur inconnu',
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    }).catch(e => console.error('[DebtContext] Erreur pending_payments:', e));
+
+    const userShort = user?.email?.split('@')[0] || 'Un utilisateur';
+    const messageText = `${userShort} a marqué le client ${clientName} comme PAYÉ (${totalBalance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND).`;
+
+    // Collaborative in-app notification
+    addDoc(collection(db, 'notifications'), {
+      type: 'payment',
+      message: messageText,
+      severity: 'low',
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      metadata: { clientName }
+    }).catch(e => console.error('[DebtContext] Erreur notification in-app payment:', e));
+
+    // Send push notification
+    sendNotification('payment', messageText);
+
+    // 5. Audit log
+    await logAction('Paiement Client', `Client ${clientName} marqué comme payé (${totalBalance} TND) via ${methodLabel}`);
+  };
+
   return (
     <DebtContext.Provider value={{ 
       debts, 
@@ -915,7 +1121,9 @@ function cleanUndefined(obj: any): any {
       settings,
       updateSettings,
       logAudit: logAction,
-      toggleManualContentious
+      toggleManualContentious,
+      markInvoiceAsPaid,
+      markClientAsPaid
     }}>
       {children}
     </DebtContext.Provider>

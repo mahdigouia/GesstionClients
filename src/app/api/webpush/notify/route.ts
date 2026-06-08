@@ -30,10 +30,14 @@ export async function POST(request: Request) {
       const amountStr = promiseAmount && promiseAmount > 0
         ? `${Number(promiseAmount).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
         : 'Solde total';
+      
+      const invoiceMatch = content.match(/facture\s+([A-Z0-9_\-\/]+)/i);
+      const invoiceDetails = invoiceMatch ? ` (Facture n° ${invoiceMatch[1]})` : '';
+
       pushTitle = '💰 Nouveau Paiement Recouvré !';
-      pushBody = `${userShort} a marqué le client ${clientName} comme PAYÉ (${amountStr}).`;
+      pushBody = `${userShort} a marqué le client ${clientName} comme PAYÉ${invoiceDetails} (${amountStr}).`;
       pushUrl = `/clients?search=${encodeURIComponent(clientName)}&open=remark`;
-      webhookMessage = `💰 **${userShort}** a marqué **${clientName}** comme **PAYÉ** (Règlement de ${amountStr}).\n📝 *Remarque : ${content}*`;
+      webhookMessage = `💰 **${userShort}** a marqué **${clientName}** comme **PAYÉ**${invoiceDetails} (Règlement de ${amountStr}).\n📝 *Remarque : ${content}*`;
     }
 
     // 1. Envoyer le webhook (Discord/Slack) si configuré
