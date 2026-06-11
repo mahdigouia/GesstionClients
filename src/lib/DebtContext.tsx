@@ -44,6 +44,7 @@ interface DebtContextType {
   logAudit: (action: string, details: string) => Promise<void>;
   toggleManualContentious: (documentNumber: string) => Promise<void>;
   markInvoiceAsPaid: (documentNumber: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => Promise<void>;
+  markMultipleInvoicesAsPaid: (documentNumbers: string[], paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => Promise<void>;
   markClientAsPaid: (clientName: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => Promise<void>;
 }
 
@@ -995,6 +996,92 @@ function cleanUndefined(obj: any): any {
     await logAction('Paiement Facture', `Facture ${documentNumber} marquée comme payée (${amount} TND) via ${methodLabel}`);
   };
 
+  /** Marque plusieurs factures comme payées en une seule opération atomique (pas de race condition). */
+  const markMultipleInvoicesAsPaid = async (
+    documentNumbers: string[],
+    paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque'
+  ) => {
+    if (documentNumbers.length === 0) return;
+    const methodLabels: Record<string, string> = { versement: 'versement', espece: 'espèce', traite: 'traite', cheque: 'chèque' };
+    const methodLabel = methodLabels[paymentMethod] || paymentMethod;
+
+    // Capture original balances before any mutation
+    const targetDebts = rawDebts.filter(d => documentNumbers.includes(d.documentNumber) && d.balance > 0);
+    if (targetDebts.length === 0) return;
+
+    // 1. Single atomic state update
+    const updatedDebts = rawDebts.map(d => {
+      if (documentNumbers.includes(d.documentNumber) && d.balance > 0) {
+        return { ...d, settlement: d.amount, balance: 0, paymentStatus: 'paid' as const, riskLevel: 'healthy' as const };
+      }
+      return d;
+    });
+    setRawDebts(updatedDebts);
+
+    // 2. Create one remark per invoice
+    let updatedRemarks = { ...clientRemarks };
+    for (const debt of targetDebts) {
+      const amount = debt.balance;
+      const content = `Payé : Règlement total de la facture ${debt.documentNumber} par ${methodLabel} de ${amount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`;
+      const newRemark: ClientRemark = {
+        id: `${Date.now()}_${debt.documentNumber}_${Math.random().toString(36).substr(2, 5)}`,
+        clientName: debt.clientName,
+        content,
+        date: new Date().toISOString(),
+        user: user?.email || 'Utilisateur inconnu',
+        promiseAmount: amount
+      };
+      const cur = updatedRemarks[debt.clientName] || [];
+      updatedRemarks = { ...updatedRemarks, [debt.clientName]: [newRemark, ...cur].slice(0, 50) };
+    }
+    setClientRemarks(updatedRemarks);
+
+    // 3. Single Firestore write
+    await saveToFirestore(updatedDebts, recoveryActions, updatedRemarks, rawArchiveDebts, manualContentiousInvoices);
+
+    // 4. Notifications & audit (fire-and-forget per invoice)
+    const clientName = targetDebts[0].clientName;
+    const totalAmount = targetDebts.reduce((s, d) => s + d.balance, 0);
+    const invoiceNums = targetDebts.map(d => d.documentNumber).join(', ');
+    const userShort = user?.email?.split('@')[0] || 'Un utilisateur';
+
+    const messageText = targetDebts.length === 1
+      ? `${userShort} a marqué la facture ${invoiceNums} de ${clientName} comme PAYÉE (${totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND).`
+      : `${userShort} a marqué ${targetDebts.length} factures de ${clientName} comme PAYÉES (${totalAmount.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND) : ${invoiceNums}.`;
+
+    addDoc(collection(db, 'notifications'), {
+      type: 'payment',
+      message: messageText,
+      severity: 'low',
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      metadata: { clientName }
+    }).catch(e => console.error('[DebtContext] notification:', e));
+
+    addDoc(collection(db, 'pending_payments'), {
+      clientName,
+      content: messageText,
+      promiseAmount: totalAmount,
+      user: user?.email || 'Utilisateur inconnu',
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    }).catch(e => console.error('[DebtContext] pending_payments:', e));
+
+    try {
+      const subsSnapshot = await getDocs(collection(db, 'push_subscriptions'));
+      const subscriptions = subsSnapshot.docs.map(subDoc => ({ id: subDoc.id, subscription: subDoc.data().subscription }));
+      await fetch('/api/webpush/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientName, content: messageText, promiseAmount: totalAmount, user: user?.email, type: 'payment', subscriptions })
+      });
+    } catch (e) {
+      console.error('[DebtContext] push notification:', e);
+    }
+
+    await logAction('Paiement Multi-Factures', `Factures ${invoiceNums} de ${clientName} payées via ${methodLabel} (${totalAmount} TND)`);
+  };
+
   const markClientAsPaid = async (clientName: string, paymentMethod: 'versement' | 'espece' | 'traite' | 'cheque') => {
     const clientActiveDebts = rawDebts.filter(d => d.clientName === clientName && d.balance > 0);
     if (clientActiveDebts.length === 0) return;
@@ -1123,6 +1210,7 @@ function cleanUndefined(obj: any): any {
       logAudit: logAction,
       toggleManualContentious,
       markInvoiceAsPaid,
+      markMultipleInvoicesAsPaid,
       markClientAsPaid
     }}>
       {children}

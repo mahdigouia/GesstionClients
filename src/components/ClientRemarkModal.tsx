@@ -56,7 +56,7 @@ interface ClientRemarkModalProps {
 
 export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark, onUpdateRemark, onDeleteRemark }: ClientRemarkModalProps) {
   const { user, userRole } = useAuth();
-  const { debts, markInvoiceAsPaid, markClientAsPaid } = useDebtContext();
+  const { debts, markInvoiceAsPaid, markMultipleInvoicesAsPaid, markClientAsPaid } = useDebtContext();
   const [newRemark, setNewRemark] = useState('');
   const [promiseDate, setPromiseDate] = useState('');
   const [promiseAmount, setPromiseAmount] = useState('');
@@ -123,23 +123,18 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const [selectedStatus, setSelectedStatus] = useState<'none' | 'reporte' | 'paye_partiel' | 'paye' | 'conflit'>('none');
   const [paymentMethod, setPaymentMethod] = useState<'versement' | 'espece' | 'traite' | 'cheque'>('versement');
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
-  // Dérivé: pour les opérations à facture unique (payé, reporté)
-  const selectedInvoice = selectedInvoices.length === 1 ? selectedInvoices[0] : null;
 
-  /** Bascule une facture dans la sélection. En mode paye_partiel, met aussi à jour le montant. */
+  /** Bascule une facture dans la sélection (multi-select pour tous les statuts). */
   const handleInvoiceToggle = (docNumber: string) => {
+    const newSel = selectedInvoices.includes(docNumber)
+      ? selectedInvoices.filter(n => n !== docNumber)
+      : [...selectedInvoices, docNumber];
+    setSelectedInvoices(newSel);
     if (selectedStatus === 'paye_partiel') {
-      const newSel = selectedInvoices.includes(docNumber)
-        ? selectedInvoices.filter(n => n !== docNumber)
-        : [...selectedInvoices, docNumber];
-      setSelectedInvoices(newSel);
       const sum = clientActiveDebts
         .filter(d => newSel.includes(d.documentNumber))
         .reduce((s, d) => s + d.balance, 0);
       setPromiseAmount(sum > 0 ? sum.toString() : '');
-    } else {
-      // Sélection unique (payé, reporté)
-      setSelectedInvoices(prev => prev.includes(docNumber) ? [] : [docNumber]);
     }
   };
 
@@ -267,14 +262,18 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   }, [isOpen]);
 
-  // Synchroniser automatiquement la date, la facture sélectionnée dans le texte pour Reporté
+  // Synchroniser automatiquement la date, les factures sélectionnées dans le texte pour Reporté
   useEffect(() => {
     if (selectedStatus === 'reporte') {
       const formattedDate = promiseDate && promiseDate.length === 10
         ? new Date(promiseDate).toLocaleDateString('fr-FR')
         : null;
       const dateSuffix = formattedDate ? ` (Prochaine visite le ${formattedDate})` : '';
-      const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
+      const invoiceSuffix = selectedInvoices.length === 1
+        ? ` (Facture ${selectedInvoices[0]})`
+        : selectedInvoices.length > 1
+        ? ` (Factures ${selectedInvoices.join(', ')})`
+        : '';
       setNewRemark(prev => {
         if (prev.startsWith("Reporté : Gérant non disponible")) {
           return `Reporté : Gérant non disponible${invoiceSuffix}.${dateSuffix}`;
@@ -285,7 +284,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
         return prev;
       });
     }
-  }, [promiseDate, selectedStatus, selectedInvoice]);
+  }, [promiseDate, selectedStatus, selectedInvoices]);
 
   // Synchroniser automatiquement le montant payé, le mode de règlement, la facture et la date dans le texte
   useEffect(() => {
@@ -315,25 +314,30 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   }, [promiseAmount, paymentMethod, promiseDate, selectedStatus, selectedInvoices]);
 
-  // Synchroniser automatiquement le mode de règlement dans le texte pour Payé (total ou par facture)
+  // Synchroniser automatiquement le mode de règlement dans le texte pour Payé (multi-factures)
   useEffect(() => {
     if (selectedStatus === 'paye') {
-      const relevantDebt = selectedInvoice
-        ? clientActiveDebts.find(d => d.documentNumber === selectedInvoice)
-        : null;
-      const relevantBal = relevantDebt
-        ? relevantDebt.balance
+      const relevantBal = selectedInvoices.length > 0
+        ? clientActiveDebts
+            .filter(d => selectedInvoices.includes(d.documentNumber))
+            .reduce((sum, d) => sum + d.balance, 0)
         : clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
       const formattedAmount = relevantBal > 0
         ? `${relevantBal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
         : '[MONTANT]';
 
+      const invoiceLabel = selectedInvoices.length === 1
+        ? `la facture ${selectedInvoices[0]}`
+        : selectedInvoices.length > 1
+        ? `les factures ${selectedInvoices.join(', ')}`
+        : null;
+
       let methodText = 'Règlement total.';
-      if (selectedInvoice) {
-        if (paymentMethod === 'versement') methodText = `Règlement total de la facture ${selectedInvoice} par versement de ${formattedAmount}`;
-        else if (paymentMethod === 'espece') methodText = `Règlement total de la facture ${selectedInvoice} en espèce de ${formattedAmount}`;
-        else if (paymentMethod === 'traite') methodText = `Règlement total de la facture ${selectedInvoice} par traite de ${formattedAmount}`;
-        else if (paymentMethod === 'cheque') methodText = `Règlement total de la facture ${selectedInvoice} par chèque de ${formattedAmount}`;
+      if (invoiceLabel) {
+        if (paymentMethod === 'versement') methodText = `Règlement total de ${invoiceLabel} par versement de ${formattedAmount}`;
+        else if (paymentMethod === 'espece') methodText = `Règlement total de ${invoiceLabel} en espèce de ${formattedAmount}`;
+        else if (paymentMethod === 'traite') methodText = `Règlement total de ${invoiceLabel} par traite de ${formattedAmount}`;
+        else if (paymentMethod === 'cheque') methodText = `Règlement total de ${invoiceLabel} par chèque de ${formattedAmount}`;
       } else {
         if (paymentMethod === 'versement') methodText = `Règlement total par versement de ${formattedAmount}`;
         else if (paymentMethod === 'espece') methodText = `Règlement total en espèce de ${formattedAmount}`;
@@ -343,7 +347,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
 
       setNewRemark(`Payé : ${methodText}`);
     }
-  }, [paymentMethod, selectedStatus, selectedInvoice, debts, clientName]);
+  }, [paymentMethod, selectedStatus, selectedInvoices, debts, clientName]);
 
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
@@ -357,15 +361,16 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     setNewRemark(prev => prev + (prev ? ' ' : '') + text);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!newRemark.trim()) return;
 
     // Pour le statut "Payé", appeler les fonctions contextuelles qui mettent à jour le solde
     if (selectedStatus === 'paye') {
-      if (selectedInvoice) {
-        markInvoiceAsPaid(selectedInvoice, paymentMethod);
+      if (selectedInvoices.length > 0) {
+        // Opération atomique : un seul setRawDebts + une seule écriture Firestore
+        await markMultipleInvoicesAsPaid(selectedInvoices, paymentMethod);
       } else {
-        markClientAsPaid(clientName, paymentMethod);
+        await markClientAsPaid(clientName, paymentMethod);
       }
       setNewRemark('');
       setPromiseDate('');
@@ -707,7 +712,11 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                         className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm"
                         onClick={() => {
                           const dateSuffix = promiseDate ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})` : '';
-                          const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
+                          const invoiceSuffix = selectedInvoices.length === 1
+                            ? ` (Facture ${selectedInvoices[0]})`
+                            : selectedInvoices.length > 1
+                            ? ` (Factures ${selectedInvoices.join(', ')})`
+                            : '';
                           setNewRemark(`Reporté : Gérant non disponible${invoiceSuffix}.${dateSuffix}`);
                         }}
                       >
@@ -720,7 +729,11 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                         className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm"
                         onClick={() => {
                           const dateSuffix = promiseDate ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})` : '';
-                          const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
+                          const invoiceSuffix = selectedInvoices.length === 1
+                            ? ` (Facture ${selectedInvoices[0]})`
+                            : selectedInvoices.length > 1
+                            ? ` (Factures ${selectedInvoices.join(', ')})`
+                            : '';
                           setNewRemark(`Reporté : Problème financier${invoiceSuffix}.${dateSuffix}`);
                         }}
                       >
@@ -810,9 +823,18 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                 <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-center gap-3">
                   <CheckCircle2 className="h-6 w-6 text-emerald-600 flex-shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-emerald-800">Paiement intégral</p>
+                    <p className="text-xs font-bold text-emerald-800">
+                      {selectedInvoices.length > 0
+                        ? `Règlement de ${selectedInvoices.length} facture${selectedInvoices.length > 1 ? 's' : ''} sélectionnée${selectedInvoices.length > 1 ? 's' : ''}`
+                        : 'Paiement intégral du client'}
+                    </p>
                     <p className="text-[10px] font-medium text-emerald-600">
-                      Montant total soldé : <span className="font-bold">{clientActiveDebts.reduce((sum, d) => sum + d.balance, 0).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                      Montant : <span className="font-bold">
+                        {(selectedInvoices.length > 0
+                          ? clientActiveDebts.filter(d => selectedInvoices.includes(d.documentNumber)).reduce((sum, d) => sum + d.balance, 0)
+                          : clientActiveDebts.reduce((sum, d) => sum + d.balance, 0)
+                        ).toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND
+                      </span>
                     </p>
                   </div>
                 </div>
