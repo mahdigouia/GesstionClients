@@ -122,7 +122,35 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
 
   const [selectedStatus, setSelectedStatus] = useState<'none' | 'reporte' | 'paye_partiel' | 'paye' | 'conflit'>('none');
   const [paymentMethod, setPaymentMethod] = useState<'versement' | 'espece' | 'traite' | 'cheque'>('versement');
-  const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
+  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  // Dérivé: pour les opérations à facture unique (payé, reporté)
+  const selectedInvoice = selectedInvoices.length === 1 ? selectedInvoices[0] : null;
+
+  /** Bascule une facture dans la sélection. En mode paye_partiel, met aussi à jour le montant. */
+  const handleInvoiceToggle = (docNumber: string) => {
+    if (selectedStatus === 'paye_partiel') {
+      const newSel = selectedInvoices.includes(docNumber)
+        ? selectedInvoices.filter(n => n !== docNumber)
+        : [...selectedInvoices, docNumber];
+      setSelectedInvoices(newSel);
+      const sum = clientActiveDebts
+        .filter(d => newSel.includes(d.documentNumber))
+        .reduce((s, d) => s + d.balance, 0);
+      setPromiseAmount(sum > 0 ? sum.toString() : '');
+    } else {
+      // Sélection unique (payé, reporté)
+      setSelectedInvoices(prev => prev.includes(docNumber) ? [] : [docNumber]);
+    }
+  };
+
+  /** Revient à « Toutes les factures » et, en paye_partiel, rètablit le total. */
+  const handleSelectAllInvoices = () => {
+    setSelectedInvoices([]);
+    if (selectedStatus === 'paye_partiel') {
+      const total = clientActiveDebts.reduce((s, d) => s + d.balance, 0);
+      setPromiseAmount(total > 0 ? total.toString() : '');
+    }
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -233,7 +261,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       setPromiseAmount('');
       setSelectedStatus('none');
       setPaymentMethod('versement');
-      setSelectedInvoice(null);
+      setSelectedInvoices([]);
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
     }
@@ -277,11 +305,15 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
         ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})`
         : '';
 
-      const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
+      const invoiceSuffix = selectedInvoices.length === 1
+        ? ` (Facture ${selectedInvoices[0]})`
+        : selectedInvoices.length > 1
+        ? ` (Factures ${selectedInvoices.join(', ')})`
+        : '';
 
       setNewRemark(`Payé Partiellement : ${methodText}${invoiceSuffix}.${dateSuffix}`);
     }
-  }, [promiseAmount, paymentMethod, promiseDate, selectedStatus, selectedInvoice]);
+  }, [promiseAmount, paymentMethod, promiseDate, selectedStatus, selectedInvoices]);
 
   // Synchroniser automatiquement le mode de règlement dans le texte pour Payé (total ou par facture)
   useEffect(() => {
@@ -339,7 +371,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       setPromiseDate('');
       setPromiseAmount('');
       setSelectedStatus('none');
-      setSelectedInvoice(null);
+      setSelectedInvoices([]);
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
       onClose();
@@ -360,7 +392,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     setPromiseDate('');
     setPromiseAmount('');
     setSelectedStatus('none');
-    setSelectedInvoice(null);
+    setSelectedInvoices([]);
     setLastAppliedDate('[DATE]');
     setLastAppliedAmount('[MONTANT]');
     onClose();
@@ -614,11 +646,11 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                     variant="outline"
                     size="sm"
                     className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                      selectedInvoice === null
+                      selectedInvoices.length === 0
                         ? 'bg-slate-800 text-white border-slate-800 hover:bg-slate-900'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}
-                    onClick={() => setSelectedInvoice(null)}
+                    onClick={handleSelectAllInvoices}
                   >
                     Toutes les factures
                   </Button>
@@ -629,11 +661,11 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                       variant="outline"
                       size="sm"
                       className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
-                        selectedInvoice === d.documentNumber
+                        selectedInvoices.includes(d.documentNumber)
                           ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
-                      onClick={() => setSelectedInvoice(d.documentNumber)}
+                      onClick={() => handleInvoiceToggle(d.documentNumber)}
                     >
                       <span className="font-mono">{d.documentNumber}</span>
                       <span className="ml-1 opacity-60 text-[9px]">{d.balance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
@@ -769,26 +801,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                   </div>
                 </div>
 
-                {/* Reste non encore payé par facture si > 1 */}
-                {clientActiveDebts.length > 1 && (
-                  <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-2xl space-y-2.5">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
-                      <AlertCircle className="h-3.5 w-3.5" />
-                      <span>Reste non payé par facture :</span>
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
-                      {clientActiveDebts.map((d) => (
-                        <div 
-                          key={d.id} 
-                          className="flex justify-between items-center text-xs font-bold text-slate-700 bg-white px-3 py-2 border border-amber-100/60 rounded-xl shadow-sm"
-                        >
-                          <span className="text-slate-400 font-medium">{d.documentNumber} :</span>
-                          <span className="text-amber-700">{d.balance.toFixed(3).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, " ")} TND</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
             )}
 
