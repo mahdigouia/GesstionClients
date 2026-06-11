@@ -56,7 +56,7 @@ interface ClientRemarkModalProps {
 
 export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddRemark, onUpdateRemark, onDeleteRemark }: ClientRemarkModalProps) {
   const { user, userRole } = useAuth();
-  const { debts } = useDebtContext();
+  const { debts, markInvoiceAsPaid, markClientAsPaid } = useDebtContext();
   const [newRemark, setNewRemark] = useState('');
   const [promiseDate, setPromiseDate] = useState('');
   const [promiseAmount, setPromiseAmount] = useState('');
@@ -122,6 +122,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
 
   const [selectedStatus, setSelectedStatus] = useState<'none' | 'reporte' | 'paye_partiel' | 'paye' | 'conflit'>('none');
   const [paymentMethod, setPaymentMethod] = useState<'versement' | 'espece' | 'traite' | 'cheque'>('versement');
+  const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -232,28 +233,33 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       setPromiseAmount('');
       setSelectedStatus('none');
       setPaymentMethod('versement');
+      setSelectedInvoice(null);
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
     }
   }, [isOpen]);
 
-  // Synchroniser automatiquement la date de prochaine visite dans le texte
+  // Synchroniser automatiquement la date, la facture sélectionnée dans le texte pour Reporté
   useEffect(() => {
-    if (selectedStatus === 'reporte' && promiseDate) {
-      const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
+    if (selectedStatus === 'reporte') {
+      const formattedDate = promiseDate && promiseDate.length === 10
+        ? new Date(promiseDate).toLocaleDateString('fr-FR')
+        : null;
+      const dateSuffix = formattedDate ? ` (Prochaine visite le ${formattedDate})` : '';
+      const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
       setNewRemark(prev => {
         if (prev.startsWith("Reporté : Gérant non disponible")) {
-          return `Reporté : Gérant non disponible. (Prochaine visite le ${formattedDate})`;
+          return `Reporté : Gérant non disponible${invoiceSuffix}.${dateSuffix}`;
         }
         if (prev.startsWith("Reporté : Problème financier")) {
-          return `Reporté : Problème financier. (Prochaine visite le ${formattedDate})`;
+          return `Reporté : Problème financier${invoiceSuffix}.${dateSuffix}`;
         }
         return prev;
       });
     }
-  }, [promiseDate, selectedStatus]);
+  }, [promiseDate, selectedStatus, selectedInvoice]);
 
-  // Synchroniser automatiquement le montant payé, le mode de règlement et la date de prochaine visite dans le texte
+  // Synchroniser automatiquement le montant payé, le mode de règlement, la facture et la date dans le texte
   useEffect(() => {
     if (selectedStatus === 'paye_partiel') {
       const amountVal = promiseAmount ? parseFloat(promiseAmount) : 0;
@@ -271,27 +277,41 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
         ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})`
         : '';
 
-      setNewRemark(`Payé Partiellement : ${methodText}.${dateSuffix}`);
-    }
-  }, [promiseAmount, paymentMethod, promiseDate, selectedStatus]);
+      const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
 
-  // Synchroniser automatiquement le mode de règlement dans le texte pour Payé (total)
+      setNewRemark(`Payé Partiellement : ${methodText}${invoiceSuffix}.${dateSuffix}`);
+    }
+  }, [promiseAmount, paymentMethod, promiseDate, selectedStatus, selectedInvoice]);
+
+  // Synchroniser automatiquement le mode de règlement dans le texte pour Payé (total ou par facture)
   useEffect(() => {
     if (selectedStatus === 'paye') {
-      const totalBal = clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
-      const formattedAmount = totalBal > 0 
-        ? `${totalBal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
+      const relevantDebt = selectedInvoice
+        ? clientActiveDebts.find(d => d.documentNumber === selectedInvoice)
+        : null;
+      const relevantBal = relevantDebt
+        ? relevantDebt.balance
+        : clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
+      const formattedAmount = relevantBal > 0
+        ? `${relevantBal.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND`
         : '[MONTANT]';
 
       let methodText = 'Règlement total.';
-      if (paymentMethod === 'versement') methodText = `Règlement total par versement de ${formattedAmount}`;
-      else if (paymentMethod === 'espece') methodText = `Règlement total en espèce de ${formattedAmount}`;
-      else if (paymentMethod === 'traite') methodText = `Règlement total par traite de ${formattedAmount}`;
-      else if (paymentMethod === 'cheque') methodText = `Règlement total par chèque de ${formattedAmount}`;
+      if (selectedInvoice) {
+        if (paymentMethod === 'versement') methodText = `Règlement total de la facture ${selectedInvoice} par versement de ${formattedAmount}`;
+        else if (paymentMethod === 'espece') methodText = `Règlement total de la facture ${selectedInvoice} en espèce de ${formattedAmount}`;
+        else if (paymentMethod === 'traite') methodText = `Règlement total de la facture ${selectedInvoice} par traite de ${formattedAmount}`;
+        else if (paymentMethod === 'cheque') methodText = `Règlement total de la facture ${selectedInvoice} par chèque de ${formattedAmount}`;
+      } else {
+        if (paymentMethod === 'versement') methodText = `Règlement total par versement de ${formattedAmount}`;
+        else if (paymentMethod === 'espece') methodText = `Règlement total en espèce de ${formattedAmount}`;
+        else if (paymentMethod === 'traite') methodText = `Règlement total par traite de ${formattedAmount}`;
+        else if (paymentMethod === 'cheque') methodText = `Règlement total par chèque de ${formattedAmount}`;
+      }
 
       setNewRemark(`Payé : ${methodText}`);
     }
-  }, [paymentMethod, selectedStatus, debts, clientName]);
+  }, [paymentMethod, selectedStatus, selectedInvoice, debts, clientName]);
 
   const handleAddTemplate = (templateText: string) => {
     let text = templateText;
@@ -306,24 +326,44 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   };
 
   const handleSubmit = () => {
-    if (newRemark.trim()) {
-      let finalRemark = newRemark.trim();
-      if (promiseDate && promiseDate.length === 10) {
-        const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
-        finalRemark = finalRemark.replace(/\[DATE\]/g, formattedDate);
+    if (!newRemark.trim()) return;
+
+    // Pour le statut "Payé", appeler les fonctions contextuelles qui mettent à jour le solde
+    if (selectedStatus === 'paye') {
+      if (selectedInvoice) {
+        markInvoiceAsPaid(selectedInvoice, paymentMethod);
+      } else {
+        markClientAsPaid(clientName, paymentMethod);
       }
-      if (promiseAmount) {
-        finalRemark = finalRemark.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
-      }
-      onAddRemark(clientName, finalRemark, promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
       setNewRemark('');
       setPromiseDate('');
       setPromiseAmount('');
       setSelectedStatus('none');
+      setSelectedInvoice(null);
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
       onClose();
+      return;
     }
+
+    // Pour tous les autres statuts, ajouter la remarque normalement
+    let finalRemark = newRemark.trim();
+    if (promiseDate && promiseDate.length === 10) {
+      const formattedDate = new Date(promiseDate).toLocaleDateString('fr-FR');
+      finalRemark = finalRemark.replace(/\[DATE\]/g, formattedDate);
+    }
+    if (promiseAmount) {
+      finalRemark = finalRemark.replace(/\[MONTANT\]/g, `${promiseAmount} TND`);
+    }
+    onAddRemark(clientName, finalRemark, promiseDate || undefined, promiseAmount ? parseFloat(promiseAmount) : undefined);
+    setNewRemark('');
+    setPromiseDate('');
+    setPromiseAmount('');
+    setSelectedStatus('none');
+    setSelectedInvoice(null);
+    setLastAppliedDate('[DATE]');
+    setLastAppliedAmount('[MONTANT]');
+    onClose();
   };
 
 
@@ -562,6 +602,47 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
               </div>
             </div>
 
+            {/* Sélection de la facture concernée (si le client a plusieurs factures actives) */}
+            {clientActiveDebts.length > 1 && ['paye', 'paye_partiel', 'reporte'].includes(selectedStatus) && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
+                  Facture concernée
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                      selectedInvoice === null
+                        ? 'bg-slate-800 text-white border-slate-800 hover:bg-slate-900'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                    onClick={() => setSelectedInvoice(null)}
+                  >
+                    Toutes les factures
+                  </Button>
+                  {clientActiveDebts.map(d => (
+                    <Button
+                      key={d.documentNumber}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
+                        selectedInvoice === d.documentNumber
+                          ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setSelectedInvoice(d.documentNumber)}
+                    >
+                      <span className="font-mono">{d.documentNumber}</span>
+                      <span className="ml-1 opacity-60 text-[9px]">{d.balance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Champs conditionnels selon le statut de relance */}
             {selectedStatus === 'reporte' && (
               <div className="space-y-3 animate-in fade-in slide-in-from-left-2 duration-300">
@@ -594,7 +675,8 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                         className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm"
                         onClick={() => {
                           const dateSuffix = promiseDate ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})` : '';
-                          setNewRemark(`Reporté : Gérant non disponible.${dateSuffix}`);
+                          const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
+                          setNewRemark(`Reporté : Gérant non disponible${invoiceSuffix}.${dateSuffix}`);
                         }}
                       >
                         Gérant non disponible
@@ -606,7 +688,8 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                         className="h-9 rounded-xl border-slate-200 text-xs font-bold text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all shadow-sm"
                         onClick={() => {
                           const dateSuffix = promiseDate ? ` (Prochaine visite le ${new Date(promiseDate).toLocaleDateString('fr-FR')})` : '';
-                          setNewRemark(`Reporté : Problème financier.${dateSuffix}`);
+                          const invoiceSuffix = selectedInvoice ? ` (Facture ${selectedInvoice})` : '';
+                          setNewRemark(`Reporté : Problème financier${invoiceSuffix}.${dateSuffix}`);
                         }}
                       >
                         Problème financier
@@ -785,10 +868,10 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                   type="button"
                   onClick={handleSubmit}
                   disabled={!newRemark.trim()}
-                  className="h-10 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100"
+                  className="hidden sm:flex h-10 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold items-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:scale-100"
                 >
                   <Send className="h-4 w-4" />
-                  <span className="hidden sm:inline">Enregistrer</span>
+                  Enregistrer
                 </Button>
               </div>
               {isListening && (
@@ -798,6 +881,17 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                 </div>
               )}
             </div>
+
+            {/* Bouton d'envoi bien visible sur mobile */}
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!newRemark.trim()}
+              className="sm:hidden w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 text-sm"
+            >
+              <Send className="h-4 w-4" />
+              Enregistrer la remarque
+            </Button>
           </div>
         </div>
 
