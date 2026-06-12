@@ -62,17 +62,39 @@ export function NotificationPopover() {
     clientName: 'Système'
   } : null;
 
-  // Map db new_user notifications to UI alerts
-  const dbNotifsFormatted = adminNotifications.map(n => ({
-    id: n.id,
-    type: 'new_user',
-    message: n.message,
-    severity: 'high',
-    clientName: 'Nouveau Profil',
-    createdAt: n.createdAt,
-    metadata: n.metadata,
-    isDbNotification: true
-  }));
+  // Map db notifications to UI alerts
+  const dbNotifsFormatted = adminNotifications.map(n => {
+    const type = n.type || 'new_user';
+    let severity = n.severity || 'low';
+    let clientName = 'Notification';
+
+    if (type === 'new_user') {
+      severity = 'high';
+      clientName = 'Nouveau Profil';
+    } else if (type === 'payment') {
+      severity = 'low';
+      clientName = n.metadata?.clientName || 'Paiement';
+    } else if (type === 'conflit') {
+      severity = 'high';
+      clientName = n.metadata?.clientName || 'Conflit';
+    } else if (type === 'visit_reminder') {
+      severity = 'medium';
+      clientName = n.metadata?.clientName || 'Visite';
+    } else {
+      clientName = n.metadata?.clientName || 'Alerte';
+    }
+
+    return {
+      id: n.id,
+      type,
+      message: n.message,
+      severity,
+      clientName,
+      createdAt: n.createdAt,
+      metadata: n.metadata,
+      isDbNotification: true
+    };
+  });
 
   const allNotifications = [
     ...dbNotifsFormatted,
@@ -122,6 +144,8 @@ export function NotificationPopover() {
                     onClick={() => {
                       if (notif.type === 'new_user') {
                         router.push('/settings');
+                      } else if (notif.metadata?.clientName) {
+                        router.push(`/clients?search=${encodeURIComponent(notif.metadata.clientName)}`);
                       }
                     }}
                     className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${isRead ? 'opacity-50 grayscale-[0.5]' : ''}`}
@@ -130,11 +154,17 @@ export function NotificationPopover() {
                       <div className={`
                         mt-1 p-2 rounded-xl flex-shrink-0
                         ${notif.type === 'new_user' ? 'bg-indigo-100 text-indigo-600' :
+                          notif.type === 'conflit' ? 'bg-rose-100 text-rose-600' :
+                          notif.type === 'payment' ? 'bg-emerald-100 text-emerald-600' :
+                          notif.type === 'visit_reminder' ? 'bg-orange-100 text-orange-600' :
                           notif.severity === 'high' ? 'bg-red-100 text-red-600' : 
                           notif.type === 'collaboration' ? 'bg-blue-100 text-blue-600' :
                           'bg-amber-100 text-amber-600'}
                       `}>
                         {notif.type === 'new_user' ? <UserPlus className="h-4 w-4" /> :
+                         notif.type === 'conflit' ? <AlertTriangle className="h-4 w-4" /> :
+                         notif.type === 'payment' ? <CheckCircle2 className="h-4 w-4" /> :
+                         notif.type === 'visit_reminder' ? <Clock className="h-4 w-4" /> :
                          notif.severity === 'high' ? <AlertTriangle className="h-4 w-4" /> :
                          notif.type === 'collaboration' ? <User className="h-4 w-4" /> :
                          <Clock className="h-4 w-4" />}
@@ -162,6 +192,11 @@ export function NotificationPopover() {
                         {notif.type === 'new_user' && (
                           <p className="text-[10px] mt-1 font-bold text-indigo-600 animate-pulse">
                             👉 Cliquer pour affecter un rôle dans les paramètres
+                          </p>
+                        )}
+                        {notif.type === 'visit_reminder' && (
+                          <p className="text-[10px] mt-1 font-bold text-orange-600 animate-pulse">
+                            👉 Cliquer pour voir le client concerné
                           </p>
                         )}
                       </div>
