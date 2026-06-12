@@ -2,7 +2,7 @@
 
 import { useDebtContext } from '@/lib/DebtContext';
 import { Sidebar } from '@/components/Sidebar';
-import { Scale, User, Calendar, FileText, AlertTriangle, DollarSign, Phone, Menu } from 'lucide-react';
+import { Scale, User, Calendar, FileText, AlertTriangle, DollarSign, Phone, Menu, Star } from 'lucide-react';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ export default function ContentieuxPage() {
         clientPhone: debt.clientPhone,
         commercialCode: debt.commercialCode,
         commercialName: debt.commercialName,
+        sourceFile: debt.sourceFile || '',
         debts: [],
         totalAmount: 0,
         totalBalance: 0
@@ -36,7 +37,17 @@ export default function ContentieuxPage() {
     return groups;
   }, {} as Record<string, any>);
   
-  const clientsList = Object.values(clientGroups).sort((a: any, b: any) => b.totalBalance - a.totalBalance);
+  const clientsList = Object.values(clientGroups).sort((a: any, b: any) => {
+    const fileComp = (a.sourceFile || '').localeCompare(b.sourceFile || '');
+    if (fileComp !== 0) return fileComp;
+    return (a.clientCode || '').localeCompare(b.clientCode || '', undefined, { numeric: true });
+  });
+
+  // Trier les factures de chaque client dans le même ordre (extractIndex asc)
+  clientsList.forEach((client: any) => {
+    client.debts.sort((a: any, b: any) => (a.extractIndex || 0) - (b.extractIndex || 0));
+  });
+
   const totalContentieux = contentieuxDebts.reduce((sum, d) => sum + d.balance, 0);
 
   return (
@@ -177,6 +188,9 @@ export default function ContentieuxPage() {
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <FileText className="h-4 w-4 text-gray-400" />
+                                  {debt.isManualContentieux && (
+                                    <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500 flex-shrink-0 animate-pulse" title="Modifié manuellement (ne suit pas les règles d'âge)" />
+                                  )}
                                   <span className="font-bold text-sm truncate">{debt.documentNumber}</span>
                                   <Badge variant="destructive" className="text-[10px] px-1.5 py-0">IC</Badge>
                                 </div>

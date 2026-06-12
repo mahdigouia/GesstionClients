@@ -15,7 +15,7 @@ import { fr } from 'date-fns/locale';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 export function NotificationPopover() {
@@ -23,6 +23,28 @@ export function NotificationPopover() {
   const { user, userRole } = useAuth();
   const router = useRouter();
   const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
+
+  const handleMarkAllAsRead = async () => {
+    // 1. Mark local alerts as read
+    markAllNotificationsAsRead();
+
+    // 2. Mark database notifications as resolved in Firestore
+    if (userRole === 'admin' && adminNotifications.length > 0) {
+      try {
+        const promises = adminNotifications.map(n => {
+          const docRef = doc(db, 'notifications', n.id);
+          return updateDoc(docRef, {
+            status: 'resolved',
+            resolvedAt: new Date().toISOString(),
+            resolvedBy: user?.email || 'unknown'
+          });
+        });
+        await Promise.all(promises);
+      } catch (err) {
+        console.error("Erreur lors de la résolution des notifications :", err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!user || userRole !== 'admin') {
@@ -221,7 +243,7 @@ export function NotificationPopover() {
             variant="ghost" 
             size="sm" 
             className="text-xs text-blue-600 font-bold hover:text-blue-700 disabled:opacity-50"
-            onClick={() => markAllNotificationsAsRead()}
+            onClick={() => handleMarkAllAsRead()}
             disabled={unreadCount === 0}
           >
             Marquer tout comme lu
