@@ -47,9 +47,28 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import Link from 'next/link';
+import { useAuth } from '@/lib/AuthContext';
+import { ClientRemarkModal } from '@/components/ClientRemarkModal';
 
 export default function Home() {
-  const { debts, archiveDebts, analysis, addDebts, updateDebtsFromFile, updateDebtsFromFiles, setDebts, setAnalysis, addRecoveryAction, logAudit } = useDebtContext();
+  const { 
+    debts, 
+    archiveDebts, 
+    analysis, 
+    addDebts, 
+    updateDebtsFromFile, 
+    updateDebtsFromFiles, 
+    setDebts, 
+    setAnalysis, 
+    addRecoveryAction, 
+    logAudit,
+    clientRemarks,
+    addClientRemark,
+    updateClientRemark,
+    deleteClientRemark
+  } = useDebtContext();
+  const { userRole } = useAuth();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -66,6 +85,9 @@ export default function Home() {
   const [selectedClientName, setSelectedClientName] = useState('');
   const [clientHistoryDebts, setClientHistoryDebts] = useState<ClientDebt[]>([]);
   
+  const [isRemarkModalOpen, setIsRemarkModalOpen] = useState(false);
+  const [remarkClientName, setRemarkClientName] = useState('');
+
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [quickActionClient, setQuickActionClient] = useState('');
 
@@ -173,6 +195,11 @@ export default function Home() {
     setSelectedClientName(clientName);
     setClientHistoryDebts(Array.from(combinedMap.values()));
     setIsHistoryModalOpen(true);
+  };
+
+  const handleShowClientRemark = (clientName: string) => {
+    setRemarkClientName(clientName);
+    setIsRemarkModalOpen(true);
   };
 
   const handleExportExcel = () => {
@@ -384,7 +411,11 @@ export default function Home() {
                       }}
                       onNavigateToDetail={() => setActiveTab('table')}
                     />
-                    <Dashboard analysis={analysis} onClientClick={handleShowClientHistory} />
+                    <Dashboard 
+                      analysis={analysis} 
+                      onClientClick={handleShowClientHistory} 
+                      onRelanceClick={handleShowClientRemark}
+                    />
                   </TabsContent>
 
                   <TabsContent value="contacts" className="space-y-6">
@@ -420,6 +451,22 @@ export default function Home() {
             }}
           />
         )}
+
+        {/* Floating shortcut to Clients page ("liste de créances") - Scroll resilient, optimized for mobile */}
+        {debts.length > 0 && (
+          <Link
+            href="/clients"
+            title={userRole === 'commercial' ? "Liste de créances" : "Liste de créances générale"}
+            className="fixed bottom-20 right-4 md:bottom-24 md:right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group"
+          >
+            <Users className="h-6 w-6" />
+            
+            {/* Tooltip on hover */}
+            <span className="absolute right-16 scale-0 group-hover:scale-100 transition-all origin-right bg-slate-900/95 text-white text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap shadow-md pointer-events-none">
+              {userRole === 'commercial' ? "Liste de créances" : "Liste de créances générale"}
+            </span>
+          </Link>
+        )}
       </div>
 
       {/* Filter Modal */}
@@ -444,6 +491,16 @@ export default function Home() {
         onClose={() => setIsQuickActionOpen(false)}
         onSubmit={addRecoveryAction}
         clientName={quickActionClient}
+      />
+
+      <ClientRemarkModal
+        isOpen={isRemarkModalOpen}
+        onClose={() => setIsRemarkModalOpen(false)}
+        clientName={remarkClientName}
+        remarks={clientRemarks[remarkClientName] || []}
+        onAddRemark={addClientRemark}
+        onUpdateRemark={updateClientRemark}
+        onDeleteRemark={deleteClientRemark}
       />
     </div>
   );

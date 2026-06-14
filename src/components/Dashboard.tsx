@@ -49,9 +49,10 @@ interface DashboardProps {
   analysis: AnalysisResult;
   onViewDetail?: () => void;
   onClientClick?: (clientName: string) => void;
+  onRelanceClick?: (clientName: string) => void;
 }
 
-export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardProps) {
+export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClick }: DashboardProps) {
   const { history } = useDebtContext();
   const { userRole } = useAuth();
   const [selectedRisk, setSelectedRisk] = useState<string | null>(null);
@@ -99,7 +100,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
   return (
     <div className="space-y-6">
       {/* Agenda des Promesses de Paiement (Nouveau - Tableau de Bord Commercial) */}
-      <PaymentPromisesAgenda onClientClick={onClientClick} />
+      <PaymentPromisesAgenda onClientClick={onClientClick} onRelanceClick={onRelanceClick} />
 
       {/* Opportunités de Liquidité Rapide & Clients à Risque Élevé */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -28,6 +28,7 @@ import {
 
 interface PaymentPromisesAgendaProps {
   onClientClick?: (clientName: string) => void;
+  onRelanceClick?: (clientName: string) => void;
 }
 
 interface PromiseItem extends ClientRemark {
@@ -36,7 +37,7 @@ interface PromiseItem extends ClientRemark {
   commercialCode?: string;
 }
 
-export function PaymentPromisesAgenda({ onClientClick }: PaymentPromisesAgendaProps) {
+export function PaymentPromisesAgenda({ onClientClick, onRelanceClick }: PaymentPromisesAgendaProps) {
   const { debts, archiveDebts, clientRemarks } = useDebtContext();
   const { userRole, commercialCode } = useAuth();
   
@@ -471,7 +472,7 @@ export function PaymentPromisesAgenda({ onClientClick }: PaymentPromisesAgendaPr
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => onClientClick?.(promise.clientName)}
+                                  onClick={() => onRelanceClick ? onRelanceClick(promise.clientName) : onClientClick?.(promise.clientName)}
                                   className="h-8 pl-3 pr-2.5 rounded-xl border border-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-500 text-xs font-black group"
                                 >
                                   Relance
