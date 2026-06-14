@@ -25,26 +25,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
     if (!user && !isPublicRoute) {
       router.push('/login');
     } else if (user && isPublicRoute) {
-      if (userRole === 'commercial') {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('commercial_landed', 'true');
-        }
-        router.push('/clients');
-      } else {
-        router.push('/');
-      }
+      router.push('/');
     } else if (user && userRole === 'commercial' && pathname === '/import') {
-      // Redirect commercials trying to import to their clients page
-      router.push('/clients');
-    } else if (user && userRole === 'commercial' && pathname === '/') {
-      // Landing redirect for commercial accounts when opening the app or fresh session
-      if (typeof window !== 'undefined') {
-        const hasLanded = sessionStorage.getItem('commercial_landed');
-        if (!hasLanded) {
-          sessionStorage.setItem('commercial_landed', 'true');
-          router.push('/clients');
-        }
-      }
+      // Redirect commercials trying to import to dashboard
+      router.push('/');
     }
   }, [user, loading, userRole, pathname, router]);
 

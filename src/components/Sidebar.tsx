@@ -55,6 +55,17 @@ export function Sidebar({ className, mobileOpen, onMobileClose }: SidebarProps) 
       return false;
     }
     return true;
+  }).map(item => {
+    if (item.href === '/clients') {
+      let name = item.name;
+      if (userRole === 'admin' || userRole === 'gestionnaire') {
+        name = 'Liste de créances générale';
+      } else if (userRole === 'commercial') {
+        name = 'Liste de créances';
+      }
+      return { ...item, name };
+    }
+    return item;
   });
 
   const getRoleLabel = () => {

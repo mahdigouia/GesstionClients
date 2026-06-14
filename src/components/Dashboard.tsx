@@ -98,105 +98,10 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards avec design moderne */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-100">Total Créances</CardTitle>
-            <div className="p-2 bg-white/20 rounded-lg">
-              <DollarSign className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {Number(analysis.totalDebts || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-lg">TND</span>
-            </div>
-            <div className="text-[10px] opacity-80 font-normal mt-0.5">(Total facturé)</div>
-            <div className="flex items-center gap-1 mt-2 text-blue-100 text-sm">
-              <ArrowUpRight className="h-4 w-4" />
-              <span>{Number(analysis.totalBalance || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TND en attente</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-emerald-100 leading-tight">
-              Taux d'Impayés Global <br />
-              <span className="text-[10px] font-normal opacity-80">(Formule: Σ Solde / Σ Montant)</span>
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-emerald-200" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {Number(analysis.globalUnpaidRate || 0).toFixed(1)}%
-            </div>
-            <div className="mt-3">
-              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-white rounded-full transition-all duration-500"
-                  style={{ width: `${Math.max(0, 100 - Number(analysis.globalUnpaidRate || 0))}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-
-        <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-violet-100">Clients Actifs</CardTitle>
-            <div className="p-2 bg-white/20 rounded-lg">
-              <Users className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {analysis.clientBreakdown?.length || 0}
-            </div>
-            <div className="flex items-center gap-1 mt-2 text-violet-100 text-sm">
-              <span>{analysis.clientBreakdown?.filter(c => c.totalBalance > 0).length || 0} avec solde impayé</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-              onClick={() => setShowNotifications(!showNotifications)}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-red-100">Alertes Critiques</CardTitle>
-            <div className="p-2 bg-white/20 rounded-lg relative">
-              <Bell className="h-4 w-4 text-white" />
-              {(analysis.alerts?.filter(a => a.severity === 'high').length || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {analysis.alerts?.filter(a => a.severity === 'high').length || 0}
-            </div>
-            <div className="flex items-center gap-1 mt-2 text-red-100 text-sm">
-              <AlertTriangle className="h-4 w-4" />
-              <span>{analysis.alerts?.length || 0} alertes totales - Cliquez pour voir</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Historique d'Évolution (Pro) */}
-      <DebtEvolutionChart history={history} />
-
-      {/* Prévisions de Recouvrement (Nouveau) */}
-      <RecoveryForecast />
-
       {/* Agenda des Promesses de Paiement (Nouveau - Tableau de Bord Commercial) */}
       <PaymentPromisesAgenda onClientClick={onClientClick} />
 
-      {/* Analyse par Commercial (Nouveau) */}
-      {userRole !== 'commercial' && (
-        <CommercialAnalysis analysis={analysis} history={history} />
-      )}
-
+      {/* Opportunités de Liquidité Rapide & Clients à Risque Élevé */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Potential Liquidity Opportunities */}
         <Card className="border-0 shadow-xl bg-white overflow-hidden">
@@ -307,6 +212,102 @@ export function Dashboard({ analysis, onViewDetail, onClientClick }: DashboardPr
           </CardContent>
         </Card>
       </div>
+
+      {/* KPI Cards avec design moderne */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-blue-100">Total Créances</CardTitle>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <DollarSign className="h-4 w-4 text-white" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {Number(analysis.totalDebts || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} <span className="text-lg">TND</span>
+            </div>
+            <div className="text-[10px] opacity-80 font-normal mt-0.5">(Total facturé)</div>
+            <div className="flex items-center gap-1 mt-2 text-blue-100 text-sm">
+              <ArrowUpRight className="h-4 w-4" />
+              <span>{Number(analysis.totalBalance || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} TND en attente</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-emerald-100 leading-tight">
+              Taux d'Impayés Global <br />
+              <span className="text-[10px] font-normal opacity-80">(Formule: Σ Solde / Σ Montant)</span>
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-emerald-200" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {Number(analysis.globalUnpaidRate || 0).toFixed(1)}%
+            </div>
+            <div className="mt-3">
+              <div className="h-2 bg-white/30 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-white rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(0, 100 - Number(analysis.globalUnpaidRate || 0))}%` }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+
+        <Card className="bg-gradient-to-br from-violet-500 to-violet-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-violet-100">Clients Actifs</CardTitle>
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Users className="h-4 w-4 text-white" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {analysis.clientBreakdown?.length || 0}
+            </div>
+            <div className="flex items-center gap-1 mt-2 text-violet-100 text-sm">
+              <span>{analysis.clientBreakdown?.filter(c => c.totalBalance > 0).length || 0} avec solde impayé</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+              onClick={() => setShowNotifications(!showNotifications)}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-red-100">Alertes Critiques</CardTitle>
+            <div className="p-2 bg-white/20 rounded-lg relative">
+              <Bell className="h-4 w-4 text-white" />
+              {(analysis.alerts?.filter(a => a.severity === 'high').length || 0) > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {analysis.alerts?.filter(a => a.severity === 'high').length || 0}
+            </div>
+            <div className="flex items-center gap-1 mt-2 text-red-100 text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{analysis.alerts?.length || 0} alertes totales - Cliquez pour voir</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Historique d'Évolution (Pro) */}
+      <DebtEvolutionChart history={history} />
+
+      {/* Prévisions de Recouvrement (Nouveau) */}
+      <RecoveryForecast />
+
+      {/* Analyse par Commercial (Nouveau) */}
+      {userRole !== 'commercial' && (
+        <CommercialAnalysis analysis={analysis} history={history} />
+      )}
 
       {/* Notifications Panel */}
       {showNotifications && analysis.alerts.length > 0 && (

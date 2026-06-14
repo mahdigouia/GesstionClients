@@ -453,7 +453,13 @@ export default function ClientsPage() {
                   <Users className="h-5 w-5 md:h-7 md:w-7 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg md:text-2xl font-bold text-slate-800 tracking-tight">Portefeuille Clients</h1>
+                  <h1 className="text-lg md:text-2xl font-bold text-slate-800 tracking-tight">
+                    {userRole === 'admin' || userRole === 'gestionnaire' 
+                      ? 'Liste de créances générale' 
+                      : userRole === 'commercial' 
+                        ? 'Liste de créances' 
+                        : 'Portefeuille Clients'}
+                  </h1>
                   <p className="text-slate-500 text-[10px] md:text-sm font-medium">
                     {filteredClients.length} clients affichés
                   </p>
