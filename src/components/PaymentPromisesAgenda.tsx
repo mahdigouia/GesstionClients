@@ -392,7 +392,7 @@ export function PaymentPromisesAgenda({ onClientClick, onRelanceClick }: Payment
                             <div className="flex-1 space-y-2">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span 
-                                  onClick={() => onClientClick?.(promise.clientName)}
+                                  onClick={() => onRelanceClick ? onRelanceClick(promise.clientName) : onClientClick?.(promise.clientName)}
                                   className="text-sm font-black text-slate-800 hover:text-blue-600 cursor-pointer transition-colors"
                                 >
                                   {promise.clientName}
