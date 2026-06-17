@@ -413,7 +413,7 @@ export default function Home() {
                     />
                     <Dashboard 
                       analysis={analysis} 
-                      onClientClick={handleShowClientHistory} 
+                      onClientClick={handleShowClientRemark} 
                       onRelanceClick={handleShowClientRemark}
                     />
                   </TabsContent>
@@ -426,7 +426,7 @@ export default function Home() {
                     <DebtTable 
                       debts={filteredDebts.length > 0 ? filteredDebts : debts} 
                       onExport={(filteredDebts) => ExportService.exportToExcel(filteredDebts, analysis || undefined, logAudit)}
-                      onClientClick={handleShowClientHistory}
+                      onClientClick={handleShowClientRemark}
                       onQuickAction={(clientName) => {
                         setQuickActionClient(clientName);
                         setIsQuickActionOpen(true);
