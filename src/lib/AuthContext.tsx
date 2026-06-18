@@ -10,7 +10,7 @@ import {
   User,
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -66,8 +66,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setCommercialCode(data.commercialCode || null);
             }
           } else {
-            // Créer le document utilisateur s'il n'existe pas encore (ex. utilisateur déjà inscrit avant cette fonctionnalité)
-            const defaultRole = isDefaultAdmin ? 'admin' : 'pending';
+            // Document non trouvé. Vérifier s'il y a une sauvegarde dans shared_data/users_backup
+            let backupRole = isDefaultAdmin ? 'admin' : 'pending';
+            let backupCode = null;
+
+            try {
+              const backupDocRef = doc(db, 'shared_data', 'users_backup');
+              const backupSnap = await getDoc(backupDocRef);
+              if (backupSnap.exists()) {
+                const backupData = backupSnap.data();
+                const userBackup = backupData[uid];
+                if (userBackup) {
+                  backupRole = userBackup.role || backupRole;
+                  backupCode = userBackup.commercialCode || null;
+                  console.log(`[AuthContext] Restauration du rôle de l'utilisateur ${uid} depuis la sauvegarde :`, { role: backupRole, code: backupCode });
+                }
+              }
+            } catch (err) {
+              console.error("[AuthContext] Erreur lors de la lecture de la sauvegarde :", err);
+            }
+
             const nameParts = currentUser.displayName?.split(' ') || ['Utilisateur'];
             const firstName = nameParts[0];
             const lastName = nameParts.slice(1).join(' ') || '';
@@ -78,13 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               fullName: currentUser.displayName || 'Utilisateur',
               firstName,
               lastName,
-              role: defaultRole,
-              commercialCode: null,
+              role: backupRole,
+              commercialCode: backupCode,
               createdAt: new Date().toISOString()
             });
 
-            setUserRole(defaultRole);
-            setCommercialCode(null);
+            setUserRole(backupRole);
+            setCommercialCode(backupCode);
 
             // Créer la notification admin si ce n'est pas un admin par défaut
             if (defaultRole === 'pending') {

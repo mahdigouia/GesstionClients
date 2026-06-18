@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc, deleteDoc, setDoc, deleteField } from 'firebase/firestore';
 import { History, FileClock, FileCode, Eye, Bell, BellOff, Smartphone, ShieldCheck } from 'lucide-react';
 import { 
   Dialog, 
@@ -235,6 +235,21 @@ export default function SettingsPage() {
         commercialCode: newRole === 'commercial' ? commercialCode : null
       });
 
+      // Sauvegarder également dans la collection de sauvegarde
+      try {
+        const backupRef = doc(db, 'shared_data', 'users_backup');
+        await setDoc(backupRef, {
+          [userId]: {
+            role: newRole,
+            commercialCode: newRole === 'commercial' ? commercialCode : null,
+            email: userEmail,
+            updatedAt: new Date().toISOString()
+          }
+        }, { merge: true });
+      } catch (backupErr) {
+        console.error('Erreur lors de la mise à jour de la sauvegarde :', backupErr);
+      }
+
       // Si le compte est promu, on résout la notification pending
       const notifRef = doc(db, 'notifications', `new_user_${userId}`);
       try {
@@ -275,6 +290,16 @@ export default function SettingsPage() {
       try {
         const userRef = doc(db, 'users', userId);
         await deleteDoc(userRef);
+
+        // Supprimer également de la sauvegarde
+        try {
+          const backupRef = doc(db, 'shared_data', 'users_backup');
+          await updateDoc(backupRef, {
+            [userId]: deleteField()
+          });
+        } catch (backupErr) {
+          console.error('Erreur lors du nettoyage de la sauvegarde :', backupErr);
+        }
         
         // Log audit
         await logAudit(
