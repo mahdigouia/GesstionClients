@@ -442,14 +442,19 @@ export class OCRService {
       if (skipNext) { skipNext = false; continue; }
       
       if (i === 0 && /^\d{1,3}$/.test(tokens[i])) {
-        // Test si c'est un âge à 2 tokens (ex: "2" "455")
-        if (i + 1 < tokens.length && /^\d{3}$/.test(tokens[i+1])) {
-          age = parseInt(tokens[i] + tokens[i+1]);
+        // Test si c'est un âge à 2 tokens (ex: "2" "455") avec un NbrJP après
+        const mergedAge = parseInt(tokens[i] + tokens[i+1]);
+        if (
+          i + 1 < tokens.length && 
+          /^\d{3}$/.test(tokens[i+1]) && 
+          mergedAge < 4000 && 
+          i + 2 < tokens.length && 
+          /^\d+$/.test(tokens[i+2])
+        ) {
+          age = mergedAge;
           skipNext = true;
-          if (i + 2 < tokens.length && /^\d+$/.test(tokens[i+2])) {
-            nbr_jp = parseInt(tokens[i+2]);
-            i += 2; skipNext = false;
-          }
+          nbr_jp = parseInt(tokens[i+2]);
+          i += 2; skipNext = false;
         } else {
           age = parseInt(tokens[i]);
           if (i + 1 < tokens.length && /^\d+$/.test(tokens[i+1])) {

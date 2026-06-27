@@ -314,11 +314,17 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         if numeric_tokens:
             first_val = numeric_tokens[0][1]
             # Cas spécial: âge avec millier séparé (ex: "2 455")
-            if len(numeric_tokens) >= 2 and len(numeric_tokens[1][1]) == 3 and numeric_tokens[1][0] == numeric_tokens[0][0] + 1:
+            merged_age = int(first_val + numeric_tokens[1][1]) if len(numeric_tokens) >= 2 else 0
+            if (
+                len(numeric_tokens) >= 3 
+                and len(numeric_tokens[1][1]) == 3 
+                and numeric_tokens[1][0] == numeric_tokens[0][0] + 1
+                and merged_age < 4000
+                and numeric_tokens[2][0] <= numeric_tokens[1][0] + 2
+            ):
                 # On fusionne les deux premiers tokens pour l'âge
-                age = int(first_val + numeric_tokens[1][1])
-                if len(numeric_tokens) > 2:
-                    nbr_jp = int(numeric_tokens[2][1])
+                age = merged_age
+                nbr_jp = int(numeric_tokens[2][1])
             else:
                 # Cas standard
                 age = int(first_val)
@@ -407,10 +413,18 @@ def parse_text_line(line: str, client: Dict[str, str], context: ExtractionContex
         # Enlever l'âge et nbr_jp (les tokens exacts)
         used_age_tokens = []
         if numeric_tokens:
-            if len(numeric_tokens) >= 2 and len(numeric_tokens[1][1]) == 3 and numeric_tokens[1][0] == numeric_tokens[0][0] + 1:
+            first_val = numeric_tokens[0][1]
+            merged_age = int(first_val + numeric_tokens[1][1]) if len(numeric_tokens) >= 2 else 0
+            if (
+                len(numeric_tokens) >= 3 
+                and len(numeric_tokens[1][1]) == 3 
+                and numeric_tokens[1][0] == numeric_tokens[0][0] + 1
+                and merged_age < 4000
+                and numeric_tokens[2][0] <= numeric_tokens[1][0] + 2
+            ):
                 used_age_tokens.append(numeric_tokens[0][1])
                 used_age_tokens.append(numeric_tokens[1][1])
-                if len(numeric_tokens) > 2: used_age_tokens.append(numeric_tokens[2][1])
+                used_age_tokens.append(numeric_tokens[2][1])
             else:
                 used_age_tokens.append(numeric_tokens[0][1])
                 if len(numeric_tokens) > 1 and numeric_tokens[1][0] <= numeric_tokens[0][0] + 2:
