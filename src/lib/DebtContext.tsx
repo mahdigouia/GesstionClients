@@ -1182,13 +1182,38 @@ function cleanUndefined(obj: any): any {
     await logAction('Paiement Client', `Client ${clientName} marqué comme payé (${totalBalance} TND) via ${methodLabel}`);
   };
 
+  // Memoized and filtered client remarks: hide remarks for invoices that no longer exist in the import
+  const filteredClientRemarks = React.useMemo(() => {
+    const filtered: Record<string, ClientRemark[]> = {};
+    
+    Object.keys(clientRemarks).forEach(clientName => {
+      const activeInvoices = new Set(
+        rawDebts
+          .filter(d => d.clientName === clientName)
+          .map(d => d.documentNumber.toUpperCase())
+      );
+
+      filtered[clientName] = (clientRemarks[clientName] || []).filter(remark => {
+        // Match document number prefixes FT, FS, AVS, AVT, FRS, FRT
+        const matches = remark.content.match(/\b((?:FT|FS|AVS|AVT|FRS|FRT)\w+)\b/gi);
+        if (!matches || matches.length === 0) {
+          return true; // General remark
+        }
+        // Keep only if at least one mentioned invoice is still active
+        return matches.some(match => activeInvoices.has(match.toUpperCase()));
+      });
+    });
+
+    return filtered;
+  }, [clientRemarks, rawDebts]);
+
   return (
     <DebtContext.Provider value={{ 
       debts, 
       archiveDebts,
       analysis, 
       recoveryActions,
-      clientRemarks,
+      clientRemarks: filteredClientRemarks,
       setDebts, 
       setAnalysis, 
       addDebts, 
