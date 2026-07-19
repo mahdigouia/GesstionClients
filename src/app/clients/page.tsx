@@ -1005,7 +1005,7 @@ export default function ClientsPage() {
                                         <span>{paymentRatio.toFixed(0)}%</span>
                                         <Target className="h-2.5 w-2.5 md:h-3 md:w-3 text-slate-300" />
                                       </div>
-                                      <Progress value={paymentRatio} className="h-1 md:h-1.5 bg-slate-100" />
+                                      <Progress value={paymentRatio} className="h-1 md:h-1.5 bg-red-500 overflow-hidden" indicatorClassName="bg-green-500" />
                                     </div>
                                   </TableCell>
                                 </TableRow>
@@ -1103,7 +1103,7 @@ export default function ClientsPage() {
                                   <span>Progression du règlement</span>
                                   <span>{paymentRatio.toFixed(0)}%</span>
                                 </div>
-                                <Progress value={paymentRatio} className="h-1 bg-slate-200" />
+                                <Progress value={paymentRatio} className="h-1 bg-red-500 overflow-hidden" indicatorClassName="bg-green-500" />
                               </div>
                             </div>
                           );
