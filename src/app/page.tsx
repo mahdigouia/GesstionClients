@@ -398,19 +398,21 @@ export default function Home() {
                   </div>
 
                   <TabsContent value="dashboard" className="space-y-6">
-                    <QuickFilters 
-                      debts={debts}
-                      onFilterChange={(filtered, activeFilter) => {
-                        setFilteredDebts(filtered);
-                        // Open modal if not 'all'
-                        if (activeFilter !== 'all') {
-                          setModalFilteredDebts(filtered);
-                          setActiveFilterName(activeFilter);
-                          setIsFilterModalOpen(true);
-                        }
-                      }}
-                      onNavigateToDetail={() => setActiveTab('table')}
-                    />
+                    {userRole !== 'commercial' && (
+                      <QuickFilters 
+                        debts={debts}
+                        onFilterChange={(filtered, activeFilter) => {
+                          setFilteredDebts(filtered);
+                          // Open modal if not 'all'
+                          if (activeFilter !== 'all') {
+                            setModalFilteredDebts(filtered);
+                            setActiveFilterName(activeFilter);
+                            setIsFilterModalOpen(true);
+                          }
+                        }}
+                        onNavigateToDetail={() => setActiveTab('table')}
+                      />
+                    )}
                     <Dashboard 
                       analysis={analysis} 
                       onClientClick={handleShowClientRemark} 
@@ -444,11 +446,13 @@ export default function Home() {
           <VoiceAssistant 
             debts={debts} 
             analysis={analysis} 
+            userRole={userRole}
             onShowResults={(results, title) => {
               setModalFilteredDebts(results);
               setActiveFilterName(title);
               setIsFilterModalOpen(true);
             }}
+            onClientClick={handleShowClientRemark}
           />
         )}
 

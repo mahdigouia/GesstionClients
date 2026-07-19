@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,14 +15,14 @@ import {
   Copy,
   CheckCircle2,
   Send,
-  ArrowRight
+  ArrowRight,
+  Search
 } from 'lucide-react';
 import { ClientDebt, AnalysisResult } from '@/types/debt';
 import { voiceNLP, VoiceResponse } from '@/lib/voiceNLP';
+import { QuickClientProfile } from './QuickClientProfile';
 import { 
   ResponsiveContainer, 
-  LineChart, 
-  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -98,7 +98,9 @@ interface ISpeechRecognition extends EventTarget {
 interface VoiceAssistantProps {
   debts: ClientDebt[];
   analysis: AnalysisResult | null;
+  userRole?: 'admin' | 'gestionnaire' | 'commercial' | 'pending' | null;
   onShowResults?: (results: ClientDebt[], title: string) => void;
+  onClientClick?: (clientName: string) => void;
 }
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
@@ -111,7 +113,227 @@ interface ConversationMessage {
   data?: VoiceResponse;
 }
 
-export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistantProps) {
+// ===== INTELLIGENT CLIENT NAME MATCHING =====
+
+/**
+ * Normalize a string for fuzzy matching:
+ * - Lowercase
+ * - Remove accents
+ * - Collapse multiple spaces
+ * - Handle abbreviations (STE -> SOCIETE, ETS -> ETABLISSEMENT, etc.)
+ */
+function normalizeForMatching(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/[^a-z0-9\s]/g, ' ')    // Replace special chars with spaces
+    .replace(/\s+/g, ' ')            // Collapse spaces
+    .trim();
+}
+
+/**
+ * Remove all spaces/separators to create a "collapsed" version for letter-by-letter matching
+ * e.g., "SO MO CO D" -> "somocod", "so mo co d" -> "somocod"
+ */
+function collapseString(str: string): string {
+  return normalizeForMatching(str).replace(/\s/g, '');
+}
+
+/**
+ * Generate alternative forms of client names for matching.
+ * Handles abbreviations, letter-by-letter names, etc.
+ */
+function generateAlternatives(clientName: string): string[] {
+  const alts: string[] = [
+    normalizeForMatching(clientName),
+    collapseString(clientName),
+  ];
+
+  // Add word-initials version: "SOCIETE SUPER DISTRIBUTION" -> "ssd"
+  const words = normalizeForMatching(clientName).split(' ').filter(w => w.length > 0);
+  if (words.length > 1) {
+    alts.push(words.map(w => w[0]).join(''));
+  }
+
+  // Add without common prefixes
+  const prefixes = ['societe', 'ste', 'ets', 'etablissement', 'sarl', 'sa', 'srl'];
+  for (const prefix of prefixes) {
+    const norm = normalizeForMatching(clientName);
+    if (norm.startsWith(prefix + ' ')) {
+      alts.push(norm.substring(prefix.length + 1).trim());
+      alts.push(collapseString(norm.substring(prefix.length + 1)));
+    }
+  }
+
+  return alts;
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b[i - 1] === a[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Smart fuzzy match: find the best matching client from speech input.
+ * Handles:
+ *   - Exact match
+ *   - Letter-by-letter names ("S O M O C O D" -> "SO MO CO D")
+ *   - Fuzzy Levenshtein match
+ *   - Partial word matching
+ *   - Abbreviation expansion
+ */
+function findBestClientMatchSmart(
+  spokenText: string, 
+  clientNames: string[]
+): { name: string; score: number } | null {
+  const normalizedInput = normalizeForMatching(spokenText);
+  const collapsedInput = collapseString(spokenText);
+  
+  let bestMatch: { name: string; score: number } | null = null;
+  let bestScore = 0;
+  
+  for (const clientName of clientNames) {
+    const alternatives = generateAlternatives(clientName);
+    let maxScore = 0;
+    
+    for (const alt of alternatives) {
+      // 1. Exact match on normalized form
+      if (alt === normalizedInput || alt === collapsedInput) {
+        maxScore = Math.max(maxScore, 1.0);
+        continue;
+      }
+      
+      // 2. Collapsed form match (handles "SO MO CO D" spoken as "somocod")
+      const collapsedAlt = alt.replace(/\s/g, '');
+      if (collapsedAlt === collapsedInput) {
+        maxScore = Math.max(maxScore, 0.98);
+        continue;
+      }
+      
+      // 3. Input contains the alternative or vice versa
+      if (normalizedInput.includes(alt) || alt.includes(normalizedInput)) {
+        const ratio = Math.min(normalizedInput.length, alt.length) / Math.max(normalizedInput.length, alt.length);
+        maxScore = Math.max(maxScore, 0.7 + ratio * 0.2);
+        continue;
+      }
+      
+      // 4. Collapsed contains check
+      if (collapsedInput.includes(collapsedAlt) || collapsedAlt.includes(collapsedInput)) {
+        const ratio = Math.min(collapsedInput.length, collapsedAlt.length) / Math.max(collapsedInput.length, collapsedAlt.length);
+        maxScore = Math.max(maxScore, 0.65 + ratio * 0.2);
+        continue;
+      }
+
+      // 5. Word-level matching: check if all words of input appear in the client name
+      const inputWords = normalizedInput.split(' ').filter(w => w.length > 1);
+      const altWords = alt.split(' ').filter(w => w.length > 0);
+      if (inputWords.length > 0 && altWords.length > 0) {
+        const matchingWords = inputWords.filter(iw => 
+          altWords.some(aw => aw.startsWith(iw) || iw.startsWith(aw))
+        );
+        const wordScore = matchingWords.length / Math.max(inputWords.length, altWords.length);
+        if (wordScore > 0.5) {
+          maxScore = Math.max(maxScore, 0.5 + wordScore * 0.3);
+        }
+      }
+      
+      // 6. Levenshtein similarity on collapsed forms
+      const maxLen = Math.max(collapsedInput.length, collapsedAlt.length);
+      if (maxLen > 0 && maxLen < 30) {
+        const dist = levenshteinDistance(collapsedInput, collapsedAlt);
+        const similarity = 1 - dist / maxLen;
+        if (similarity > 0.6) {
+          maxScore = Math.max(maxScore, similarity * 0.85);
+        }
+      }
+    }
+    
+    if (maxScore > bestScore) {
+      bestScore = maxScore;
+      bestMatch = { name: clientName, score: maxScore };
+    }
+  }
+  
+  // Minimum threshold
+  return bestMatch && bestScore >= 0.5 ? bestMatch : null;
+}
+
+/**
+ * Find top N matching clients (for suggestions when confidence is not high enough)
+ */
+function findTopClientMatches(
+  spokenText: string,
+  clientNames: string[],
+  topN: number = 3
+): { name: string; score: number }[] {
+  const results: { name: string; score: number }[] = [];
+  
+  for (const clientName of clientNames) {
+    const alternatives = generateAlternatives(clientName);
+    const normalizedInput = normalizeForMatching(spokenText);
+    const collapsedInput = collapseString(spokenText);
+    let maxScore = 0;
+    
+    for (const alt of alternatives) {
+      const collapsedAlt = alt.replace(/\s/g, '');
+      
+      // Same scoring as findBestClientMatchSmart but collect all
+      if (alt === normalizedInput || collapsedAlt === collapsedInput) {
+        maxScore = 1.0;
+      } else if (normalizedInput.includes(alt) || alt.includes(normalizedInput)) {
+        const ratio = Math.min(normalizedInput.length, alt.length) / Math.max(normalizedInput.length, alt.length);
+        maxScore = Math.max(maxScore, 0.7 + ratio * 0.2);
+      } else if (collapsedInput.includes(collapsedAlt) || collapsedAlt.includes(collapsedInput)) {
+        const ratio = Math.min(collapsedInput.length, collapsedAlt.length) / Math.max(collapsedInput.length, collapsedAlt.length);
+        maxScore = Math.max(maxScore, 0.65 + ratio * 0.2);
+      } else {
+        const maxLen = Math.max(collapsedInput.length, collapsedAlt.length);
+        if (maxLen > 0 && maxLen < 30) {
+          const dist = levenshteinDistance(collapsedInput, collapsedAlt);
+          const similarity = 1 - dist / maxLen;
+          if (similarity > 0.4) {
+            maxScore = Math.max(maxScore, similarity * 0.85);
+          }
+        }
+      }
+    }
+    
+    if (maxScore > 0.3) {
+      results.push({ name: clientName, score: maxScore });
+    }
+  }
+  
+  return results.sort((a, b) => b.score - a.score).slice(0, topN);
+}
+
+
+// ===== MAIN COMPONENT =====
+
+export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onClientClick }: VoiceAssistantProps) {
+  const isCommercial = userRole === 'commercial';
+  
   const [isOpen, setIsOpen] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -120,6 +342,12 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [textInput, setTextInput] = useState('');
   const [recognitionLang, setRecognitionLang] = useState<'fr-FR' | 'ar-TN'>('fr-FR');
+  
+  // Commercial-specific state
+  const [isDirectListening, setIsDirectListening] = useState(false);
+  const [matchedClient, setMatchedClient] = useState<string | null>(null);
+  const [matchSuggestions, setMatchSuggestions] = useState<{ name: string; score: number }[]>([]);
+  const [listeningFeedback, setListeningFeedback] = useState<string>('');
   
   const recognitionRef = useRef<ISpeechRecognition | null>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -131,10 +359,19 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Get unique client names for the LLM
-  const clientNames = Array.from(new Set(debts.map(d => d.clientName)));
+  // Get unique client names for matching
+  const clientNames = useMemo(() => 
+    Array.from(new Set(debts.map(d => d.clientName))),
+    [debts]
+  );
 
-  // Handle voice command
+  // Get client debts for the matched client
+  const matchedClientDebts = useMemo(() => {
+    if (!matchedClient) return [];
+    return debts.filter(d => d.clientName === matchedClient);
+  }, [matchedClient, debts]);
+
+  // Handle voice command (non-commercial mode - existing behavior)
   const handleVoiceCommand = useCallback(async (command: string) => {
     setVoiceState('processing');
     
@@ -196,8 +433,40 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     }
   }, [debts, analysis, isMuted, clientNames]);
 
+  // Handle commercial direct client search from voice
+  const handleCommercialVoiceSearch = useCallback((spokenText: string) => {
+    setVoiceState('processing');
+    setListeningFeedback(`Recherche: "${spokenText}"...`);
+    
+    // Try all alternatives from speech recognition
+    const bestMatch = findBestClientMatchSmart(spokenText, clientNames);
+    
+    if (bestMatch && bestMatch.score >= 0.7) {
+      // High confidence match - show client directly
+      setMatchedClient(bestMatch.name);
+      setMatchSuggestions([]);
+      setListeningFeedback(`✅ Client trouvé: ${bestMatch.name}`);
+      setVoiceState('idle');
+      
+      // Auto-close listening overlay after a short delay
+      setTimeout(() => {
+        setIsDirectListening(false);
+      }, 500);
+    } else {
+      // Low confidence - show suggestions
+      const suggestions = findTopClientMatches(spokenText, clientNames, 5);
+      if (suggestions.length > 0) {
+        setMatchSuggestions(suggestions);
+        setListeningFeedback(`🔍 Suggestions pour "${spokenText}"`);
+      } else {
+        setListeningFeedback(`❌ Aucun client trouvé pour "${spokenText}"`);
+      }
+      setVoiceState('idle');
+    }
+  }, [clientNames]);
+
   // Initialize speech recognition
-  const initSpeechRecognition = useCallback(() => {
+  const initSpeechRecognition = useCallback((isCommercialDirect: boolean = false) => {
     if (typeof window === 'undefined') return null;
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -210,7 +479,8 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = recognitionLang;
-    recognition.maxAlternatives = 1;
+    // Use multiple alternatives for better matching
+    recognition.maxAlternatives = isCommercialDirect ? 5 : 1;
 
     recognition.onstart = () => {
       setVoiceState('listening');
@@ -222,17 +492,43 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
       let interimTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
+        const result = event.results[i];
+        
+        if (result.isFinal) {
+          // For commercial mode: try ALL alternatives against client list
+          if (isCommercialDirect) {
+            let matched = false;
+            
+            // Try each alternative transcript
+            for (let altIndex = 0; altIndex < result.length; altIndex++) {
+              const altTranscript = result[altIndex].transcript;
+              const match = findBestClientMatchSmart(altTranscript, clientNames);
+              if (match && match.score >= 0.7) {
+                finalTranscript = altTranscript;
+                matched = true;
+                break;
+              }
+            }
+            
+            // If no high-confidence match from alternatives, use best transcript
+            if (!matched) {
+              finalTranscript = result[0].transcript;
+            }
+          } else {
+            finalTranscript = result[0].transcript;
+          }
         } else {
-          interimTranscript += transcript;
+          interimTranscript = result[0].transcript;
         }
       }
 
       if (finalTranscript) {
         setTranscript(finalTranscript);
-        handleVoiceCommand(finalTranscript);
+        if (isCommercialDirect) {
+          handleCommercialVoiceSearch(finalTranscript);
+        } else {
+          handleVoiceCommand(finalTranscript);
+        }
       } else {
         setTranscript(interimTranscript);
       }
@@ -258,7 +554,11 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
           break;
       }
       
-      addMessage('assistant', errorMessage);
+      if (isCommercialDirect) {
+        setListeningFeedback(`❌ ${errorMessage}`);
+      } else {
+        addMessage('assistant', errorMessage);
+      }
       setVoiceState('idle');
     };
 
@@ -269,7 +569,7 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     };
 
     return recognition;
-  }, [recognitionLang, voiceState, handleVoiceCommand]);
+  }, [recognitionLang, voiceState, handleVoiceCommand, handleCommercialVoiceSearch, clientNames]);
 
   // Handle text input submission
   const handleTextSubmit = () => {
@@ -325,9 +625,31 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     window.speechSynthesis.speak(utterance);
   };
 
-  // Start listening
+  // Start listening (commercial direct mode)
+  const startDirectListening = () => {
+    setIsDirectListening(true);
+    setMatchedClient(null);
+    setMatchSuggestions([]);
+    setListeningFeedback('🎤 Dites le nom du client...');
+    setTranscript('');
+    
+    const recognition = initSpeechRecognition(true);
+    if (recognition) {
+      recognitionRef.current = recognition;
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error('Error starting recognition:', error);
+        setListeningFeedback('❌ La reconnaissance vocale n\'est pas supportée.');
+      }
+    } else {
+      setListeningFeedback('❌ La reconnaissance vocale n\'est pas supportée.');
+    }
+  };
+
+  // Start listening (normal mode)
   const startListening = () => {
-    const recognition = initSpeechRecognition();
+    const recognition = initSpeechRecognition(false);
     if (recognition) {
       recognitionRef.current = recognition;
       try {
@@ -343,7 +665,7 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
   // Stop listening
   const stopListening = () => {
     recognitionRef.current?.stop();
-    window.speechSynthesis.cancel();
+    window.speechSynthesis?.cancel();
     setVoiceState('idle');
   };
 
@@ -351,7 +673,7 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
   const toggleMute = () => {
     setIsMuted(!isMuted);
     if (!isMuted) {
-      window.speechSynthesis.cancel();
+      window.speechSynthesis?.cancel();
     }
   };
 
@@ -366,6 +688,25 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
   const clearConversation = () => {
     setMessages([]);
     conversationStartTime.current = new Date();
+  };
+
+  // Handle commercial FAB click: directly start listening
+  const handleCommercialFabClick = () => {
+    if (isDirectListening) {
+      // Already listening - stop
+      stopListening();
+      setIsDirectListening(false);
+    } else {
+      startDirectListening();
+    }
+  };
+
+  // Handle suggestion click
+  const handleSuggestionSelect = (clientName: string) => {
+    setMatchedClient(clientName);
+    setMatchSuggestions([]);
+    setIsDirectListening(false);
+    setListeningFeedback('');
   };
 
   // Suggested questions based on language
@@ -387,6 +728,146 @@ export function VoiceAssistant({ debts, analysis, onShowResults }: VoiceAssistan
     handleVoiceCommand(question);
   };
 
+  // ===== RENDER =====
+
+  // Commercial mode: Direct search FAB + Listening overlay + Client popup
+  if (isCommercial) {
+    return (
+      <>
+        {/* Large Floating Action Button for Commercial */}
+        <button
+          onClick={handleCommercialFabClick}
+          className={`
+            fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50
+            w-20 h-20 md:w-24 md:h-24 rounded-full
+            flex flex-col items-center justify-center gap-1
+            shadow-2xl hover:shadow-3xl
+            transition-all duration-300 transform
+            ${isDirectListening || voiceState === 'listening'
+              ? 'bg-gradient-to-br from-red-500 to-rose-600 scale-110 ring-4 ring-red-300/50 animate-pulse' 
+              : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:via-indigo-700 hover:to-violet-700 hover:scale-105'
+            }
+            text-white
+          `}
+          aria-label="Rechercher un client par la voix"
+        >
+          {isDirectListening || voiceState === 'listening' ? (
+            <>
+              <MicOff className="h-8 w-8 md:h-9 md:w-9" />
+              <span className="text-[9px] md:text-[10px] font-bold leading-tight">Arrêter</span>
+            </>
+          ) : (
+            <>
+              <Mic className="h-8 w-8 md:h-9 md:w-9" />
+              <span className="text-[9px] md:text-[10px] font-bold leading-tight text-center">Chercher{'\n'}Client</span>
+            </>
+          )}
+        </button>
+
+        {/* Listening Overlay (replaces the full modal) */}
+        {isDirectListening && (
+          <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-28 md:pb-32 pointer-events-none">
+            <div className="max-w-md mx-auto pointer-events-auto">
+              <Card className="border-2 border-blue-200 shadow-2xl bg-white/95 backdrop-blur-xl animate-in slide-in-from-bottom-4 duration-300">
+                <CardContent className="p-4 space-y-3">
+                  {/* Status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-2 rounded-full ${
+                        voiceState === 'listening' ? 'bg-red-100 text-red-600 animate-pulse' :
+                        voiceState === 'processing' ? 'bg-yellow-100 text-yellow-600' :
+                        'bg-blue-100 text-blue-600'
+                      }`}>
+                        {voiceState === 'listening' ? <Mic className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">Recherche Client Vocale</p>
+                        <p className="text-xs text-slate-500">{listeningFeedback}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        stopListening();
+                        setIsDirectListening(false);
+                      }}
+                      className="h-8 w-8"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Live transcript */}
+                  {voiceState === 'listening' && transcript && (
+                    <div className="p-3 bg-blue-50 rounded-xl text-sm text-blue-800 font-medium animate-pulse">
+                      🎤 {transcript}
+                    </div>
+                  )}
+
+                  {/* Suggestions list */}
+                  {matchSuggestions.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vouliez-vous dire :</p>
+                      {matchSuggestions.map((s, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSuggestionSelect(s.name)}
+                          className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-100 hover:border-blue-200 transition-all text-left group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
+                              {s.name.charAt(0)}
+                            </div>
+                            <span className="font-bold text-slate-800 group-hover:text-blue-700 text-sm">{s.name}</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] border-blue-200 text-blue-600">
+                            {Math.round(s.score * 100)}%
+                          </Badge>
+                        </button>
+                      ))}
+                      
+                      {/* Retry button */}
+                      <Button
+                        onClick={() => {
+                          setMatchSuggestions([]);
+                          startDirectListening();
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2 gap-2"
+                      >
+                        <Mic className="h-4 w-4" />
+                        Réessayer
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Client Profile Popup */}
+        {matchedClient && matchedClientDebts.length > 0 && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300">
+              <QuickClientProfile 
+                clientName={matchedClient}
+                debts={matchedClientDebts}
+                onClose={() => {
+                  setMatchedClient(null);
+                  setListeningFeedback('');
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ===== Non-commercial mode: Existing chat-based assistant =====
   return (
     <>
       {/* Floating Action Button */}

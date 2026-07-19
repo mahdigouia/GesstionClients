@@ -67,7 +67,8 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
 
   const pieColors = ['#10b981', '#f59e0b', '#f97316', '#ef4444'];
 
-  // Logic for Potential Liquidity Opportunities (< 90 days, > 10k TND cumul per client)
+  // Logic for Potential Liquidity Opportunities (< 90 days, > threshold TND cumul per client)
+  const liquidityThreshold = userRole === 'commercial' ? 5000 : 10000;
   const liquidityOpportunities = (() => {
     if (!analysis.processedDebts) return [];
 
@@ -93,7 +94,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
     });
 
     return Array.from(clientOpportunities.values())
-      .filter(opp => opp.totalRecentBalance > 10000)
+      .filter(opp => opp.totalRecentBalance > liquidityThreshold)
       .sort((a, b) => b.totalRecentBalance - a.totalRecentBalance);
   })();
 
@@ -103,7 +104,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
       <PaymentPromisesAgenda onClientClick={onClientClick} onRelanceClick={onRelanceClick} />
 
       {/* Opportunités de Liquidité Rapide & Clients à Risque Élevé */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`grid grid-cols-1 ${userRole !== 'commercial' ? 'lg:grid-cols-2' : ''} gap-6`}>
         {/* Potential Liquidity Opportunities */}
         <Card className="border-0 shadow-xl bg-white overflow-hidden">
           <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-blue-50 to-indigo-50 flex flex-row items-center justify-between">
@@ -112,7 +113,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
                 <Zap className="h-5 w-5 text-blue-600 fill-blue-600" />
                 Opportunités de Liquidité Rapide
               </CardTitle>
-              <p className="text-xs text-blue-700 font-medium mt-1">Clients &lt; 90 jours avec solde &gt; 10k TND</p>
+              <p className="text-xs text-blue-700 font-medium mt-1">Clients &lt; 90 jours avec solde &gt; {(liquidityThreshold / 1000).toFixed(0)}k TND</p>
             </div>
             <Badge className="bg-blue-600 text-white border-0">
               {liquidityOpportunities.length} opportunités
@@ -152,7 +153,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 text-slate-400 mb-3">
                     <Zap className="h-6 w-6" />
                   </div>
-                  <p className="text-slate-500 text-sm font-medium">Aucune opportunité de liquidité &gt; 10k TND détectée actuellement.</p>
+                  <p className="text-slate-500 text-sm font-medium">Aucune opportunité de liquidité &gt; {(liquidityThreshold / 1000).toFixed(0)}k TND détectée actuellement.</p>
                 </div>
               )}
             </div>
@@ -166,52 +167,54 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
           </CardContent>
         </Card>
 
-        {/* Top Risk Clients */}
-        <Card className="border-0 shadow-xl bg-white overflow-hidden">
-          <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-red-50 to-orange-50">
-            <CardTitle className="text-lg font-bold text-red-900 flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-              Clients à Risque Élevé
-            </CardTitle>
-            <p className="text-xs text-red-700 font-medium mt-1">Factures critiques nécessitant une attention</p>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-gray-100">
-              {analysis.topRiskClients?.slice(0, 6).map((client) => (
-                <div 
-                  key={client.id} 
-                  className="flex items-center justify-between p-4 hover:bg-red-50/50 transition-colors cursor-pointer group"
-                  onClick={() => onClientClick?.(client.clientName)}
-                >
-                  <div className="flex-1">
-                    <div className="font-bold text-slate-800 group-hover:text-red-700 transition-colors">{client.clientName}</div>
-                    <div className="text-xs text-slate-500 font-medium">
-                      Facture {client.documentNumber} • {client.age} jours
-                    </div>
-                  </div>
-                  <div className="text-right flex items-center gap-4">
-                    <div>
-                      <div className="font-bold text-lg text-slate-900">
-                        {client.balance?.toLocaleString('fr-FR') || '0'} <span className="text-[10px]">TND</span>
+        {/* Top Risk Clients - Hidden for commercial accounts */}
+        {userRole !== 'commercial' && (
+          <Card className="border-0 shadow-xl bg-white overflow-hidden">
+            <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-red-50 to-orange-50">
+              <CardTitle className="text-lg font-bold text-red-900 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+                Clients à Risque Élevé
+              </CardTitle>
+              <p className="text-xs text-red-700 font-medium mt-1">Factures critiques nécessitant une attention</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-gray-100">
+                {analysis.topRiskClients?.slice(0, 6).map((client) => (
+                  <div 
+                    key={client.id} 
+                    className="flex items-center justify-between p-4 hover:bg-red-50/50 transition-colors cursor-pointer group"
+                    onClick={() => onClientClick?.(client.clientName)}
+                  >
+                    <div className="flex-1">
+                      <div className="font-bold text-slate-800 group-hover:text-red-700 transition-colors">{client.clientName}</div>
+                      <div className="text-xs text-slate-500 font-medium">
+                        Facture {client.documentNumber} • {client.age} jours
                       </div>
-                      <Badge 
-                        variant="outline" 
-                        className="text-[9px] h-4 py-0 font-bold border-0"
-                        style={{ 
-                          backgroundColor: riskColors[client.riskLevel as keyof typeof riskColors] + '20',
-                          color: riskColors[client.riskLevel as keyof typeof riskColors]
-                        }}
-                      >
-                        {AnalysisService.getRiskLabel(client.riskLevel)}
-                      </Badge>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-red-500 transition-colors" />
+                    <div className="text-right flex items-center gap-4">
+                      <div>
+                        <div className="font-bold text-lg text-slate-900">
+                          {client.balance?.toLocaleString('fr-FR') || '0'} <span className="text-[10px]">TND</span>
+                        </div>
+                        <Badge 
+                          variant="outline" 
+                          className="text-[9px] h-4 py-0 font-bold border-0"
+                          style={{ 
+                            backgroundColor: riskColors[client.riskLevel as keyof typeof riskColors] + '20',
+                            color: riskColors[client.riskLevel as keyof typeof riskColors]
+                          }}
+                        >
+                          {AnalysisService.getRiskLabel(client.riskLevel)}
+                        </Badge>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-red-500 transition-colors" />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* KPI Cards avec design moderne */}
