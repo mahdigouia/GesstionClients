@@ -116,14 +116,96 @@ interface ConversationMessage {
 // ===== INTELLIGENT CLIENT NAME MATCHING =====
 
 /**
+ * Transliterate Arabic script names into Latin equivalents for Tunisian names.
+ */
+function transliterateArabicToLatin(str: string): string {
+  const arabicToLatinMap: { [key: string]: string } = {
+    'أ': 'a', 'ا': 'a', 'إ': 'a', 'آ': 'a', 'ى': 'a',
+    'ب': 'b',
+    'ت': 't', 'ة': 't',
+    'ث': 'th',
+    'ج': 'j',
+    'ح': 'h',
+    'خ': 'kh',
+    'د': 'd',
+    'ذ': 'dh',
+    'ر': 'r',
+    'ز': 'z',
+    'س': 's', 'ص': 's',
+    'ش': 'ch',
+    'ض': 'd', 'ط': 't', 'ظ': 'z',
+    'ع': 'a',
+    'غ': 'gh',
+    'ف': 'f',
+    'ق': 'q',
+    'ك': 'k',
+    'ل': 'l',
+    'م': 'm',
+    'ن': 'n',
+    'ه': 'h',
+    'و': 'ou',
+    'ي': 'y',
+    'ء': 'a',
+    'ئ': 'i',
+    'ؤ': 'ou',
+  };
+
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    if (arabicToLatinMap[char] !== undefined) {
+      result += arabicToLatinMap[char];
+    } else {
+      result += char;
+    }
+  }
+  return result;
+}
+
+/**
+ * Extract a consonant skeleton of a name to match phonetically regardless of variable vowels.
+ */
+function getConsonantSkeleton(str: string): string {
+  let normalized = transliterateArabicToLatin(str.toLowerCase());
+  
+  // Keep only letters and remove accents
+  normalized = normalized
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z]/g, '');
+    
+  // Standard replacements
+  normalized = normalized
+    .replace(/gh/g, 'r')
+    .replace(/kh/g, 'r')
+    .replace(/ch/g, 's')
+    .replace(/sh/g, 's')
+    .replace(/ph/g, 'f')
+    .replace(/g/g, 'r')
+    .replace(/k/g, 'q')
+    .replace(/c/g, 'q')
+    .replace(/j/g, 'z')
+    .replace(/x/g, 's');
+    
+  // Remove vowels
+  const consonantsOnly = normalized.replace(/[aeiouwy]/g, '');
+  
+  // Simplify doubles
+  return consonantsOnly.replace(/([a-z])\1+/g, '$1');
+}
+
+/**
  * Normalize a string for fuzzy matching:
+ * - Convert Arabic script to Latin
  * - Lowercase
  * - Remove accents
  * - Collapse multiple spaces
  * - Handle abbreviations (STE -> SOCIETE, ETS -> ETABLISSEMENT, etc.)
  */
 function normalizeForMatching(str: string): string {
-  return str
+  const transliterated = transliterateArabicToLatin(str);
+  
+  return transliterated
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove accents
@@ -232,21 +314,20 @@ function levenshteinDistance(a: string, b: string): number {
 
 /**
  * Smart fuzzy match: find the best matching client from speech input.
- * Handles:
- *   - Exact match
- *   - Letter-by-letter names ("S O M O C O D" -> "SO MO CO D")
- *   - Fuzzy Levenshtein match
- *   - Partial word matching
- *   - Abbreviation expansion
  */
 function findBestClientMatchSmart(
   spokenText: string, 
   clientNames: string[]
 ): { name: string; score: number } | null {
+  if (!spokenText || !spokenText.trim()) return null;
+  
   const normalizedInput = normalizeForMatching(spokenText);
+  if (!normalizedInput) return null;
+  
   const collapsedInput = collapseString(spokenText);
   const phoneticInput = tunisianPhoneticNormalize(spokenText);
   const collapsedPhoneticInput = phoneticInput.replace(/\s/g, '');
+  const skeletonInput = getConsonantSkeleton(spokenText);
   
   let bestMatch: { name: string; score: number } | null = null;
   let bestScore = 0;
@@ -255,8 +336,18 @@ function findBestClientMatchSmart(
     const alternatives = generateAlternatives(clientName);
     const clientPhonetic = tunisianPhoneticNormalize(clientName);
     const collapsedClientPhonetic = clientPhonetic.replace(/\s/g, '');
+    const clientSkeleton = getConsonantSkeleton(clientName);
     
     let maxScore = 0;
+    
+    // Direct consonant skeleton match (extremely robust for Tunisian pronunciation)
+    if (skeletonInput === clientSkeleton && skeletonInput.length >= 3) {
+      maxScore = Math.max(maxScore, 0.98);
+    } else if (clientSkeleton.includes(skeletonInput) && skeletonInput.length >= 4) {
+      maxScore = Math.max(maxScore, 0.88);
+    } else if (skeletonInput.includes(clientSkeleton) && clientSkeleton.length >= 4) {
+      maxScore = Math.max(maxScore, 0.88);
+    }
     
     // Direct phonetic match check
     if (phoneticInput === clientPhonetic || collapsedPhoneticInput === collapsedClientPhonetic) {
@@ -270,7 +361,7 @@ function findBestClientMatchSmart(
         continue;
       }
       
-      // 2. Collapsed form match (handles "SO MO CO D" spoken as "somocod")
+      // 2. Collapsed form match
       const collapsedAlt = alt.replace(/\s/g, '');
       if (collapsedAlt === collapsedInput) {
         maxScore = Math.max(maxScore, 0.98);
@@ -299,7 +390,7 @@ function findBestClientMatchSmart(
         continue;
       }
       
-      // 5. Word-level matching: check if all words of input appear in the client name
+      // 5. Word-level matching
       const inputWords = normalizedInput.split(' ').filter(w => w.length > 1);
       const altWords = alt.split(' ').filter(w => w.length > 0);
       if (inputWords.length > 0 && altWords.length > 0) {
@@ -339,8 +430,7 @@ function findBestClientMatchSmart(
     }
   }
   
-  // Minimum threshold
-  return bestMatch && bestScore >= 0.5 ? bestMatch : null;
+  return bestMatch && bestScore >= 0.6 ? bestMatch : null;
 }
 
 /**
@@ -352,16 +442,29 @@ function findTopClientMatches(
   topN: number = 3
 ): { name: string; score: number }[] {
   const results: { name: string; score: number }[] = [];
+  if (!spokenText || !spokenText.trim()) return [];
+  
   const normalizedInput = normalizeForMatching(spokenText);
+  if (!normalizedInput) return [];
+  
   const collapsedInput = collapseString(spokenText);
   const phoneticInput = tunisianPhoneticNormalize(spokenText);
   const collapsedPhoneticInput = phoneticInput.replace(/\s/g, '');
+  const skeletonInput = getConsonantSkeleton(spokenText);
   
   for (const clientName of clientNames) {
     const alternatives = generateAlternatives(clientName);
     const clientPhonetic = tunisianPhoneticNormalize(clientName);
     const collapsedClientPhonetic = clientPhonetic.replace(/\s/g, '');
+    const clientSkeleton = getConsonantSkeleton(clientName);
     let maxScore = 0;
+    
+    // Direct consonant skeleton match
+    if (skeletonInput === clientSkeleton && skeletonInput.length >= 3) {
+      maxScore = Math.max(maxScore, 0.96);
+    } else if (clientSkeleton.includes(skeletonInput) && skeletonInput.length >= 3) {
+      maxScore = Math.max(maxScore, 0.85);
+    }
     
     if (phoneticInput === clientPhonetic || collapsedPhoneticInput === collapsedClientPhonetic) {
       maxScore = Math.max(maxScore, 0.90);

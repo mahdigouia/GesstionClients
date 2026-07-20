@@ -68,11 +68,10 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
   const pieColors = ['#10b981', '#f59e0b', '#f97316', '#ef4444'];
 
   // Logic for Potential Liquidity Opportunities (< 90 days, > threshold TND cumul per client)
-  const liquidityThreshold = 5000;
-  const liquidityOpportunities = (() => {
+  const clientOpportunities = (() => {
     if (!analysis.processedDebts) return [];
 
-    const clientOpportunities = new Map<string, {
+    const oppsMap = new Map<string, {
       clientName: string;
       totalRecentBalance: number;
       debtCount: number;
@@ -81,7 +80,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
     analysis.processedDebts.forEach(debt => {
       // Criteria: age < 90, not contentieux, balance > 0
       if (debt.age < 90 && !debt.isContentieux && debt.balance > 0) {
-        const existing = clientOpportunities.get(debt.clientName) || {
+        const existing = oppsMap.get(debt.clientName) || {
           clientName: debt.clientName,
           totalRecentBalance: 0,
           debtCount: 0
@@ -89,14 +88,20 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
         
         existing.totalRecentBalance += debt.balance;
         existing.debtCount += 1;
-        clientOpportunities.set(debt.clientName, existing);
+        oppsMap.set(debt.clientName, existing);
       }
     });
 
-    return Array.from(clientOpportunities.values())
-      .filter(opp => opp.totalRecentBalance > liquidityThreshold)
-      .sort((a, b) => b.totalRecentBalance - a.totalRecentBalance);
+    return Array.from(oppsMap.values());
   })();
+
+  const moderateOpportunities = clientOpportunities
+    .filter(opp => opp.totalRecentBalance >= 5000 && opp.totalRecentBalance <= 10000)
+    .sort((a, b) => b.totalRecentBalance - a.totalRecentBalance);
+
+  const majorOpportunities = clientOpportunities
+    .filter(opp => opp.totalRecentBalance > 10000)
+    .sort((a, b) => b.totalRecentBalance - a.totalRecentBalance);
 
   return (
     <div className="space-y-6">
@@ -104,25 +109,25 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
       <PaymentPromisesAgenda onClientClick={onClientClick} onRelanceClick={onRelanceClick} />
 
       {/* Opportunités de Liquidité Rapide */}
-      <div className="grid grid-cols-1 gap-6">
-        {/* Potential Liquidity Opportunities */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Moderate Liquidity Opportunities (5k - 10k TND) */}
         <Card className="border-0 shadow-xl bg-white overflow-hidden">
           <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-blue-50 to-indigo-50 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg font-bold text-blue-900 flex items-center gap-2">
                 <Zap className="h-5 w-5 text-blue-600 fill-blue-600" />
-                Opportunités de Liquidité Rapide
+                Liquidité Rapide : Modérée
               </CardTitle>
-              <p className="text-xs text-blue-700 font-medium mt-1">Clients &lt; 90 jours avec solde &gt; {(liquidityThreshold / 1000).toFixed(0)}k TND</p>
+              <p className="text-xs text-blue-700 font-medium mt-1">Clients &lt; 90 jours • Solde entre 5k et 10k TND</p>
             </div>
             <Badge className="bg-blue-600 text-white border-0">
-              {liquidityOpportunities.length} opportunités
+              {moderateOpportunities.length} opportunités
             </Badge>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-gray-100">
-              {liquidityOpportunities.length > 0 ? (
-                liquidityOpportunities.map((opp, index) => (
+              {moderateOpportunities.length > 0 ? (
+                moderateOpportunities.map((opp, index) => (
                   <div 
                     key={index}
                     className="flex items-center justify-between p-4 hover:bg-blue-50/50 transition-colors cursor-pointer group"
@@ -142,7 +147,7 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
                         <div className="text-lg font-black text-blue-700">
                           {opp.totalRecentBalance.toLocaleString('fr-FR')} <span className="text-[10px] font-bold">TND</span>
                         </div>
-                        <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Potentiel Immédiat</div>
+                        <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Potentiel Modéré</div>
                       </div>
                       <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
                     </div>
@@ -153,14 +158,76 @@ export function Dashboard({ analysis, onViewDetail, onClientClick, onRelanceClic
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 text-slate-400 mb-3">
                     <Zap className="h-6 w-6" />
                   </div>
-                  <p className="text-slate-500 text-sm font-medium">Aucune opportunité de liquidité &gt; {(liquidityThreshold / 1000).toFixed(0)}k TND détectée actuellement.</p>
+                  <p className="text-slate-500 text-sm font-medium">Aucune opportunité entre 5k et 10k TND.</p>
                 </div>
               )}
             </div>
-            {liquidityOpportunities.length > 0 && (
+            {moderateOpportunities.length > 0 && (
               <div className="p-3 bg-blue-50/30 border-t border-gray-100 text-center">
                 <p className="text-[11px] text-blue-600 font-bold">
-                  Total potentiel : {liquidityOpportunities.reduce((sum, o) => sum + o.totalRecentBalance, 0).toLocaleString('fr-FR')} TND
+                  Total potentiel modéré : {moderateOpportunities.reduce((sum, o) => sum + o.totalRecentBalance, 0).toLocaleString('fr-FR')} TND
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Major Liquidity Opportunities (> 10k TND) */}
+        <Card className="border-0 shadow-xl bg-white overflow-hidden">
+          <CardHeader className="border-b border-gray-50 bg-gradient-to-r from-emerald-50 to-teal-50 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-bold text-emerald-900 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-emerald-600" />
+                Liquidité Rapide : Majeure
+              </CardTitle>
+              <p className="text-xs text-emerald-700 font-medium mt-1">Clients &lt; 90 jours • Solde &gt; 10k TND</p>
+            </div>
+            <Badge className="bg-emerald-600 text-white border-0">
+              {majorOpportunities.length} opportunités
+            </Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-gray-100">
+              {majorOpportunities.length > 0 ? (
+                majorOpportunities.map((opp, index) => (
+                  <div 
+                    key={index}
+                    className="flex items-center justify-between p-4 hover:bg-emerald-50/50 transition-colors cursor-pointer group"
+                    onClick={() => onClientClick?.(opp.clientName)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold shadow-sm group-hover:scale-110 transition-transform">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">{opp.clientName}</div>
+                        <div className="text-xs text-slate-500 font-medium">{opp.debtCount} facture{opp.debtCount > 1 ? 's' : ''} récente{opp.debtCount > 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-lg font-black text-emerald-700">
+                          {opp.totalRecentBalance.toLocaleString('fr-FR')} <span className="text-[10px] font-bold">TND</span>
+                        </div>
+                        <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Potentiel Majeur</div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 text-slate-400 mb-3">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                  <p className="text-slate-500 text-sm font-medium">Aucune opportunité supérieure à 10k TND.</p>
+                </div>
+              )}
+            </div>
+            {majorOpportunities.length > 0 && (
+              <div className="p-3 bg-emerald-50/30 border-t border-gray-100 text-center">
+                <p className="text-[11px] text-emerald-600 font-bold">
+                  Total potentiel majeur : {majorOpportunities.reduce((sum, o) => sum + o.totalRecentBalance, 0).toLocaleString('fr-FR')} TND
                 </p>
               </div>
             )}

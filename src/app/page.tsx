@@ -461,7 +461,7 @@ export default function Home() {
           <Link
             href="/clients"
             title={userRole === 'commercial' ? "Liste de créances" : "Liste de créances générale"}
-            className={`fixed ${userRole === 'commercial' ? 'bottom-28 md:bottom-32' : 'bottom-20 md:bottom-24'} right-4 md:right-6 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group`}
+            className="fixed bottom-28 md:bottom-36 right-7 md:right-11 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg hover:shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 group"
           >
             <Users className="h-6 w-6" />
             
