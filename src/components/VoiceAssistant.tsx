@@ -141,6 +141,36 @@ function collapseString(str: string): string {
 }
 
 /**
+ * Normalize Tunisian Arabic / French accents and common phonetic transcriptions.
+ * Specifically targets the rolled R / Russian-like pronunciation or uvular R
+ * which might get transcribed as "g", "gh", "kh", "rr", etc.
+ */
+function tunisianPhoneticNormalize(str: string): string {
+  let res = normalizeForMatching(str);
+  
+  // Standard replacements for Tunisian french/arabic spellings
+  res = res
+    .replace(/gh/g, 'r')
+    .replace(/kh/g, 'r')
+    .replace(/ch/g, 's')
+    .replace(/sh/g, 's')
+    .replace(/ph/g, 'f')
+    .replace(/ou/g, 'o')
+    .replace(/w/g, 'o')
+    .replace(/y/g, 'i')
+    
+    // Tunisian pronunciation of R (rolled R like Russian, or uvular R transcribed as g)
+    .replace(/g/g, 'r')
+    .replace(/k/g, 'q')
+    .replace(/c/g, 'q')
+    
+    // Remove double characters
+    .replace(/([a-z])\1+/g, '$1');
+    
+  return res;
+}
+
+/**
  * Generate alternative forms of client names for matching.
  * Handles abbreviations, letter-by-letter names, etc.
  */
@@ -166,7 +196,12 @@ function generateAlternatives(clientName: string): string[] {
     }
   }
 
-  return alts;
+  // Add Tunisian phonetic versions
+  const phonetic = tunisianPhoneticNormalize(clientName);
+  alts.push(phonetic);
+  alts.push(phonetic.replace(/\s/g, ''));
+
+  return Array.from(new Set(alts));
 }
 
 /**
@@ -210,13 +245,23 @@ function findBestClientMatchSmart(
 ): { name: string; score: number } | null {
   const normalizedInput = normalizeForMatching(spokenText);
   const collapsedInput = collapseString(spokenText);
+  const phoneticInput = tunisianPhoneticNormalize(spokenText);
+  const collapsedPhoneticInput = phoneticInput.replace(/\s/g, '');
   
   let bestMatch: { name: string; score: number } | null = null;
   let bestScore = 0;
   
   for (const clientName of clientNames) {
     const alternatives = generateAlternatives(clientName);
+    const clientPhonetic = tunisianPhoneticNormalize(clientName);
+    const collapsedClientPhonetic = clientPhonetic.replace(/\s/g, '');
+    
     let maxScore = 0;
+    
+    // Direct phonetic match check
+    if (phoneticInput === clientPhonetic || collapsedPhoneticInput === collapsedClientPhonetic) {
+      maxScore = Math.max(maxScore, 0.95);
+    }
     
     for (const alt of alternatives) {
       // 1. Exact match on normalized form
@@ -229,6 +274,14 @@ function findBestClientMatchSmart(
       const collapsedAlt = alt.replace(/\s/g, '');
       if (collapsedAlt === collapsedInput) {
         maxScore = Math.max(maxScore, 0.98);
+        continue;
+      }
+      
+      // Exact phonetic check on alternative
+      const altPhonetic = tunisianPhoneticNormalize(alt);
+      const collapsedAltPhonetic = altPhonetic.replace(/\s/g, '');
+      if (altPhonetic === phoneticInput || collapsedAltPhonetic === collapsedPhoneticInput) {
+        maxScore = Math.max(maxScore, 0.92);
         continue;
       }
       
@@ -245,7 +298,7 @@ function findBestClientMatchSmart(
         maxScore = Math.max(maxScore, 0.65 + ratio * 0.2);
         continue;
       }
-
+      
       // 5. Word-level matching: check if all words of input appear in the client name
       const inputWords = normalizedInput.split(' ').filter(w => w.length > 1);
       const altWords = alt.split(' ').filter(w => w.length > 0);
@@ -266,6 +319,16 @@ function findBestClientMatchSmart(
         const similarity = 1 - dist / maxLen;
         if (similarity > 0.6) {
           maxScore = Math.max(maxScore, similarity * 0.85);
+        }
+      }
+
+      // 7. Phonetic Levenshtein similarity
+      const maxPhoneticLen = Math.max(collapsedPhoneticInput.length, collapsedAltPhonetic.length);
+      if (maxPhoneticLen > 0 && maxPhoneticLen < 30) {
+        const dist = levenshteinDistance(collapsedPhoneticInput, collapsedAltPhonetic);
+        const similarity = 1 - dist / maxPhoneticLen;
+        if (similarity > 0.65) {
+          maxScore = Math.max(maxScore, similarity * 0.80);
         }
       }
     }
@@ -289,19 +352,31 @@ function findTopClientMatches(
   topN: number = 3
 ): { name: string; score: number }[] {
   const results: { name: string; score: number }[] = [];
+  const normalizedInput = normalizeForMatching(spokenText);
+  const collapsedInput = collapseString(spokenText);
+  const phoneticInput = tunisianPhoneticNormalize(spokenText);
+  const collapsedPhoneticInput = phoneticInput.replace(/\s/g, '');
   
   for (const clientName of clientNames) {
     const alternatives = generateAlternatives(clientName);
-    const normalizedInput = normalizeForMatching(spokenText);
-    const collapsedInput = collapseString(spokenText);
+    const clientPhonetic = tunisianPhoneticNormalize(clientName);
+    const collapsedClientPhonetic = clientPhonetic.replace(/\s/g, '');
     let maxScore = 0;
+    
+    if (phoneticInput === clientPhonetic || collapsedPhoneticInput === collapsedClientPhonetic) {
+      maxScore = Math.max(maxScore, 0.90);
+    }
     
     for (const alt of alternatives) {
       const collapsedAlt = alt.replace(/\s/g, '');
+      const altPhonetic = tunisianPhoneticNormalize(alt);
+      const collapsedAltPhonetic = altPhonetic.replace(/\s/g, '');
       
       // Same scoring as findBestClientMatchSmart but collect all
       if (alt === normalizedInput || collapsedAlt === collapsedInput) {
-        maxScore = 1.0;
+        maxScore = Math.max(maxScore, 1.0);
+      } else if (altPhonetic === phoneticInput || collapsedAltPhonetic === collapsedPhoneticInput) {
+        maxScore = Math.max(maxScore, 0.88);
       } else if (normalizedInput.includes(alt) || alt.includes(normalizedInput)) {
         const ratio = Math.min(normalizedInput.length, alt.length) / Math.max(normalizedInput.length, alt.length);
         maxScore = Math.max(maxScore, 0.7 + ratio * 0.2);
@@ -315,6 +390,15 @@ function findTopClientMatches(
           const similarity = 1 - dist / maxLen;
           if (similarity > 0.4) {
             maxScore = Math.max(maxScore, similarity * 0.85);
+          }
+        }
+        
+        const maxPhoneticLen = Math.max(collapsedPhoneticInput.length, collapsedAltPhonetic.length);
+        if (maxPhoneticLen > 0 && maxPhoneticLen < 30) {
+          const dist = levenshteinDistance(collapsedPhoneticInput, collapsedAltPhonetic);
+          const similarity = 1 - dist / maxPhoneticLen;
+          if (similarity > 0.45) {
+            maxScore = Math.max(maxScore, similarity * 0.78);
           }
         }
       }
@@ -332,7 +416,7 @@ function findTopClientMatches(
 // ===== MAIN COMPONENT =====
 
 export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onClientClick }: VoiceAssistantProps) {
-  const isCommercial = userRole === 'commercial';
+  const isCommercial = userRole === 'commercial' || userRole === 'admin' || userRole === 'gestionnaire';
   
   const [isOpen, setIsOpen] = useState(false);
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
@@ -858,6 +942,13 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
                 onClose={() => {
                   setMatchedClient(null);
                   setListeningFeedback('');
+                }}
+                onClientClick={(name) => {
+                  setMatchedClient(null);
+                  setListeningFeedback('');
+                  if (onClientClick) {
+                    onClientClick(name);
+                  }
                 }}
               />
             </div>

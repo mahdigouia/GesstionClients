@@ -32,6 +32,7 @@ interface QuickClientProfileProps {
   clientName: string;
   debts: ClientDebt[];
   onClose: () => void;
+  onClientClick?: (clientName: string) => void;
 }
 
 const getClientTheme = (clientName: string) => {
@@ -73,7 +74,7 @@ const getClientTheme = (clientName: string) => {
   return themes[hash % themes.length];
 };
 
-export function QuickClientProfile({ clientName, debts: clientDebts, onClose }: QuickClientProfileProps) {
+export function QuickClientProfile({ clientName, debts: clientDebts, onClose, onClientClick }: QuickClientProfileProps) {
   const { 
     clientRemarks, 
     addClientRemark, 
@@ -111,7 +112,11 @@ export function QuickClientProfile({ clientName, debts: clientDebts, onClose }: 
 
   const handleOpenRemarkModal = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsRemarkModalOpen(true);
+    if (onClientClick) {
+      onClientClick(clientName);
+    } else {
+      setIsRemarkModalOpen(true);
+    }
   };
 
   return (
