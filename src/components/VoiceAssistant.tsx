@@ -278,11 +278,26 @@ function applyPhonemeRules(str: string): string {
   return res;
 }
 
+// Common French Speech-to-Text mishearings for Tunisian client names
+const FRENCH_STT_EQUIVALENCES: [RegExp, string][] = [
+  [/\bmais c est oui\b/gi, 'missaoui'],
+  [/\bmais c oui\b/gi, 'missaoui'],
+  [/\bme c oui\b/gi, 'missaoui'],
+  [/\bel oueda\b/gi, 'el wehda'],
+  [/\bel ouda\b/gi, 'el wehda'],
+  [/\bben corbel\b/gi, 'ben ghorbel'],
+  [/\bben corbal\b/gi, 'ben ghorbel'],
+];
+
 /**
  * Normalize a string for matching.
  */
 function normalizeForMatching(str: string): string {
-  const transliterated = transliterateArabicToLatin(str);
+  let text = str;
+  for (const [pattern, replacement] of FRENCH_STT_EQUIVALENCES) {
+    text = text.replace(pattern, replacement);
+  }
+  const transliterated = transliterateArabicToLatin(text);
   return transliterated
     .toLowerCase()
     .normalize('NFD')
