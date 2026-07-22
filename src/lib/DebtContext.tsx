@@ -13,6 +13,7 @@ interface DebtContextType {
   analysis: AnalysisResult | null;
   recoveryActions: RecoveryAction[];
   clientRemarks: Record<string, ClientRemark[]>;
+  allClientRemarks: Record<string, ClientRemark[]>;
   setDebts: (debts: ClientDebt[]) => void;
   setAnalysis: (analysis: AnalysisResult | null) => void;
   addDebts: (newDebts: ClientDebt[]) => void;
@@ -1248,6 +1249,7 @@ function cleanUndefined(obj: any): any {
       analysis, 
       recoveryActions,
       clientRemarks: filteredClientRemarks,
+      allClientRemarks: clientRemarks,
       setDebts, 
       setAnalysis, 
       addDebts, 

@@ -206,16 +206,19 @@ export function recordVoiceCorrection(spokenText: string, correctClientName: str
 
 // ===== STOP WORDS =====
 const STOP_WORDS_SET = new Set([
-  'societe', 'ste', 'sarl', 'sa', 'srl', 'snc', 'spa', 'eurl', 'sas',
+  'societe', 'ste', 'sarl', 'suarl', 'sarlu', 'sa', 'srl', 'snc', 'spa', 'eurl', 'sas',
   'etablissement', 'ets', 'enterprise', 'entreprise',
   'distribution', 'commerce', 'commercial', 'import', 'export', 'service', 'services',
   'general', 'generale', 'internationale', 'national', 'nationale',
-  'industrie', 'industries', 'industrielle', 'alimentaire',
+  'industrie', 'industries', 'industrielle', 'alimentaire', 'alimentaires',
   'trading', 'group', 'groupe', 'freres', 'fils', 'et',
+  'emballage', 'emballages', 'packaging', 'pack', 'conditionnement',
+  'fourniture', 'fournitures', 'materiel', 'quincaillerie', 'plastique', 'plast',
+  'batiment', 'travaux', 'negoce', 'negorce', 'technique', 'techniques',
   'de', 'du', 'des', 'le', 'la', 'les', 'en', 'au', 'aux',
 ]);
 // These connecting words ARE kept even though short, as they're part of Tunisian names
-const KEEP_WORDS_SET = new Set(['ben', 'bel', 'bou', 'el', 'al', 'bou']);
+const KEEP_WORDS_SET = new Set(['ben', 'bel', 'bou', 'el', 'al']);
 
 function isStopWord(word: string): boolean {
   return STOP_WORDS_SET.has(word) && !KEEP_WORDS_SET.has(word);
@@ -642,7 +645,7 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
     // Try all alternatives from speech recognition
     const bestMatch = findBestClientMatchSmart(spokenText, clientNames);
     
-    if (bestMatch && bestMatch.score >= 0.7) {
+    if (bestMatch && bestMatch.score >= 0.88) {
       // High confidence match - show client directly
       setMatchedClient(bestMatch.name);
       setMatchSuggestions([]);
@@ -704,7 +707,7 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
             for (let altIndex = 0; altIndex < result.length; altIndex++) {
               const altTranscript = result[altIndex].transcript;
               const match = findBestClientMatchSmart(altTranscript, clientNames);
-              if (match && match.score >= 0.7) {
+              if (match && match.score >= 0.88) {
                 finalTranscript = altTranscript;
                 matched = true;
                 break;
