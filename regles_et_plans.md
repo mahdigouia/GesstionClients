@@ -134,3 +134,84 @@ Les clients sont listés selon leur **ordre d'apparition** dans les documents so
 ### C. Tris Personnalisés (Global)
 Contrairement à l'ordre par défaut, lorsqu'un utilisateur choisit un critère de tri spécifique (Nom, Montant, Solde, Âge), le groupement par fichier est **supprimé**. Le tri devient **global** sur l'ensemble de la base de données pour permettre, par exemple, de voir les plus gros montants de tous les fichiers confondus en haut de liste.
 
+---
+
+## 12. Seuil de Paiement Effectif (98.5%)
+
+Une facture est considérée **effectivement payée** lorsque le rapport `Règlement / Montant ≥ 98.5%`. Le reliquat de ≤ 1.5% correspond à une **retenue** (timbre, garantie, arrondi) et ne constitue pas un impayé réel.
+
+**Applications de cette règle :**
+- **Filtrage des Commentaires** : Un commentaire lié à une facture à ≥ 98.5% payée est traité comme facture réglée pour le filtrage (elle reste visible pour audit mais n'est plus dans les "factures actives")
+- **Interface Remarques Client** : Les factures à ≥ 98.5% n'apparaissent pas dans la liste des factures "actives" à sélectionner
+
+**Formule** : `isPaid = (settlement / amount) >= 0.985` (si `amount > 0`)
+
+---
+
+## 13. Règles de Filtrage des Commentaires (Liste de Créances)
+
+Les commentaires affichés dans la liste de créances suivent ces règles strictes :
+
+### Règle 1 : Client absent de l'import actuel
+**Si un client n'a aucune facture dans l'import actuel → AUCUN commentaire ne s'affiche**, même les commentaires généraux. L'historique reste stocké en Firestore mais n'est pas affiché.
+
+### Règle 2 : Commentaire avec référence de facture
+Un commentaire mentionnant un numéro de facture (préfixes : `FT`, `FS`, `IC`, `AVS`, `AVT`, `FRS`, `FRT`) :
+- **S'affiche** si au moins une des factures mentionnées existe encore dans l'import actuel
+- **Disparaît** si toutes les factures mentionnées ont disparu de l'import
+
+### Règle 3 : Commentaire général
+Un commentaire sans référence de facture s'affiche si le client est présent dans l'import (Règle 1 satisfaite).
+
+---
+
+## 14. Règles de l'Assistant Vocal (Matching Intelligent)
+
+### Moteur de matching multi-stratégies (8 niveaux)
+
+1. **Exact** : Correspondance exacte normalisée
+2. **Phonétique canonique** : Forme phonétique unique (H=ح, gh=غ, kh=خ, ou/w=و, ch=ش, q/k/g=ق)
+3. **Squelette consonantique** : Suppression des voyelles
+4. **Token-based ORDER-INDEPENDENT** : Résout les inversions ("heykel ben ghorbel" → "ben ghorbel heykal")
+5. **Containment** : Sous-chaîne contenue ("missaoui" → "missaoui distribution emballage")
+6. **Containment du squelette**
+7. **N-grammes trigrammes** (Dice) : Résistant aux erreurs STT ("el oueda" → "el wehda")
+8. **Alternatives** : Sans préfixe légal (Ste, Sarl, ETS...)
+
+### Mappings phonétiques Arabes-Tunisiens reconnus
+
+| Lettre | Transcriptions | Forme canonique |
+|:---|:---|:---|
+| ح (ha) | h | h |
+| غ (ghain) | gh, g | g |
+| خ (kha) | kh, k | k |
+| ق (qaf) | q, k, g | k |
+| و (waw) | ou, w | u |
+| ش (shin) | ch, sh | s |
+| ث (tha) | th | t |
+| ذ (dhal) | dh | d |
+
+### Stop-words ignorés dans le matching
+`societe, ste, sarl, ets, etablissement, distribution, commerce, service, general, nationale, internationale, trading, groupe, et, de, du, des, le, la, les, en, au, aux`
+
+**Particules tunisiennes conservées** : `ben, bel, bou, el, al`
+
+### Auto-apprentissage
+Corrections utilisateur mémorisées dans `localStorage['gc_voice_corrections']`. Format : `normalizedSpokenText → clientName`. Priorité absolue sur l'algorithme lors des prochaines utilisations (seuil fuzzy de réutilisation : 92%).
+
+### Seuil de confiance : 0.55 (abaissé depuis 0.60 pour mieux capturer les noms partiels)
+
+### Recherche selon le rôle
+- **Commercial** : Uniquement son portefeuille
+- **Admin / Gestionnaire** : Tous les clients
+
+---
+
+## 15. Règle de Sélection de Factures pour Marquage "Payé"
+
+1. **Client avec 1 seule facture active** → auto-sélection automatique
+2. **Client avec plusieurs factures actives** → sélection **obligatoire** d'au moins une facture (erreur bloquante sinon)
+3. **Bouton "Tout sélectionner"** : coche toutes les factures actives en un clic
+4. La sélection multiple est autorisée (paiement atomique de plusieurs factures)
+
+**Justification** : Éviter de marquer accidentellement toutes les factures comme payées.

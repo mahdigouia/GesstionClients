@@ -69,7 +69,14 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const [editPromiseAmount, setEditPromiseAmount] = useState('');
 
   const clientDebts = debts.filter(d => d.clientName === clientName);
-  const clientActiveDebts = clientDebts.filter(d => d.balance > 0);
+  // A debt is considered effectively paid if ≥ 98.5% of its amount is settled
+  const PAID_THRESHOLD = 0.985;
+  const clientActiveDebts = clientDebts.filter(d => {
+    const amount = typeof d.amount === 'number' ? d.amount : parseFloat(String(d.amount)) || 0;
+    const settlement = typeof d.settlement === 'number' ? d.settlement : parseFloat(String(d.settlement)) || 0;
+    const isPaid = amount > 0 ? (settlement / amount) >= PAID_THRESHOLD : d.balance <= 0;
+    return !isPaid;
+  });
 
   const adminEmails = ['moslem.gouia@gmail.com', 'mahdigouia@gmail.com'];
   const isAdmin = adminEmails.includes(user?.email || '') || userRole === 'admin';
@@ -123,6 +130,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const [selectedStatus, setSelectedStatus] = useState<'none' | 'reporte' | 'paye_partiel' | 'paye' | 'conflit'>('none');
   const [paymentMethod, setPaymentMethod] = useState<'versement' | 'espece' | 'traite' | 'cheque'>('versement');
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
+  const [invoiceSelectionError, setInvoiceSelectionError] = useState(false);
 
   /** Bascule une facture dans la sélection (multi-select pour tous les statuts). */
   const handleInvoiceToggle = (docNumber: string) => {
@@ -130,6 +138,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       ? selectedInvoices.filter(n => n !== docNumber)
       : [...selectedInvoices, docNumber];
     setSelectedInvoices(newSel);
+    setInvoiceSelectionError(false);
     if (selectedStatus === 'paye_partiel') {
       const sum = clientActiveDebts
         .filter(d => newSel.includes(d.documentNumber))
@@ -138,9 +147,21 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     }
   };
 
-  /** Revient à « Toutes les factures » et, en paye_partiel, rètablit le total. */
+  /** Sélectionne toutes les factures actives */
+  const handleSelectAllActiveInvoices = () => {
+    const allNums = clientActiveDebts.map(d => d.documentNumber);
+    setSelectedInvoices(allNums);
+    setInvoiceSelectionError(false);
+    if (selectedStatus === 'paye_partiel') {
+      const total = clientActiveDebts.reduce((s, d) => s + d.balance, 0);
+      setPromiseAmount(total > 0 ? total.toString() : '');
+    }
+  };
+
+  /** Revient à « Toutes les factures » et, en paye_partiel, rétablit le total. */
   const handleSelectAllInvoices = () => {
     setSelectedInvoices([]);
+    setInvoiceSelectionError(false);
     if (selectedStatus === 'paye_partiel') {
       const total = clientActiveDebts.reduce((s, d) => s + d.balance, 0);
       setPromiseAmount(total > 0 ? total.toString() : '');
@@ -257,6 +278,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
       setSelectedStatus('none');
       setPaymentMethod('versement');
       setSelectedInvoices([]);
+      setInvoiceSelectionError(false);
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
     }
@@ -364,19 +386,27 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
   const handleSubmit = async () => {
     if (!newRemark.trim()) return;
 
-    // Pour le statut "Payé", appeler les fonctions contextuelles qui mettent à jour le solde
+    // Pour le statut "Payé", l'utilisateur DOIT sélectionner au moins une facture
+    // (sauf si le client n'a qu'une seule facture active — auto-sélectionnée)
     if (selectedStatus === 'paye') {
-      if (selectedInvoices.length > 0) {
-        // Opération atomique : un seul setRawDebts + une seule écriture Firestore
-        await markMultipleInvoicesAsPaid(selectedInvoices, paymentMethod);
-      } else {
-        await markClientAsPaid(clientName, paymentMethod);
+      // Si plusieurs factures actives et aucune sélectionnée → bloquer
+      if (clientActiveDebts.length > 1 && selectedInvoices.length === 0) {
+        setInvoiceSelectionError(true);
+        return;
       }
+      // Si une seule facture active et rien sélectionné → auto-sélectionner
+      const invoicesToPay = selectedInvoices.length > 0
+        ? selectedInvoices
+        : clientActiveDebts.map(d => d.documentNumber);
+
+      // Opération atomique : un seul setRawDebts + une seule écriture Firestore
+      await markMultipleInvoicesAsPaid(invoicesToPay, paymentMethod);
       setNewRemark('');
       setPromiseDate('');
       setPromiseAmount('');
       setSelectedStatus('none');
       setSelectedInvoices([]);
+      setInvoiceSelectionError(false);
       setLastAppliedDate('[DATE]');
       setLastAppliedAmount('[MONTANT]');
       onClose();
@@ -398,6 +428,7 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
     setPromiseAmount('');
     setSelectedStatus('none');
     setSelectedInvoices([]);
+    setInvoiceSelectionError(false);
     setLastAppliedDate('[DATE]');
     setLastAppliedAmount('[MONTANT]');
     onClose();
@@ -609,6 +640,11 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                   onClick={() => {
                     setSelectedStatus('paye');
                     setPromiseDate('');
+                    setInvoiceSelectionError(false);
+                    // Auto-sélectionner si une seule facture active
+                    if (clientActiveDebts.length === 1) {
+                      setSelectedInvoices([clientActiveDebts[0].documentNumber]);
+                    }
                     const totalBal = clientActiveDebts.reduce((sum, d) => sum + d.balance, 0);
                     setPromiseAmount(totalBal.toString());
                   }}
@@ -642,23 +678,63 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
             {/* Sélection de la facture concernée (si le client a plusieurs factures actives) */}
             {clientActiveDebts.length > 1 && ['paye', 'paye_partiel', 'reporte'].includes(selectedStatus) && (
               <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">
-                  Facture concernée
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className={`text-[10px] font-black uppercase tracking-widest block ${
+                    invoiceSelectionError && selectedStatus === 'paye'
+                      ? 'text-rose-500'
+                      : 'text-slate-400'
+                  }`}>
+                    {selectedStatus === 'paye'
+                      ? <span className="flex items-center gap-1.5">
+                          Factures à régler
+                          <span className="normal-case font-medium text-[9px] text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded-full">
+                            * Sélection obligatoire
+                          </span>
+                        </span>
+                      : 'Facture concernée'
+                    }
+                  </label>
+                  {/* Bouton Tout sélectionner */}
+                  {selectedStatus === 'paye' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2.5 rounded-lg text-[10px] font-bold text-emerald-600 border-emerald-200 hover:bg-emerald-50 transition-all"
+                      onClick={handleSelectAllActiveInvoices}
+                    >
+                      <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
+                      Tout sélectionner
+                    </Button>
+                  )}
+                </div>
+
+                {/* Message d'erreur si aucune facture sélectionnée */}
+                {invoiceSelectionError && selectedStatus === 'paye' && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-rose-50 border border-rose-200 rounded-xl animate-in fade-in duration-200">
+                    <AlertCircle className="h-3.5 w-3.5 text-rose-500 flex-shrink-0" />
+                    <p className="text-xs font-bold text-rose-600">
+                      Veuillez sélectionner au moins une facture à marquer comme payée.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm ${
-                      selectedInvoices.length === 0
-                        ? 'bg-slate-800 text-white border-slate-800 hover:bg-slate-900'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                    onClick={handleSelectAllInvoices}
-                  >
-                    Toutes les factures
-                  </Button>
+                  {selectedStatus !== 'paye' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                        selectedInvoices.length === 0
+                          ? 'bg-slate-800 text-white border-slate-800 hover:bg-slate-900'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                      onClick={handleSelectAllInvoices}
+                    >
+                      Toutes les factures
+                    </Button>
+                  )}
                   {clientActiveDebts.map(d => (
                     <Button
                       key={d.documentNumber}
@@ -667,11 +743,14 @@ export function ClientRemarkModal({ isOpen, onClose, clientName, remarks, onAddR
                       size="sm"
                       className={`h-8 px-3 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 ${
                         selectedInvoices.includes(d.documentNumber)
-                          ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                          ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20'
+                          : invoiceSelectionError && selectedStatus === 'paye'
+                          ? 'bg-white text-slate-600 border-rose-300 hover:bg-rose-50 animate-pulse'
                           : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                       }`}
                       onClick={() => handleInvoiceToggle(d.documentNumber)}
                     >
+                      {selectedInvoices.includes(d.documentNumber) && <Check className="h-3 w-3 mr-0.5" />}
                       <span className="font-mono">{d.documentNumber}</span>
                       <span className="ml-1 opacity-60 text-[9px]">{d.balance.toLocaleString('fr-TN', { minimumFractionDigits: 3 })} TND</span>
                     </Button>

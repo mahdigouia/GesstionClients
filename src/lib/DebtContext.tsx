@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { ClientDebt, AnalysisResult, RecoveryAction } from '@/types/debt';
+import { ClientDebt, AnalysisResult, RecoveryAction, ClientRemark } from '@/types/debt';
 import { AnalysisService } from '@/lib/analysis';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
@@ -1182,25 +1182,59 @@ function cleanUndefined(obj: any): any {
     await logAction('Paiement Client', `Client ${clientName} marqué comme payé (${totalBalance} TND) via ${methodLabel}`);
   };
 
-  // Memoized and filtered client remarks: hide remarks for invoices that no longer exist in the import
+  // Utility: a debt is considered effectively paid if ≥ 98.5% of its amount is settled
+  // (the remaining ≤ 1.5% is a retention / rounding — not a real unpaid balance)
+  const PAID_THRESHOLD = 0.985;
+
+  // Memoized and filtered client remarks.
+  // Rules:
+  //  1. If the client has NO invoices in the current import → show NO remarks at all
+  //  2. If the remark mentions a specific invoice number → only show if that invoice
+  //     still exists in the current import AND is not yet effectively paid (< 98.5%)
+  //  3. General remarks (no invoice reference) → show only if client exists in import
   const filteredClientRemarks = React.useMemo(() => {
     const filtered: Record<string, ClientRemark[]> = {};
-    
+
     Object.keys(clientRemarks).forEach(clientName => {
+      // All invoices for this client in the current import
+      const clientDebts = rawDebts.filter(d => d.clientName === clientName);
+
+      // Rule 1: client has no invoices in current import → no remarks shown
+      if (clientDebts.length === 0) {
+        filtered[clientName] = [];
+        return;
+      }
+
+      // Active (not yet effectively paid) invoice numbers
       const activeInvoices = new Set(
-        rawDebts
-          .filter(d => d.clientName === clientName)
+        clientDebts
+          .filter(d => {
+            const amount = typeof d.amount === 'number' ? d.amount : parseFloat(String(d.amount)) || 0;
+            const settlement = typeof d.settlement === 'number' ? d.settlement : parseFloat(String(d.settlement)) || 0;
+            const isPaid = amount > 0 ? (settlement / amount) >= PAID_THRESHOLD : d.balance <= 0;
+            return !isPaid; // Keep only invoices that are NOT yet effectively paid
+          })
           .map(d => d.documentNumber.toUpperCase())
       );
 
+      // All invoice numbers (including paid ones) — for reference matching
+      const allInvoices = new Set(
+        clientDebts.map(d => d.documentNumber.toUpperCase())
+      );
+
       filtered[clientName] = (clientRemarks[clientName] || []).filter(remark => {
-        // Match document number prefixes FT, FS, AVS, AVT, FRS, FRT
-        const matches = remark.content.match(/\b((?:FT|FS|AVS|AVT|FRS|FRT)\w+)\b/gi);
+        // Detect invoice references in the remark content (FT, FS, IC, AVS, AVT, FRS, FRT, etc.)
+        const matches = remark.content.match(/\b((?:FT|FS|IC|AVS|AVT|FRS|FRT)\w+)\b/gi);
+
         if (!matches || matches.length === 0) {
-          return true; // General remark
+          // Rule 3: General remark — show since client exists in import (already checked above)
+          return true;
         }
-        // Keep only if at least one mentioned invoice is still active
-        return matches.some(match => activeInvoices.has(match.toUpperCase()));
+
+        // Rule 2: Invoice-specific remark — show only if at least one referenced invoice
+        // exists in the current import (regardless of paid status, so the remark is visible
+        // for audit), BUT hide if ALL referenced invoices are gone from the import.
+        return matches.some((match: string) => allInvoices.has(match.toUpperCase()));
       });
     });
 

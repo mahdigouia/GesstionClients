@@ -122,7 +122,7 @@ function transliterateArabicToLatin(str: string): string {
   const arabicToLatinMap: { [key: string]: string } = {
     'أ': 'a', 'ا': 'a', 'إ': 'a', 'آ': 'a', 'ى': 'a',
     'ب': 'b',
-    'ت': 't', 'ة': 't',
+    'ت': 't', 'ة': 'h',
     'ث': 'th',
     'ج': 'j',
     'ح': 'h',
@@ -162,357 +162,371 @@ function transliterateArabicToLatin(str: string): string {
   return result;
 }
 
+// ===== SELF-LEARNING ENGINE =====
+// Stores user-confirmed corrections: { normalizedSpokenText -> correctClientName }
+const LEARNING_STORAGE_KEY = 'gc_voice_corrections';
+
+function getLearningMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(LEARNING_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveLearningCorrection(spokenText: string, correctClientName: string): void {
+  try {
+    const map = getLearningMap();
+    map[normalizeForMatching(spokenText)] = correctClientName;
+    localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+function checkLearningMap(spokenText: string, clientNames: string[]): string | null {
+  try {
+    const map = getLearningMap();
+    const normalizedInput = normalizeForMatching(spokenText);
+    const learned = map[normalizedInput];
+    if (learned && clientNames.includes(learned)) return learned;
+    // Fuzzy check on learned keys
+    for (const [learnedInput, clientName] of Object.entries(map)) {
+      if (!clientNames.includes(clientName)) continue;
+      const maxLen = Math.max(normalizedInput.length, learnedInput.length);
+      if (maxLen > 0 && (1 - levenshteinDistance(normalizedInput, learnedInput) / maxLen) >= 0.92) {
+        return clientName;
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
+// Export so UI can record user corrections
+export function recordVoiceCorrection(spokenText: string, correctClientName: string): void {
+  saveLearningCorrection(spokenText, correctClientName);
+}
+
+// ===== STOP WORDS =====
+const STOP_WORDS_SET = new Set([
+  'societe', 'ste', 'sarl', 'sa', 'srl', 'snc', 'spa', 'eurl', 'sas',
+  'etablissement', 'ets', 'enterprise', 'entreprise',
+  'distribution', 'commerce', 'commercial', 'import', 'export', 'service', 'services',
+  'general', 'generale', 'internationale', 'national', 'nationale',
+  'industrie', 'industries', 'industrielle', 'alimentaire',
+  'trading', 'group', 'groupe', 'freres', 'fils', 'et',
+  'de', 'du', 'des', 'le', 'la', 'les', 'en', 'au', 'aux',
+]);
+// These connecting words ARE kept even though short, as they're part of Tunisian names
+const KEEP_WORDS_SET = new Set(['ben', 'bel', 'bou', 'el', 'al', 'bou']);
+
+function isStopWord(word: string): boolean {
+  return STOP_WORDS_SET.has(word) && !KEEP_WORDS_SET.has(word);
+}
+
+// ===== PHONETIC NORMALIZATION ENGINE =====
 /**
- * Extract a consonant skeleton of a name to match phonetically regardless of variable vowels.
+ * Canonical phoneme replacements for Tunisian Arabic / French names.
+ * Maps multiple romanizations of the same Arabic phoneme to one form.
+ *
+ * Key Arabic letter mappings:
+ *   ح (ha)   → h
+ *   غ (ghain)→ g  (gh/g/r in Tunisian)
+ *   خ (kha)  → k  (kh/k)
+ *   ع (ain)  → a  (silent or vowel)
+ *   ق (qaf)  → k  (q/k/g in Tunisian)
+ *   و (waw)  → u  (ou/w/o)
+ *   ش (shin) → s  (ch/sh)
+ *   ص (sad)  → s
+ *   ث (tha)  → t  (th)
+ *   ذ (dhal) → d  (dh)
  */
-function getConsonantSkeleton(str: string): string {
-  let normalized = transliterateArabicToLatin(str.toLowerCase());
-  
-  // Keep only letters and remove accents
-  normalized = normalized
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z]/g, '');
-    
-  // Standard replacements
-  normalized = normalized
-    .replace(/gh/g, 'r')
-    .replace(/kh/g, 'r')
-    .replace(/ch/g, 's')
-    .replace(/sh/g, 's')
-    .replace(/ph/g, 'f')
-    .replace(/g/g, 'r')
-    .replace(/k/g, 'q')
-    .replace(/c/g, 'q')
-    .replace(/j/g, 'z')
-    .replace(/x/g, 's');
-    
-  // Remove vowels
-  const consonantsOnly = normalized.replace(/[aeiouwy]/g, '');
-  
-  // Simplify doubles
-  return consonantsOnly.replace(/([a-z])\1+/g, '$1');
+const PHONEME_RULES: [RegExp, string][] = [
+  // Multi-char first
+  [/gh/g, 'g'],
+  [/kh/g, 'k'],
+  [/ch/g, 's'],
+  [/sh/g, 's'],
+  [/ph/g, 'f'],
+  [/th/g, 't'],
+  [/dh/g, 'd'],
+  [/aa/g, 'a'],
+  [/ee/g, 'i'],
+  [/ou/g, 'u'],
+  [/oo/g, 'u'],
+  // Single chars
+  [/[wv]/g, 'u'],
+  [/[qkg]/g, 'k'],
+  [/[sz]/g, 's'],
+  [/x/g, 's'],
+  [/j/g, 'z'],
+  [/y/g, 'i'],
+  // Vowel normalization (collapse all vowel variants)
+  [/[aàâä]/g, 'a'],
+  [/[eéèêë]/g, 'a'],
+  [/[iïî]/g, 'i'],
+  [/[oôö]/g, 'u'],
+  [/[uùûü]/g, 'u'],
+  // Deduplicate
+  [/(..)\1+/g, '$1'],
+  [/(.)(\1)+/g, '$1'],
+];
+
+function applyPhonemeRules(str: string): string {
+  let res = str;
+  for (const [pat, rep] of PHONEME_RULES) res = res.replace(pat, rep);
+  return res;
 }
 
 /**
- * Normalize a string for fuzzy matching:
- * - Convert Arabic script to Latin
- * - Lowercase
- * - Remove accents
- * - Collapse multiple spaces
- * - Handle abbreviations (STE -> SOCIETE, ETS -> ETABLISSEMENT, etc.)
+ * Normalize a string for matching.
  */
 function normalizeForMatching(str: string): string {
   const transliterated = transliterateArabicToLatin(str);
-  
   return transliterated
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove accents
-    .replace(/[^a-z0-9\s]/g, ' ')    // Replace special chars with spaces
-    .replace(/\s+/g, ' ')            // Collapse spaces
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
 /**
- * Remove all spaces/separators to create a "collapsed" version for letter-by-letter matching
- * e.g., "SO MO CO D" -> "somocod", "so mo co d" -> "somocod"
+ * Full canonical phonetic form — used for cross-romanization matching.
  */
+function toCanonicalPhonetic(str: string): string {
+  let res = normalizeForMatching(str);
+  res = applyPhonemeRules(res);
+  return res.replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Consonant skeleton — vowel-stripped form for robust phonetic matching.
+ */
+function getConsonantSkeleton(str: string): string {
+  return toCanonicalPhonetic(str)
+    .replace(/[aeiou\s]/g, '')
+    .replace(/(.)(\1)+/g, '$1');
+}
+
 function collapseString(str: string): string {
   return normalizeForMatching(str).replace(/\s/g, '');
 }
 
 /**
- * Normalize Tunisian Arabic / French accents and common phonetic transcriptions.
- * Specifically targets the rolled R / Russian-like pronunciation or uvular R
- * which might get transcribed as "g", "gh", "kh", "rr", etc.
+ * Extract significant tokens (remove stop words, min length 2).
+ * Sorted by length desc — longer = more distinctive.
  */
-function tunisianPhoneticNormalize(str: string): string {
-  let res = normalizeForMatching(str);
-  
-  // Standard replacements for Tunisian french/arabic spellings
-  res = res
-    .replace(/gh/g, 'r')
-    .replace(/kh/g, 'r')
-    .replace(/ch/g, 's')
-    .replace(/sh/g, 's')
-    .replace(/ph/g, 'f')
-    .replace(/ou/g, 'o')
-    .replace(/w/g, 'o')
-    .replace(/y/g, 'i')
-    
-    // Tunisian pronunciation of R (rolled R like Russian, or uvular R transcribed as g)
-    .replace(/g/g, 'r')
-    .replace(/k/g, 'q')
-    .replace(/c/g, 'q')
-    
-    // Remove double characters
-    .replace(/([a-z])\1+/g, '$1');
-    
-  return res;
+function extractSignificantTokens(name: string): string[] {
+  const tokens = normalizeForMatching(name).split(' ').filter(t => t.length >= 2);
+  const sig = tokens.filter(t => !isStopWord(t));
+  const result = sig.length > 0 ? sig : tokens;
+  return result.sort((a, b) => b.length - a.length);
+}
+
+/** N-gram set */
+function getNgrams(str: string, n: number = 3): Set<string> {
+  const s = str.replace(/\s/g, '_');
+  const grams = new Set<string>();
+  for (let i = 0; i <= s.length - n; i++) grams.add(s.substring(i, i + n));
+  return grams;
+}
+
+/** Dice coefficient between two n-gram sets */
+function ngramSimilarity(a: string, b: string, n: number = 3): number {
+  if (a.length < n && b.length < n) {
+    return a === b ? 1 : (a.includes(b) || b.includes(a) ? 0.7 : 0);
+  }
+  const ag = getNgrams(a, n);
+  const bg = getNgrams(b, n);
+  if (ag.size === 0 || bg.size === 0) return 0;
+  let inter = 0;
+  for (const g of ag) if (bg.has(g)) inter++;
+  return (2 * inter) / (ag.size + bg.size);
 }
 
 /**
- * Generate alternative forms of client names for matching.
- * Handles abbreviations, letter-by-letter names, etc.
+ * Levenshtein distance
  */
-function generateAlternatives(clientName: string): string[] {
-  const alts: string[] = [
-    normalizeForMatching(clientName),
-    collapseString(clientName),
-  ];
-
-  // Add word-initials version: "SOCIETE SUPER DISTRIBUTION" -> "ssd"
-  const words = normalizeForMatching(clientName).split(' ').filter(w => w.length > 0);
-  if (words.length > 1) {
-    alts.push(words.map(w => w[0]).join(''));
-  }
-
-  // Add without common prefixes
-  const prefixes = ['societe', 'ste', 'ets', 'etablissement', 'sarl', 'sa', 'srl'];
-  for (const prefix of prefixes) {
-    const norm = normalizeForMatching(clientName);
-    if (norm.startsWith(prefix + ' ')) {
-      alts.push(norm.substring(prefix.length + 1).trim());
-      alts.push(collapseString(norm.substring(prefix.length + 1)));
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      matrix[i][j] = b[i-1] === a[j-1]
+        ? matrix[i-1][j-1]
+        : Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
     }
   }
+  return matrix[b.length][a.length];
+}
 
-  // Add Tunisian phonetic versions
-  const phonetic = tunisianPhoneticNormalize(clientName);
-  alts.push(phonetic);
-  alts.push(phonetic.replace(/\s/g, ''));
+function levenshteinSim(a: string, b: string): number {
+  const ml = Math.max(a.length, b.length);
+  return ml === 0 ? 1 : 1 - levenshteinDistance(a, b) / ml;
+}
 
+/**
+ * Token-level matching score (ORDER INDEPENDENT).
+ * Each query token is matched against all client tokens using phonetics.
+ * Weight = sqrt(token length) → longer tokens are more distinctive.
+ */
+function tokenMatchScore(queryTokens: string[], clientTokens: string[]): number {
+  if (!queryTokens.length || !clientTokens.length) return 0;
+
+  const cPhonetic = clientTokens.map(t => toCanonicalPhonetic(t));
+  const cSkeleton = clientTokens.map(t => getConsonantSkeleton(t));
+
+  let totalWeight = 0, matchedWeight = 0;
+
+  for (const qTok of queryTokens) {
+    const w = Math.sqrt(qTok.length);
+    totalWeight += w;
+    const qPh = toCanonicalPhonetic(qTok);
+    const qSk = getConsonantSkeleton(qTok);
+    let best = 0;
+
+    for (let i = 0; i < clientTokens.length; i++) {
+      const cTok = clientTokens[i];
+      let sc = 0;
+      if (qTok === cTok)                                              sc = 1.0;
+      else if (qPh === cPhonetic[i] && qPh.length >= 2)              sc = 0.97;
+      else if (qSk === cSkeleton[i] && qSk.length >= 2)              sc = 0.94;
+      else if (cTok.startsWith(qTok) && qTok.length >= 4)            sc = 0.85 + (qTok.length / cTok.length) * 0.1;
+      else if (qTok.startsWith(cTok) && cTok.length >= 4)            sc = 0.80 + (cTok.length / qTok.length) * 0.1;
+      else if (cPhonetic[i].startsWith(qPh) && qPh.length >= 3)     sc = 0.82;
+      else if (qPh.startsWith(cPhonetic[i]) && cPhonetic[i].length >= 3) sc = 0.78;
+      else if (cSkeleton[i].includes(qSk) && qSk.length >= 3)       sc = 0.75;
+      else {
+        const ng = ngramSimilarity(qPh, cPhonetic[i], Math.min(3, Math.min(qPh.length, cPhonetic[i].length)));
+        if (ng > 0.4) sc = ng * 0.88;
+      }
+      if (sc < 0.6 && qPh.length >= 3) {
+        const lev = levenshteinSim(qPh, cPhonetic[i]);
+        if (lev > 0.65) sc = Math.max(sc, lev * 0.82);
+      }
+      if (sc > best) best = sc;
+    }
+    matchedWeight += w * best;
+  }
+  return totalWeight > 0 ? matchedWeight / totalWeight : 0;
+}
+
+/** Generate alternative client name forms (without legal prefixes) */
+function generateAlternatives(clientName: string): string[] {
+  const alts: string[] = [normalizeForMatching(clientName)];
+  const norm = normalizeForMatching(clientName);
+  for (const pfx of ['societe', 'ste', 'ets', 'etablissement', 'sarl', 'sa', 'srl', 'snc']) {
+    if (norm.startsWith(pfx + ' ')) alts.push(norm.substring(pfx.length + 1).trim());
+  }
   return Array.from(new Set(alts));
 }
 
 /**
- * Calculate Levenshtein distance between two strings
+ * Compute final match score between spoken text and a client name.
+ * Combines 8 strategies: exact, phonetic, skeleton, token, containment, ngram, alternatives.
  */
-function levenshteinDistance(a: string, b: string): number {
-  const matrix: number[][] = [];
-  
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-  
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b[i - 1] === a[j - 1]) {
-        matrix[i][j] = matrix[i - 1][j - 1];
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
-        );
-      }
-    }
+function computeMatchScore(spokenText: string, clientName: string): number {
+  const normInput = normalizeForMatching(spokenText);
+  const normClient = normalizeForMatching(clientName);
+  if (!normInput || !normClient) return 0;
+
+  const phInput  = toCanonicalPhonetic(spokenText);
+  const phClient = toCanonicalPhonetic(clientName);
+  const skInput  = getConsonantSkeleton(spokenText);
+  const skClient = getConsonantSkeleton(clientName);
+  const colInput  = collapseString(spokenText);
+  const colClient = collapseString(clientName);
+
+  let best = 0;
+
+  // S1: Exact
+  if (normInput === normClient) return 1.0;
+  // S2: Phonetic exact
+  if (phInput === phClient && phInput.length >= 3) best = Math.max(best, 0.98);
+  // S3: Skeleton exact
+  if (skInput === skClient && skInput.length >= 3) best = Math.max(best, 0.96);
+
+  // S4: Token matching (ORDER INDEPENDENT)
+  const qTokens = extractSignificantTokens(spokenText);
+  const cTokens = normClient.split(' ').filter(t => t.length >= 2);
+  if (qTokens.length > 0 && cTokens.length > 0) {
+    const tokScore = tokenMatchScore(qTokens, cTokens);
+    const coverage = qTokens.length / Math.max(qTokens.length, cTokens.length);
+    best = Math.max(best, tokScore * (0.7 + coverage * 0.3));
+    // Single distinctive token bonus
+    if (qTokens.length === 1 && tokScore >= 0.88) best = Math.max(best, tokScore * 0.98);
   }
-  
-  return matrix[b.length][a.length];
+
+  // S5: Containment on collapsed strings
+  if (colClient.includes(colInput) && colInput.length >= 4)
+    best = Math.max(best, 0.65 + (colInput.length / colClient.length) * 0.25);
+  if (colInput.includes(colClient) && colClient.length >= 4)
+    best = Math.max(best, 0.65 + (colClient.length / colInput.length) * 0.25);
+
+  // S6: Skeleton containment
+  if (skClient.includes(skInput) && skInput.length >= 4) best = Math.max(best, 0.82);
+
+  // S7: N-gram on collapsed phonetic forms
+  const phColInput  = phInput.replace(/\s/g, '');
+  const phColClient = phClient.replace(/\s/g, '');
+  if (phColInput.length >= 4 && phColClient.length >= 4)
+    best = Math.max(best, ngramSimilarity(phColInput, phColClient, 3) * 0.88);
+
+  // S8: Alternatives (strip legal prefix)
+  for (const alt of generateAlternatives(clientName)) {
+    if (alt === normInput) { best = 1.0; break; }
+    const altPh = toCanonicalPhonetic(alt);
+    if (altPh === phInput && altPh.length >= 3) { best = Math.max(best, 0.96); break; }
+    const altTokens = alt.split(' ').filter(t => t.length >= 2);
+    if (altTokens.length > 0 && qTokens.length > 0)
+      best = Math.max(best, tokenMatchScore(qTokens, altTokens) * 0.95);
+  }
+
+  return best;
 }
 
 /**
- * Smart fuzzy match: find the best matching client from speech input.
+ * Find best matching client. Checks self-learning first.
  */
 function findBestClientMatchSmart(
-  spokenText: string, 
+  spokenText: string,
   clientNames: string[]
 ): { name: string; score: number } | null {
-  if (!spokenText || !spokenText.trim()) return null;
-  
-  const normalizedInput = normalizeForMatching(spokenText);
-  if (!normalizedInput) return null;
-  
-  const collapsedInput = collapseString(spokenText);
-  const phoneticInput = tunisianPhoneticNormalize(spokenText);
-  const collapsedPhoneticInput = phoneticInput.replace(/\s/g, '');
-  const skeletonInput = getConsonantSkeleton(spokenText);
-  
+  if (!spokenText?.trim()) return null;
+
+  const learned = checkLearningMap(spokenText, clientNames);
+  if (learned) return { name: learned, score: 1.0 };
+
   let bestMatch: { name: string; score: number } | null = null;
   let bestScore = 0;
-  
-  for (const clientName of clientNames) {
-    const alternatives = generateAlternatives(clientName);
-    const clientPhonetic = tunisianPhoneticNormalize(clientName);
-    const collapsedClientPhonetic = clientPhonetic.replace(/\s/g, '');
-    const clientSkeleton = getConsonantSkeleton(clientName);
-    
-    let maxScore = 0;
-    
-    // Direct consonant skeleton match (extremely robust for Tunisian pronunciation)
-    if (skeletonInput === clientSkeleton && skeletonInput.length >= 3) {
-      maxScore = Math.max(maxScore, 0.98);
-    } else if (clientSkeleton.includes(skeletonInput) && skeletonInput.length >= 4) {
-      maxScore = Math.max(maxScore, 0.88);
-    } else if (skeletonInput.includes(clientSkeleton) && clientSkeleton.length >= 4) {
-      maxScore = Math.max(maxScore, 0.88);
-    }
-    
-    // Direct phonetic match check
-    if (phoneticInput === clientPhonetic || collapsedPhoneticInput === collapsedClientPhonetic) {
-      maxScore = Math.max(maxScore, 0.95);
-    }
-    
-    for (const alt of alternatives) {
-      // 1. Exact match on normalized form
-      if (alt === normalizedInput || alt === collapsedInput) {
-        maxScore = Math.max(maxScore, 1.0);
-        continue;
-      }
-      
-      // 2. Collapsed form match
-      const collapsedAlt = alt.replace(/\s/g, '');
-      if (collapsedAlt === collapsedInput) {
-        maxScore = Math.max(maxScore, 0.98);
-        continue;
-      }
-      
-      // Exact phonetic check on alternative
-      const altPhonetic = tunisianPhoneticNormalize(alt);
-      const collapsedAltPhonetic = altPhonetic.replace(/\s/g, '');
-      if (altPhonetic === phoneticInput || collapsedAltPhonetic === collapsedPhoneticInput) {
-        maxScore = Math.max(maxScore, 0.92);
-        continue;
-      }
-      
-      // 3. Input contains the alternative or vice versa
-      if (normalizedInput.includes(alt) || alt.includes(normalizedInput)) {
-        const ratio = Math.min(normalizedInput.length, alt.length) / Math.max(normalizedInput.length, alt.length);
-        maxScore = Math.max(maxScore, 0.7 + ratio * 0.2);
-        continue;
-      }
-      
-      // 4. Collapsed contains check
-      if (collapsedInput.includes(collapsedAlt) || collapsedAlt.includes(collapsedInput)) {
-        const ratio = Math.min(collapsedInput.length, collapsedAlt.length) / Math.max(collapsedInput.length, collapsedAlt.length);
-        maxScore = Math.max(maxScore, 0.65 + ratio * 0.2);
-        continue;
-      }
-      
-      // 5. Word-level matching
-      const inputWords = normalizedInput.split(' ').filter(w => w.length > 1);
-      const altWords = alt.split(' ').filter(w => w.length > 0);
-      if (inputWords.length > 0 && altWords.length > 0) {
-        const matchingWords = inputWords.filter(iw => 
-          altWords.some(aw => aw.startsWith(iw) || iw.startsWith(aw))
-        );
-        const wordScore = matchingWords.length / Math.max(inputWords.length, altWords.length);
-        if (wordScore > 0.5) {
-          maxScore = Math.max(maxScore, 0.5 + wordScore * 0.3);
-        }
-      }
-      
-      // 6. Levenshtein similarity on collapsed forms
-      const maxLen = Math.max(collapsedInput.length, collapsedAlt.length);
-      if (maxLen > 0 && maxLen < 30) {
-        const dist = levenshteinDistance(collapsedInput, collapsedAlt);
-        const similarity = 1 - dist / maxLen;
-        if (similarity > 0.6) {
-          maxScore = Math.max(maxScore, similarity * 0.85);
-        }
-      }
 
-      // 7. Phonetic Levenshtein similarity
-      const maxPhoneticLen = Math.max(collapsedPhoneticInput.length, collapsedAltPhonetic.length);
-      if (maxPhoneticLen > 0 && maxPhoneticLen < 30) {
-        const dist = levenshteinDistance(collapsedPhoneticInput, collapsedAltPhonetic);
-        const similarity = 1 - dist / maxPhoneticLen;
-        if (similarity > 0.65) {
-          maxScore = Math.max(maxScore, similarity * 0.80);
-        }
-      }
-    }
-    
-    if (maxScore > bestScore) {
-      bestScore = maxScore;
-      bestMatch = { name: clientName, score: maxScore };
-    }
+  for (const name of clientNames) {
+    const score = computeMatchScore(spokenText, name);
+    if (score > bestScore) { bestScore = score; bestMatch = { name, score }; }
   }
-  
-  return bestMatch && bestScore >= 0.6 ? bestMatch : null;
+
+  // Threshold 0.55 — more permissive to catch partial names ("missaoui")
+  return bestMatch && bestScore >= 0.55 ? bestMatch : null;
 }
 
 /**
- * Find top N matching clients (for suggestions when confidence is not high enough)
+ * Find top N matching clients for suggestions.
  */
 function findTopClientMatches(
   spokenText: string,
   clientNames: string[],
-  topN: number = 3
+  topN: number = 5
 ): { name: string; score: number }[] {
-  const results: { name: string; score: number }[] = [];
-  if (!spokenText || !spokenText.trim()) return [];
-  
-  const normalizedInput = normalizeForMatching(spokenText);
-  if (!normalizedInput) return [];
-  
-  const collapsedInput = collapseString(spokenText);
-  const phoneticInput = tunisianPhoneticNormalize(spokenText);
-  const collapsedPhoneticInput = phoneticInput.replace(/\s/g, '');
-  const skeletonInput = getConsonantSkeleton(spokenText);
-  
-  for (const clientName of clientNames) {
-    const alternatives = generateAlternatives(clientName);
-    const clientPhonetic = tunisianPhoneticNormalize(clientName);
-    const collapsedClientPhonetic = clientPhonetic.replace(/\s/g, '');
-    const clientSkeleton = getConsonantSkeleton(clientName);
-    let maxScore = 0;
-    
-    // Direct consonant skeleton match
-    if (skeletonInput === clientSkeleton && skeletonInput.length >= 3) {
-      maxScore = Math.max(maxScore, 0.96);
-    } else if (clientSkeleton.includes(skeletonInput) && skeletonInput.length >= 3) {
-      maxScore = Math.max(maxScore, 0.85);
-    }
-    
-    if (phoneticInput === clientPhonetic || collapsedPhoneticInput === collapsedClientPhonetic) {
-      maxScore = Math.max(maxScore, 0.90);
-    }
-    
-    for (const alt of alternatives) {
-      const collapsedAlt = alt.replace(/\s/g, '');
-      const altPhonetic = tunisianPhoneticNormalize(alt);
-      const collapsedAltPhonetic = altPhonetic.replace(/\s/g, '');
-      
-      // Same scoring as findBestClientMatchSmart but collect all
-      if (alt === normalizedInput || collapsedAlt === collapsedInput) {
-        maxScore = Math.max(maxScore, 1.0);
-      } else if (altPhonetic === phoneticInput || collapsedAltPhonetic === collapsedPhoneticInput) {
-        maxScore = Math.max(maxScore, 0.88);
-      } else if (normalizedInput.includes(alt) || alt.includes(normalizedInput)) {
-        const ratio = Math.min(normalizedInput.length, alt.length) / Math.max(normalizedInput.length, alt.length);
-        maxScore = Math.max(maxScore, 0.7 + ratio * 0.2);
-      } else if (collapsedInput.includes(collapsedAlt) || collapsedAlt.includes(collapsedInput)) {
-        const ratio = Math.min(collapsedInput.length, collapsedAlt.length) / Math.max(collapsedInput.length, collapsedAlt.length);
-        maxScore = Math.max(maxScore, 0.65 + ratio * 0.2);
-      } else {
-        const maxLen = Math.max(collapsedInput.length, collapsedAlt.length);
-        if (maxLen > 0 && maxLen < 30) {
-          const dist = levenshteinDistance(collapsedInput, collapsedAlt);
-          const similarity = 1 - dist / maxLen;
-          if (similarity > 0.4) {
-            maxScore = Math.max(maxScore, similarity * 0.85);
-          }
-        }
-        
-        const maxPhoneticLen = Math.max(collapsedPhoneticInput.length, collapsedAltPhonetic.length);
-        if (maxPhoneticLen > 0 && maxPhoneticLen < 30) {
-          const dist = levenshteinDistance(collapsedPhoneticInput, collapsedAltPhonetic);
-          const similarity = 1 - dist / maxPhoneticLen;
-          if (similarity > 0.45) {
-            maxScore = Math.max(maxScore, similarity * 0.78);
-          }
-        }
-      }
-    }
-    
-    if (maxScore > 0.3) {
-      results.push({ name: clientName, score: maxScore });
-    }
-  }
-  
-  return results.sort((a, b) => b.score - a.score).slice(0, topN);
+  if (!spokenText?.trim()) return [];
+
+  const learned = checkLearningMap(spokenText, clientNames);
+  if (learned) return [{ name: learned, score: 1.0 }];
+
+  return clientNames
+    .map(name => ({ name, score: computeMatchScore(spokenText, name) }))
+    .filter(r => r.score >= 0.3)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN);
 }
 
 
@@ -888,8 +902,11 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
     }
   };
 
-  // Handle suggestion click
+  // Handle suggestion click & learn correction
   const handleSuggestionSelect = (clientName: string) => {
+    if (transcript.trim()) {
+      recordVoiceCorrection(transcript, clientName);
+    }
     setMatchedClient(clientName);
     setMatchSuggestions([]);
     setIsDirectListening(false);
@@ -1218,7 +1235,7 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => onShowResults(message.data.data.invoices || [], message.data.data.clientName || 'Résultats')}
+                                onClick={() => onShowResults(message.data?.data?.invoices || [], message.data?.data?.clientName || 'Résultats')}
                                 className="h-6 px-2 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
                               >
                                 <ArrowRight className="h-3 w-3 mr-1" />
