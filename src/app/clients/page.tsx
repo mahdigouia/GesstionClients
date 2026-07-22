@@ -556,18 +556,14 @@ export default function ClientsPage() {
                 </Button>
 
                 <Button
-                  variant={activeTab === 'history' ? 'default' : 'outline'}
+                  variant="outline"
                   size="sm"
-                  onClick={() => setActiveTab('history')}
-                  className={`rounded-xl font-bold text-xs md:text-sm gap-2 transition-all ${
-                    activeTab === 'history'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
+                  onClick={() => router.push('/history')}
+                  className="rounded-xl font-bold text-xs md:text-sm gap-2 transition-all border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200"
                 >
-                  <History className="h-4 w-4" />
+                  <History className="h-4 w-4 text-indigo-600" />
                   <span>Historique & Remarques Clients</span>
-                  <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full font-black">
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full font-black bg-indigo-100 text-indigo-700">
                     {historicalClients.length}
                   </Badge>
                 </Button>

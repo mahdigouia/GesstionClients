@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Scale,
+  History,
   Zap,
   Crown,
   Mic,
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Factures', href: '/invoices', icon: FileText, color: 'bg-violet-500' },
   { name: 'Analyse', href: '/analysis', icon: BarChart3, color: 'bg-amber-500' },
   { name: 'Contentieux', href: '/contentieux', icon: Scale, color: 'bg-red-500' },
+  { name: 'Historique Clients', href: '/history', icon: History, color: 'bg-indigo-500' },
   { name: 'Import OCR', href: '/import', icon: Upload, color: 'bg-cyan-500' },
   { name: 'Paramètres', href: '/settings', icon: Settings, color: 'bg-gray-500' },
 ];

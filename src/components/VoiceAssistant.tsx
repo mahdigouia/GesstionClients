@@ -439,65 +439,68 @@ function generateAlternatives(clientName: string): string[] {
   return Array.from(new Set(alts));
 }
 
-/**
- * Compute final match score between spoken text and a client name.
- * Combines 8 strategies: exact, phonetic, skeleton, token, containment, ngram, alternatives.
- */
 function computeMatchScore(spokenText: string, clientName: string): number {
   const normInput = normalizeForMatching(spokenText);
   const normClient = normalizeForMatching(clientName);
   if (!normInput || !normClient) return 0;
 
+  // Pre-compute forms
   const phInput  = toCanonicalPhonetic(spokenText);
   const phClient = toCanonicalPhonetic(clientName);
   const skInput  = getConsonantSkeleton(spokenText);
   const skClient = getConsonantSkeleton(clientName);
-  const colInput  = collapseString(spokenText);
-  const colClient = collapseString(clientName);
+
+  // 1. Exact normalized match
+  if (normInput === normClient) return 1.0;
+
+  // 2. Phonetic exact match
+  if (phInput === phClient && phInput.length >= 3) return 0.98;
+
+  // 3. Skeleton exact match
+  if (skInput === skClient && skInput.length >= 3) return 0.96;
+
+  // Extract significant distinctive tokens
+  const qTokens = extractSignificantTokens(spokenText);
+  const cTokens = extractSignificantTokens(clientName);
+
+  // STRICT REQUIREMENT: If spoken text has distinctive tokens, at least ONE token MUST match
+  // a client token with a score >= 0.60. Otherwise, the client is NOT a match (returns 0).
+  if (qTokens.length > 0) {
+    const bestTokenMatch = tokenMatchScore(qTokens, cTokens);
+    if (bestTokenMatch < 0.40) {
+      // Check full client tokens as fallback (in case client tokens were filtered by stop words)
+      const cTokensAll = normClient.split(' ').filter(t => t.length >= 2);
+      const fallbackTokenMatch = tokenMatchScore(qTokens, cTokensAll);
+      if (fallbackTokenMatch < 0.45) {
+        return 0; // No token overlap -> ABSOLUTELY NO MATCH
+      }
+    }
+  }
 
   let best = 0;
 
-  // S1: Exact
-  if (normInput === normClient) return 1.0;
-  // S2: Phonetic exact
-  if (phInput === phClient && phInput.length >= 3) best = Math.max(best, 0.98);
-  // S3: Skeleton exact
-  if (skInput === skClient && skInput.length >= 3) best = Math.max(best, 0.96);
-
-  // S4: Token matching (ORDER INDEPENDENT)
-  const qTokens = extractSignificantTokens(spokenText);
-  const cTokens = normClient.split(' ').filter(t => t.length >= 2);
-  if (qTokens.length > 0 && cTokens.length > 0) {
-    const tokScore = tokenMatchScore(qTokens, cTokens);
-    const coverage = qTokens.length / Math.max(qTokens.length, cTokens.length);
-    best = Math.max(best, tokScore * (0.7 + coverage * 0.3));
-    // Single distinctive token bonus
-    if (qTokens.length === 1 && tokScore >= 0.88) best = Math.max(best, tokScore * 0.98);
+  // 4. Token matching score (ORDER INDEPENDENT)
+  const cTokensAll = normClient.split(' ').filter(t => t.length >= 2);
+  if (qTokens.length > 0 && cTokensAll.length > 0) {
+    const tokScore = tokenMatchScore(qTokens, cTokensAll);
+    const coverage = qTokens.length / Math.max(qTokens.length, cTokensAll.length);
+    best = Math.max(best, tokScore * (0.65 + coverage * 0.35));
+    // Single distinctive token bonus (e.g. "missaoui")
+    if (qTokens.length === 1 && tokScore >= 0.80) {
+      best = Math.max(best, tokScore * 0.98);
+    }
   }
 
-  // S5: Containment on collapsed strings
-  if (colClient.includes(colInput) && colInput.length >= 4)
-    best = Math.max(best, 0.65 + (colInput.length / colClient.length) * 0.25);
-  if (colInput.includes(colClient) && colClient.length >= 4)
-    best = Math.max(best, 0.65 + (colClient.length / colInput.length) * 0.25);
-
-  // S6: Skeleton containment
-  if (skClient.includes(skInput) && skInput.length >= 4) best = Math.max(best, 0.82);
-
-  // S7: N-gram on collapsed phonetic forms
-  const phColInput  = phInput.replace(/\s/g, '');
-  const phColClient = phClient.replace(/\s/g, '');
-  if (phColInput.length >= 4 && phColClient.length >= 4)
-    best = Math.max(best, ngramSimilarity(phColInput, phColClient, 3) * 0.88);
-
-  // S8: Alternatives (strip legal prefix)
+  // 5. Alternatives without legal prefixes (Ste, Sarl, ETS...)
   for (const alt of generateAlternatives(clientName)) {
-    if (alt === normInput) { best = 1.0; break; }
+    if (alt === normInput) { best = Math.max(best, 1.0); break; }
     const altPh = toCanonicalPhonetic(alt);
     if (altPh === phInput && altPh.length >= 3) { best = Math.max(best, 0.96); break; }
     const altTokens = alt.split(' ').filter(t => t.length >= 2);
-    if (altTokens.length > 0 && qTokens.length > 0)
-      best = Math.max(best, tokenMatchScore(qTokens, altTokens) * 0.95);
+    if (altTokens.length > 0 && qTokens.length > 0) {
+      const altTokScore = tokenMatchScore(qTokens, altTokens);
+      best = Math.max(best, altTokScore * 0.95);
+    }
   }
 
   return best;
