@@ -186,22 +186,42 @@ function checkLearningMap(spokenText: string, clientNames: string[]): string | n
     const map = getLearningMap();
     const normalizedInput = normalizeForMatching(spokenText);
     const learned = map[normalizedInput];
-    if (learned && clientNames.includes(learned)) return learned;
+
+    if (learned && clientNames.includes(learned)) {
+      // Validate that the learned mapping is plausibly related (score > 0)
+      // If score is 0, it means it's a corrupted/accidental cache entry (e.g., missaoui -> 369 EMBALLAGE)
+      const score = computeMatchScore(spokenText, learned);
+      if (score > 0) {
+        return learned;
+      } else {
+        // Automatically purge corrupted cache entry!
+        delete map[normalizedInput];
+        localStorage.setItem(LEARNING_STORAGE_KEY, JSON.stringify(map));
+      }
+    }
+
     // Fuzzy check on learned keys
     for (const [learnedInput, clientName] of Object.entries(map)) {
       if (!clientNames.includes(clientName)) continue;
       const maxLen = Math.max(normalizedInput.length, learnedInput.length);
       if (maxLen > 0 && (1 - levenshteinDistance(normalizedInput, learnedInput) / maxLen) >= 0.92) {
-        return clientName;
+        const score = computeMatchScore(spokenText, clientName);
+        if (score > 0) return clientName;
       }
     }
     return null;
   } catch { return null; }
 }
 
-// Export so UI can record user corrections
+// Export so UI or user can record user corrections & clear cache
 export function recordVoiceCorrection(spokenText: string, correctClientName: string): void {
   saveLearningCorrection(spokenText, correctClientName);
+}
+
+export function clearVoiceLearningCache(): void {
+  try {
+    localStorage.removeItem(LEARNING_STORAGE_KEY);
+  } catch {}
 }
 
 // ===== STOP WORDS =====
@@ -508,26 +528,26 @@ function computeMatchScore(spokenText: string, clientName: string): number {
 
 /**
  * Find best matching client. Checks self-learning first.
+ * Returns isLearned=true if the result comes from a previously confirmed correction.
  */
 function findBestClientMatchSmart(
   spokenText: string,
   clientNames: string[]
-): { name: string; score: number } | null {
+): { name: string; score: number; isLearned: boolean } | null {
   if (!spokenText?.trim()) return null;
 
   const learned = checkLearningMap(spokenText, clientNames);
-  if (learned) return { name: learned, score: 1.0 };
+  if (learned) return { name: learned, score: 1.0, isLearned: true };
 
-  let bestMatch: { name: string; score: number } | null = null;
+  let bestMatch: { name: string; score: number; isLearned: boolean } | null = null;
   let bestScore = 0;
 
   for (const name of clientNames) {
     const score = computeMatchScore(spokenText, name);
-    if (score > bestScore) { bestScore = score; bestMatch = { name, score }; }
+    if (score > bestScore) { bestScore = score; bestMatch = { name, score, isLearned: false }; }
   }
 
-  // Threshold 0.55 — more permissive to catch partial names ("missaoui")
-  return bestMatch && bestScore >= 0.55 ? bestMatch : null;
+  return bestMatch && bestScore >= 0.40 ? bestMatch : null;
 }
 
 /**
@@ -660,26 +680,22 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
     setVoiceState('processing');
     setListeningFeedback(`Recherche: "${spokenText}"...`);
     
-    // Try all alternatives from speech recognition
     const bestMatch = findBestClientMatchSmart(spokenText, clientNames);
     
-    if (bestMatch && bestMatch.score >= 0.88) {
-      // High confidence match - show client directly
+    // Direct open ONLY if the result comes from a LEARNED (confirmed) correction AND score >= 0.95
+    // Otherwise: always show suggestions so the user can confirm and teach the assistant
+    if (bestMatch && bestMatch.isLearned && bestMatch.score >= 0.95) {
       setMatchedClient(bestMatch.name);
       setMatchSuggestions([]);
       setListeningFeedback(`✅ Client trouvé: ${bestMatch.name}`);
       setVoiceState('idle');
-      
-      // Auto-close listening overlay after a short delay
-      setTimeout(() => {
-        setIsDirectListening(false);
-      }, 500);
+      setTimeout(() => setIsDirectListening(false), 500);
     } else {
-      // Low confidence - show suggestions
+      // Always show suggestions — user click = learns for next time
       const suggestions = findTopClientMatches(spokenText, clientNames, 5);
       if (suggestions.length > 0) {
         setMatchSuggestions(suggestions);
-        setListeningFeedback(`🔍 Suggestions pour "${spokenText}"`);
+        setListeningFeedback(`🔍 Suggestions pour "${spokenText}" — cliquez pour confirmer`);
       } else {
         setListeningFeedback(`❌ Aucun client trouvé pour "${spokenText}"`);
       }
@@ -921,6 +937,11 @@ export function VoiceAssistant({ debts, analysis, userRole, onShowResults, onCli
     } else {
       startDirectListening();
     }
+  };
+
+  // Save a user-confirmed voice correction for future auto-match
+  const recordVoiceCorrection = (spokenText: string, correctClientName: string) => {
+    saveLearningCorrection(spokenText, correctClientName);
   };
 
   // Handle suggestion click & learn correction
